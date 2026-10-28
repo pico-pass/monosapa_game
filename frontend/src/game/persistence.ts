@@ -31,6 +31,9 @@ export function createInitialState(now: number, reducedMotion = false): GameStat
     recoveryPenaltyUntil: 0,
     recoveryReentryRequired: false,
     equipment: { mic: 0, studio: 0, promotion: 0 },
+    darkEquipment: { mic: 0, studio: 0, promotion: 0 },
+    musicPower: 0,
+    dripPower: 0,
     singles: [],
     albums: [],
     concerts,
@@ -117,6 +120,22 @@ export function validateState(input: unknown): Validation {
       promotion: int(equipmentRaw, 'promotion', 0, maxLv, 'equipment.promotion'),
     };
 
+    // 어둠속성 장비·두 클릭 업그레이드는 나중에 추가된 필드라, 없는 예전 저장은 0레벨로 읽는다.
+    // (클릭 업그레이드는 최대 레벨이 없지만 코인 상한 안에서는 100레벨도 못 간다.)
+    let darkEquipment = { mic: 0, studio: 0, promotion: 0 };
+    if (o.darkEquipment !== undefined) {
+      const darkRaw = o.darkEquipment;
+      if (!isObj(darkRaw)) return bad('darkEquipment가 올바르지 않습니다.');
+      const darkMaxLv = BALANCE.darkEquipment.maxLevel;
+      darkEquipment = {
+        mic: int(darkRaw, 'mic', 0, darkMaxLv, 'darkEquipment.mic'),
+        studio: int(darkRaw, 'studio', 0, darkMaxLv, 'darkEquipment.studio'),
+        promotion: int(darkRaw, 'promotion', 0, darkMaxLv, 'darkEquipment.promotion'),
+      };
+    }
+    const musicPower = o.musicPower === undefined ? 0 : int(o, 'musicPower', 0, 1000, 'musicPower');
+    const dripPower = o.dripPower === undefined ? 0 : int(o, 'dripPower', 0, 1000, 'dripPower');
+
     if (!Array.isArray(o.singles) || o.singles.length > BALANCE.maxSingles) return bad('singles 목록이 올바르지 않습니다.');
     const singleIds = new Set<string>();
     const singles = o.singles.map((x, i) => {
@@ -185,6 +204,9 @@ export function validateState(input: unknown): Validation {
       recoveryPenaltyUntil: num(o, 'recoveryPenaltyUntil', 0, MAX_TIME),
       recoveryReentryRequired: bool(o, 'recoveryReentryRequired'),
       equipment,
+      darkEquipment,
+      musicPower,
+      dripPower,
       singles,
       albums,
       concerts,

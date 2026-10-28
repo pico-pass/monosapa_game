@@ -70,6 +70,40 @@ describe('저장·검증', () => {
     }
   });
 
+  it('순수 음악력: 왕복 저장되고, 이 필드가 없는 예전 저장은 0레벨로 읽는다', () => {
+    const st = memoryStorage();
+    saveGame(st, { ...sampleState(), musicPower: 7 }, T0 + 10);
+    const loaded = loadGame(st);
+    expect(loaded.status === 'ok' && loaded.state.musicPower).toBe(7);
+
+    const { musicPower: _omit, ...legacy } = sampleState();
+    const old = validateState(legacy);
+    expect(old.ok && old.state.musicPower).toBe(0);
+
+    expect(validateState({ ...sampleState(), musicPower: -1 }).ok).toBe(false);
+    expect(validateState({ ...sampleState(), musicPower: 1.5 }).ok).toBe(false);
+    expect(validateState({ ...sampleState(), musicPower: 'many' }).ok).toBe(false);
+    expect(validateState({ ...sampleState(), musicPower: 1001 }).ok).toBe(false);
+  });
+
+  it('어둠속성 장비·음지 드립력: 왕복 저장되고, 없는 예전 저장은 0레벨로 읽는다', () => {
+    const st = memoryStorage();
+    saveGame(st, { ...sampleState(), darkEquipment: { mic: 3, studio: 2, promotion: 1 }, dripPower: 4 }, T0 + 10);
+    const loaded = loadGame(st);
+    expect(loaded.status === 'ok' && loaded.state.darkEquipment).toEqual({ mic: 3, studio: 2, promotion: 1 });
+    expect(loaded.status === 'ok' && loaded.state.dripPower).toBe(4);
+
+    const { darkEquipment: _d, dripPower: _p, ...legacy } = sampleState();
+    const old = validateState(legacy);
+    expect(old.ok && old.state.darkEquipment).toEqual({ mic: 0, studio: 0, promotion: 0 });
+    expect(old.ok && old.state.dripPower).toBe(0);
+
+    expect(validateState({ ...sampleState(), darkEquipment: { mic: 21, studio: 0, promotion: 0 } }).ok).toBe(false);
+    expect(validateState({ ...sampleState(), darkEquipment: { mic: 1.5, studio: 0, promotion: 0 } }).ok).toBe(false);
+    expect(validateState({ ...sampleState(), darkEquipment: 'x' }).ok).toBe(false);
+    expect(validateState({ ...sampleState(), dripPower: -1 }).ok).toBe(false);
+  });
+
   it('10) 손상 JSON·이전/미래 스키마·음수·무한 수치를 거부한다', () => {
     expect(parseSave('{not json').ok).toBe(false);
     expect(parseSave('[]').ok).toBe(false);

@@ -4,10 +4,12 @@ import { Modal } from './components/Modal';
 import { PersonaBadge } from './components/parts';
 import { fmt, fmtDuration, fmtHave, fmtRate } from './components/format';
 import { BALANCE } from './game/balance';
-import { PERSONA_TEXT, STAGE_TEXT } from './game/content';
+import { CLICK_POWER_TEXT, PERSONA_TEXT, STAGE_TEXT } from './game/content';
 import {
   albumRoyaltyBonus,
   albumRoyaltyOf,
+  clickGain,
+  clickPowerOf,
   playerLevel,
   productionMultiplier,
   rhymeRate,
@@ -270,29 +272,40 @@ function OfflineModal() {
 
 function BasisModal() {
   const { game: g } = useUi();
-  const P = productionMultiplier(g);
+  const Pn = productionMultiplier(g, 'normal');
+  const Pd = productionMultiplier(g, 'dark');
+  const persona = g.activePersona;
   const roy = royaltyBreakdown(g);
   const lv = playerLevel(g.fans);
   const nextFans = BALANCE.level.fansPerStep * lv * lv;
   return (
     <Modal title="계산 근거" onClose={() => setBasisOpen(false)}>
       <dl className="basis">
-        <dt>생산배율 P</dt>
+        <dt>일반속성 생산배율</dt>
         <dd>
-          1 + 0.15×마이크 {g.equipment.mic} + 0.10×작업실 {g.equipment.studio} = <b>{P.toFixed(2)}</b>
+          1 + 0.15×마이크 {g.equipment.mic} + 0.05×작업실 {g.equipment.studio} = <b>{Pn.toFixed(2)}</b>
+        </dd>
+        <dt>어둠속성 생산배율</dt>
+        <dd>
+          1 + 0.15×마이크 {g.darkEquipment.mic} + 0.05×작업실 {g.darkEquipment.studio} = <b>{Pd.toFixed(2)}</b>
+        </dd>
+        <dt>작업하기 1회 라임 ({PERSONA_TEXT[persona].short})</dt>
+        <dd>
+          (1 + {CLICK_POWER_TEXT[persona].name} {clickPowerOf(g, persona)}) × {persona === 'normal' ? '일반' : '어둠'} 생산배율 ={' '}
+          <b>{fmtRate(clickGain(g))}</b>
         </dd>
         <dt>일반 라임/초</dt>
         <dd>
-          1.0 × P = <b>{fmtRate(rhymeRate(g, 'normal'))}</b> (마이크 압수 직후 20초는 50%)
+          1.0 × 일반 생산배율 = <b>{fmtRate(rhymeRate(g, 'normal'))}</b> (마이크 압수 직후 20초는 50%)
         </dd>
         <dt>어둠 라임/초</dt>
         <dd>
-          {g.heat < BALANCE.persona.hotThreshold ? '1.7' : '2.1'} × P = <b>{fmtRate(rhymeRate(g, 'dark'))}</b> (과열 80 이상이면 2.1)
+          {g.heat < BALANCE.persona.hotThreshold ? '1.7' : '2.1'} × 어둠 생산배율 = <b>{fmtRate(rhymeRate(g, 'dark'))}</b> (과열 80 이상이면 2.1)
         </dd>
         <dt>인세 코인/초</dt>
         <dd>
-          팬 {fmtHave(roy.fans)} × 0.02 × 홍보 {roy.promotionMult.toFixed(2)} × 앨범 {roy.albumMult.toFixed(2)} × 자아 {roy.personaMult} ={' '}
-          <b>{fmtRate(roy.perSec)}</b> ({PERSONA_TEXT[g.activePersona].short})
+          팬 {fmtHave(roy.fans)} × 0.02 × 홍보({PERSONA_TEXT[persona].short}) {roy.promotionMult.toFixed(2)} × 앨범 {roy.albumMult.toFixed(2)} × 자아 {roy.personaMult} ={' '}
+          <b>{fmtRate(roy.perSec)}</b> ({PERSONA_TEXT[persona].short})
         </dd>
         <dt>레벨</dt>
         <dd>

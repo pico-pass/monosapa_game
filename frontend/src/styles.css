@@ -679,12 +679,14 @@ button {
 
 .rate-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 .rate-row > div {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
   padding: 8px 10px;
   border-radius: 12px;
   background: var(--panel);

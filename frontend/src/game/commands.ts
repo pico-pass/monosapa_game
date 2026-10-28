@@ -2,10 +2,14 @@ import { BALANCE, STAGES, manualGameOf, type ManualGame } from './balance';
 import { pickComments, type AlbumDef } from './content';
 import {
   clampResource,
+  clickGain,
+  clickPowerOf,
   equipmentCost,
+  equipmentDef,
+  equipmentOf,
+  musicPowerCost,
   previewAlbum,
   previewSingle,
-  productionMultiplier,
   rhymesOf,
   stageDifficulty,
   stageStatus,
@@ -40,7 +44,7 @@ const withFlag = (s: GameState, flag: string): GameState =>
 
 /** 입력 상한 검사는 InputLimiter가 맡고, 여기서는 인정된 입력 1회의 효과만 계산한다. */
 export function work(state: GameState): CommandResult<{ gained: number }> {
-  const gained = BALANCE.click.value * productionMultiplier(state);
+  const gained = clickGain(state);
   const key = state.activePersona === 'normal' ? 'normalRhymes' : 'darkRhymes';
   const next = withFlag({ ...state, [key]: clampResource(state[key] + gained) }, 'work');
   return { ok: true, state: next, gained };
@@ -115,16 +119,29 @@ export function releaseSingle(state: GameState): CommandResult<ReleaseInfo> {
 
 /* ---------- 장비 ---------- */
 
-export function buyEquipment(state: GameState, kind: EquipmentKind): CommandResult<{ cost: number; level: number }> {
-  const level = state.equipment[kind];
-  if (level >= BALANCE.equipment.maxLevel) return fail(state, 'max_level');
-  const cost = equipmentCost(kind, level);
+export function buyEquipment(
+  state: GameState,
+  kind: EquipmentKind,
+  persona: Persona = 'normal',
+): CommandResult<{ cost: number; level: number }> {
+  const level = equipmentOf(state, persona)[kind];
+  if (level >= equipmentDef(persona).maxLevel) return fail(state, 'max_level');
+  const cost = equipmentCost(kind, level, persona);
   if (state.coins < cost) return fail(state, 'insufficient_coins');
-  const next = withFlag(
-    { ...state, coins: state.coins - cost, equipment: { ...state.equipment, [kind]: level + 1 } },
-    'buy',
-  );
+  const key = persona === 'normal' ? 'equipment' : 'darkEquipment';
+  const next = withFlag({ ...state, coins: state.coins - cost, [key]: { ...state[key], [kind]: level + 1 } }, 'buy');
   return { ok: true, state: next, cost, level: level + 1 };
+}
+
+/* ---------- 클릭 업그레이드 (일반: 순수 음악력, 어둠: 음지 드립력) ---------- */
+
+/** 코인으로 그 속성의 클릭 업그레이드를 1레벨 올린다. 최대 레벨은 없다(코인이 모자라면 실패). */
+export function buyMusicPower(state: GameState, persona: Persona = 'normal'): CommandResult<{ cost: number; level: number }> {
+  const level = clickPowerOf(state, persona);
+  const cost = musicPowerCost(level, persona);
+  if (!Number.isFinite(cost) || state.coins < cost) return fail(state, 'insufficient_coins');
+  const key = persona === 'normal' ? 'musicPower' : 'dripPower';
+  return { ok: true, state: { ...state, coins: state.coins - cost, [key]: level + 1 }, cost, level: level + 1 };
 }
 
 /* ---------- 앨범 ---------- */

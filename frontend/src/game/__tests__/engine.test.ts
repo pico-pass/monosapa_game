@@ -90,23 +90,48 @@ describe('기획서 14장 검증 1~3: 자동 생산·과열 구간', () => {
     expect(r.state.normalRhymes).toBeCloseTo(100, 6);
   });
 
-  it('장비 배율: P = 1 + 0.15×마이크 + 0.10×작업실', () => {
-    const s = base({ equipment: { mic: 4, studio: 3, promotion: 0 } });
-    expect(productionMultiplier(s)).toBeCloseTo(1.9, 9);
-    expect(rhymeRate(s, 'normal')).toBeCloseTo(1.9, 9);
-    expect(rhymeRate({ ...s, heat: 10 }, 'dark')).toBeCloseTo(1.7 * 1.9, 9);
-    expect(rhymeRate({ ...s, heat: 85 }, 'dark')).toBeCloseTo(2.1 * 1.9, 9);
+  it('장비 배율: P = 1 + 0.15×마이크 + 0.05×작업실, 속성마다 자기 장비만 쓴다', () => {
+    const s = base({ equipment: { mic: 4, studio: 3, promotion: 0 }, darkEquipment: { mic: 2, studio: 0, promotion: 0 } });
+    expect(productionMultiplier(s, 'normal')).toBeCloseTo(1.75, 9);
+    expect(productionMultiplier(s, 'dark')).toBeCloseTo(1.3, 9);
+    expect(rhymeRate(s, 'normal')).toBeCloseTo(1.75, 9);
+    // 어둠 생산은 어둠속성 장비만 곱한다 (일반 장비는 무관)
+    expect(rhymeRate({ ...s, heat: 10 }, 'dark')).toBeCloseTo(1.7 * 1.3, 9);
+    expect(rhymeRate({ ...s, heat: 85 }, 'dark')).toBeCloseTo(2.1 * 1.3, 9);
+  });
+
+  it('일반 장비는 일반속성에서만, 어둠 장비는 어둠속성에서만 적용된다 (자동 생산·인세 정산)', () => {
+    const bare = base({ fans: 100 });
+    const normalGear = { ...bare, equipment: { mic: 4, studio: 3, promotion: 5 } };
+    const darkGear = { ...bare, darkEquipment: { mic: 4, studio: 3, promotion: 5 } };
+    const run = (s: GameState, persona: 'normal' | 'dark') => advance({ ...s, activePersona: persona }, sec(20)).state;
+
+    // 일반 장비: 일반에서는 배율(P=1.75)·홍보(×2), 어둠에서는 아무 효과 없음
+    expect(run(normalGear, 'normal').normalRhymes).toBeCloseTo(run(bare, 'normal').normalRhymes * 1.75, 9);
+    expect(run(normalGear, 'normal').coins).toBeCloseTo(run(bare, 'normal').coins * 2, 9);
+    expect(run(normalGear, 'dark').darkRhymes).toBeCloseTo(run(bare, 'dark').darkRhymes, 9);
+    expect(run(normalGear, 'dark').coins).toBeCloseTo(run(bare, 'dark').coins, 9);
+
+    // 어둠 장비: 어둠에서는 배율·홍보가 적용되고, 일반에서는 아무 효과 없음
+    expect(run(darkGear, 'dark').darkRhymes).toBeCloseTo(run(bare, 'dark').darkRhymes * 1.75, 9);
+    expect(run(darkGear, 'dark').coins).toBeCloseTo(run(bare, 'dark').coins * 2, 9);
+    expect(run(darkGear, 'normal').normalRhymes).toBeCloseTo(run(bare, 'normal').normalRhymes, 9);
+    expect(run(darkGear, 'normal').coins).toBeCloseTo(run(bare, 'normal').coins, 9);
   });
 
   it('인세 공식과 자아 배율', () => {
     const s = base({ fans: 100, albums: [{ id: 'a', title: 't', type: 'normal', releasedAt: 0 }] });
-    const withPromo = { ...s, equipment: { mic: 0, studio: 0, promotion: 5 } };
+    const withPromo = { ...s, equipment: { mic: 0, studio: 0, promotion: 5 }, darkEquipment: { mic: 0, studio: 0, promotion: 0 } };
     // 앨범 3장: 인세 배율 +8% → +10% → +12%가 누적(1.08, 1.18, 1.30)
     const alb = (n: number) => ({ ...withPromo, albums: Array.from({ length: n }, (_, i) => ({ id: `a${i}`, title: 't', type: 'normal' as const, releasedAt: 0 })) });
-    expect(royaltyRate(alb(2), 'dark')).toBeCloseTo(100 * 0.02 * 2 * 1.18, 9);
-    expect(royaltyRate(alb(3), 'dark')).toBeCloseTo(100 * 0.02 * 2 * 1.3, 9);
-    expect(royaltyRate(withPromo, 'dark')).toBeCloseTo(100 * 0.02 * 2 * 1.08, 9);
+    // 일반 홍보(×2)는 어둠 인세에 곱해지지 않는다. 어둠 인세에는 어둠 홍보만 곱해진다.
+    expect(royaltyRate(alb(2), 'dark')).toBeCloseTo(100 * 0.02 * 1.18, 9);
+    expect(royaltyRate(alb(3), 'dark')).toBeCloseTo(100 * 0.02 * 1.3, 9);
+    expect(royaltyRate(withPromo, 'dark')).toBeCloseTo(100 * 0.02 * 1.08, 9);
     expect(royaltyRate(withPromo, 'normal')).toBeCloseTo(100 * 0.02 * 2 * 1.08 * 1.25, 9);
+    const darkPromo = { ...withPromo, darkEquipment: { mic: 0, studio: 0, promotion: 10 } };
+    expect(royaltyRate(darkPromo, 'dark')).toBeCloseTo(100 * 0.02 * 3 * 1.08, 9);
+    expect(royaltyRate(darkPromo, 'normal')).toBeCloseTo(100 * 0.02 * 2 * 1.08 * 1.25, 9);
     expect(playerLevel(0)).toBe(1);
     expect(playerLevel(20)).toBe(2);
     expect(playerLevel(80)).toBe(3);

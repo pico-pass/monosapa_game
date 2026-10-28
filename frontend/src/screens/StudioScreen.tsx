@@ -3,8 +3,10 @@ import { StudioScene, type Mood } from '../components/StudioScene';
 import { HeatGauge, PersonaBadge, WorkPad } from '../components/parts';
 import { fmtHave, fmtRate } from '../components/format';
 import { BALANCE } from '../game/balance';
-import { PERSONA_TEXT } from '../game/content';
+import { CLICK_POWER_TEXT, PERSONA_TEXT } from '../game/content';
 import {
+  clickGain,
+  clickPowerOf,
   currentHint,
   isPenaltyActive,
   previewSingle,
@@ -106,6 +108,11 @@ export function StudioScreen() {
           <span className="rate-label">초당 라임</span>
           <strong>{fmtRate(rhymeRate(g))}</strong>
           <small>{persona === 'normal' ? '일반' : '어둠'} · 자동</small>
+        </div>
+        <div>
+          <span className="rate-label">작업 당 라임</span>
+          <strong>{fmtRate(clickGain(g))}</strong>
+          <small>{CLICK_POWER_TEXT[persona].short} Lv.{clickPowerOf(g, persona)}</small>
         </div>
         <div>
           <span className="rate-label">초당 인세</span>

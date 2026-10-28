@@ -417,9 +417,15 @@ export const STAGE_TEXT: Record<StageId, { name: string; blurb: string }> = {
 
 export const EQUIPMENT_TEXT = {
   mic: { name: '마이크', effect: '생산배율 +0.15 / 레벨', icon: '🎤' },
-  studio: { name: '작업실', effect: '생산배율 +0.10 / 레벨 · 5레벨마다 방이 바뀐다', icon: '🏠' },
+  studio: { name: '작업실', effect: '생산배율 +0.05 / 레벨 · 5레벨마다 방이 바뀐다', icon: '🏠' },
   promotion: { name: '홍보', effect: '인세 배율 계수 +0.20 / 레벨', icon: '📣' },
 } as const;
+
+/** 클릭 업그레이드 카드 문구. 장비와 달리 최대 레벨이 없다. 일반속성은 순수 음악력, 어둠속성은 음지 드립력이다. */
+export const CLICK_POWER_TEXT: Record<Persona, { name: string; short: string; effect: string; icon: string }> = {
+  normal: { name: '순수 음악력', short: '음악력', effect: '작업하기 한 번에 얻는 기본 라임 +1 / 레벨 (생산배율이 곱해져요)', icon: '🎼' },
+  dark: { name: '음지 드립력', short: '드립력', effect: '작업하기 한 번에 얻는 기본 라임 +1 / 레벨 (생산배율이 곱해져요)', icon: '🕶️' },
+};
 
 export const PERSONA_TEXT: Record<Persona, { name: string; short: string; poster: string; sub: string }> = {
   normal: { name: '일반속성모노사파', short: '일반', poster: '오늘도 작업중', sub: 'MONO SAPA · 새벽 라이브' },

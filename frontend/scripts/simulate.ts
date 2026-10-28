@@ -33,7 +33,7 @@ for (const sc of scenarios) {
   console.log(
     ' '.repeat(22),
     `전환 ${m.switches}회, 압수 ${m.seizures}회, 어둠 체류 ${Math.round((m.darkSeconds / Math.max(1, m.tourDone ?? 21600)) * 100)}%,`,
-    `싱글 ${end.singles.length}곡, 앨범 ${end.albums.length}장, 장비 ${end.equipment.mic}/${end.equipment.studio}/${end.equipment.promotion},`,
+    `싱글 ${end.singles.length}곡, 앨범 ${end.albums.length}장, 장비 일반 ${end.equipment.mic}/${end.equipment.studio}/${end.equipment.promotion}·어둠 ${end.darkEquipment.mic}/${end.darkEquipment.studio}/${end.darkEquipment.promotion},`,
     `구매 간격 평균(앞 40회) ${avgGap}초`,
   );
 }

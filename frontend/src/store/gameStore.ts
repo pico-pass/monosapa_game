@@ -6,6 +6,7 @@ import {
   abandonConcert as abandonRun,
   beginManualConcert,
   buyEquipment,
+  buyMusicPower,
   finishManualConcert,
   releaseAlbum,
   releaseSingle,
@@ -459,8 +460,17 @@ export function doRelease(): void {
   saveNow();
 }
 
-export function doBuy(kind: EquipmentKind): void {
-  const r = exec((s) => buyEquipment(s, kind));
+export function doBuy(kind: EquipmentKind, persona: Persona = 'normal'): void {
+  const r = exec((s) => buyEquipment(s, kind, persona));
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  say('buy', true);
+  sfx.buy();
+  saveNow();
+}
+
+export function doBuyMusicPower(persona: Persona = 'normal'): void {
+  const r = exec((s) => buyMusicPower(s, persona));
   if (!r) return;
   if (!r.ok) return failToast(r.reason);
   say('buy', true);

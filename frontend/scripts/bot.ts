@@ -1,6 +1,6 @@
 /**
  * 시뮬레이션 봇. 게임 엔진·명령을 그대로 호출하며 1초 단위로 플레이한다.
- * 정책: 발매 가능하면 즉시 발매, 앨범·장비 중 가장 싼 것부터 구매, 공연은 자동 공연.
+ * 정책: 발매 가능하면 즉시 발매, 앨범·장비 중 가장 싼 것부터 구매(어둠을 쓰는 전략은 어둠 장비도), 공연은 자동 공연.
  */
 import { STAGES, TOUR_STAGE } from '../src/game/balance';
 import {
@@ -14,6 +14,7 @@ import {
 import { createInitialState } from '../src/game/persistence';
 import {
   equipmentCost,
+  equipmentOf,
   previewSingle,
   previewAlbum,
   rhymesOf,
@@ -118,15 +119,19 @@ export function run(sc: Scenario): { m: Milestones; end: GameState } {
           },
         });
       }
-      for (const k of EQUIP) {
-        if (s.equipment[k] < 20) {
-          options.push({
-            cost: equipmentCost(k, s.equipment[k]),
-            buy: () => {
-              const b = buyEquipment(s, k);
-              return b.ok ? b.state : null;
-            },
-          });
+      // 일반 장비는 항상, 어둠속성을 쓰는 전략이면 어둠 장비도 후보에 넣는다. (가장 싼 것부터 산다)
+      for (const persona of sc.strategy === 'normal' ? (['normal'] as const) : (['normal', 'dark'] as const)) {
+        const owned = equipmentOf(s, persona);
+        for (const k of EQUIP) {
+          if (owned[k] < 20) {
+            options.push({
+              cost: equipmentCost(k, owned[k], persona),
+              buy: () => {
+                const b = buyEquipment(s, k, persona);
+                return b.ok ? b.state : null;
+              },
+            });
+          }
         }
       }
       options.sort((a, b) => a.cost - b.cost);

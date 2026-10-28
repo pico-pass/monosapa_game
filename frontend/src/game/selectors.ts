@@ -1,6 +1,6 @@
 import { BALANCE, STAGES, TOUR_STAGE } from './balance';
 import { ALBUM_CATALOG, singleTitle, type AlbumDef } from './content';
-import type { EquipmentKind, GameState, Persona, StageId } from './types';
+import type { Equipment, EquipmentKind, GameState, Persona, StageId } from './types';
 
 const P = BALANCE.persona;
 
@@ -11,11 +11,35 @@ export function clampResource(n: number): number {
 
 /* ---------- 파생 값: 원본 데이터에서만 계산한다 ---------- */
 
-export function productionMultiplier(s: Pick<GameState, 'equipment'>): number {
-  return (
-    1 + BALANCE.production.micPerLevel * s.equipment.mic + BALANCE.production.studioPerLevel * s.equipment.studio
-  );
+/* 장비는 속성마다 따로 있다. 일반속성은 equipment·musicPower, 어둠속성은 darkEquipment·dripPower를 쓰고
+ * 각각 자기 속성에서만 효과가 난다. */
+
+export const equipmentOf = (s: Pick<GameState, 'equipment' | 'darkEquipment'>, persona: Persona): Equipment =>
+  persona === 'normal' ? s.equipment : s.darkEquipment;
+
+/** 그 속성의 클릭 업그레이드 레벨 (일반: 순수 음악력, 어둠: 음지 드립력) */
+export const clickPowerOf = (s: Pick<GameState, 'musicPower' | 'dripPower'>, persona: Persona): number =>
+  persona === 'normal' ? s.musicPower : s.dripPower;
+
+export const equipmentDef = (persona: Persona) => (persona === 'normal' ? BALANCE.equipment : BALANCE.darkEquipment);
+const clickDef = (persona: Persona) => (persona === 'normal' ? BALANCE.musicPower : BALANCE.dripPower);
+
+/** 그 속성 장비(마이크·작업실)가 주는 생산배율 */
+export function productionMultiplier(s: Pick<GameState, 'equipment' | 'darkEquipment'>, persona: Persona): number {
+  const e = equipmentOf(s, persona);
+  return 1 + BALANCE.production.micPerLevel * e.mic + BALANCE.production.studioPerLevel * e.studio;
 }
+
+type ClickState = Pick<GameState, 'equipment' | 'darkEquipment' | 'musicPower' | 'dripPower' | 'activePersona'>;
+
+/** 작업하기 한 번에 얻는 기본 라임(생산배율 곱하기 전). 그 속성의 클릭 업그레이드 레벨당 늘어난다. */
+export function clickValue(s: ClickState, persona: Persona = s.activePersona): number {
+  return BALANCE.click.value + clickDef(persona).clickPerLevel * clickPowerOf(s, persona);
+}
+
+/** 작업하기 한 번에 실제로 얻는 라임 = 기본 라임 × 그 속성의 생산배율 */
+export const clickGain = (s: ClickState, persona: Persona = s.activePersona): number =>
+  clickValue(s, persona) * productionMultiplier(s, persona);
 
 export function playerLevel(fans: number): number {
   return 1 + Math.floor(Math.sqrt(fans / BALANCE.level.fansPerStep));
@@ -30,7 +54,7 @@ export function isPenaltyActive(s: GameState, at: number = s.lastSettledAt): boo
 
 /** 현재(혹은 at 시점) 상태에서의 라임 초당 생산량. 효율(오프라인)은 곱하지 않는다. */
 export function rhymeRate(s: GameState, persona: Persona = s.activePersona, at: number = s.lastSettledAt): number {
-  const mult = productionMultiplier(s);
+  const mult = productionMultiplier(s, persona);
   if (persona === 'normal') {
     return P.normalRate * mult * (isPenaltyActive(s, at) ? P.recoveryPenalty : 1);
   }
@@ -46,7 +70,7 @@ export interface RoyaltyBreakdown {
 }
 
 export function royaltyBreakdown(s: GameState, persona: Persona = s.activePersona): RoyaltyBreakdown {
-  const promotionMult = 1 + BALANCE.royalty.promotionPerLevel * s.equipment.promotion;
+  const promotionMult = 1 + BALANCE.royalty.promotionPerLevel * equipmentOf(s, persona).promotion;
   const albumMult = 1 + albumRoyaltyBonus(s.albums.length);
   const personaMult = persona === 'normal' ? P.normalRoyaltyMult : P.darkRoyaltyMult;
   return {
@@ -145,61 +169,101 @@ export function previewAlbum(s: GameState): AlbumPreview | null {
 
 /* ---------- 장비 ---------- */
 
-export function equipmentCost(kind: EquipmentKind, level: number): number {
-  const def = BALANCE.equipment[kind];
+export function equipmentCost(kind: EquipmentKind, level: number, persona: Persona = 'normal'): number {
+  const def = equipmentDef(persona)[kind];
   return Math.ceil(def.base * def.growth ** level);
 }
 
 export interface EquipmentPreview {
   kind: EquipmentKind;
+  persona: Persona;
   level: number;
   maxed: boolean;
   cost: number;
   /** 구매 전/후 표시 값 (생산배율 또는 인세 배율 계수) */
   before: number;
   after: number;
-  /** 현재 자아 기준 초당 생산 또는 수입의 전/후 */
+  /** 그 속성 기준 초당 생산 또는 수입의 전/후 */
   rateBefore: number;
   rateAfter: number;
   rateLabel: '라임/초' | '코인/초';
 }
 
-export function previewEquipment(s: GameState, kind: EquipmentKind): EquipmentPreview {
-  const level = s.equipment[kind];
-  const maxed = level >= BALANCE.equipment.maxLevel;
-  const next: GameState = {
-    ...s,
-    equipment: { ...s.equipment, [kind]: Math.min(level + 1, BALANCE.equipment.maxLevel) },
-  };
+/** 그 속성 장비 한 종류를 한 레벨 올린 상태 */
+function withEquipmentLevel(s: GameState, persona: Persona, kind: EquipmentKind, level: number): GameState {
+  return persona === 'normal'
+    ? { ...s, equipment: { ...s.equipment, [kind]: level } }
+    : { ...s, darkEquipment: { ...s.darkEquipment, [kind]: level } };
+}
+
+export function previewEquipment(s: GameState, kind: EquipmentKind, persona: Persona = 'normal'): EquipmentPreview {
+  const level = equipmentOf(s, persona)[kind];
+  const maxLevel = equipmentDef(persona).maxLevel;
+  const maxed = level >= maxLevel;
+  const next = withEquipmentLevel(s, persona, kind, Math.min(level + 1, maxLevel));
   if (kind === 'promotion') {
     return {
       kind,
+      persona,
       level,
       maxed,
-      cost: equipmentCost(kind, level),
+      cost: equipmentCost(kind, level, persona),
       before: 1 + BALANCE.royalty.promotionPerLevel * level,
-      after: 1 + BALANCE.royalty.promotionPerLevel * next.equipment.promotion,
-      rateBefore: royaltyRate(s),
-      rateAfter: royaltyRate(next),
+      after: 1 + BALANCE.royalty.promotionPerLevel * equipmentOf(next, persona).promotion,
+      rateBefore: royaltyRate(s, persona),
+      rateAfter: royaltyRate(next, persona),
       rateLabel: '코인/초',
     };
   }
   return {
     kind,
+    persona,
     level,
     maxed,
-    cost: equipmentCost(kind, level),
-    before: productionMultiplier(s),
-    after: productionMultiplier(next),
-    rateBefore: rhymeRate(s),
-    rateAfter: rhymeRate(next),
+    cost: equipmentCost(kind, level, persona),
+    before: productionMultiplier(s, persona),
+    after: productionMultiplier(next, persona),
+    rateBefore: rhymeRate(s, persona),
+    rateAfter: rhymeRate(next, persona),
     rateLabel: '라임/초',
   };
 }
 
-/** 작업실 외형 단계: 작업실 레벨 5마다 한 단계. */
-export function roomTier(s: Pick<GameState, 'equipment'>): number {
-  return Math.min(4, Math.floor(s.equipment.studio / 5));
+/* ---------- 클릭 업그레이드 (일반: 순수 음악력, 어둠: 음지 드립력) ---------- */
+
+/** level: 지금 레벨. 다음 레벨로 올리는 비용(코인)을 돌려준다. */
+export function musicPowerCost(level: number, persona: Persona = 'normal'): number {
+  const c = clickDef(persona);
+  return Math.ceil(c.base * c.growth ** level);
+}
+
+export interface MusicPowerPreview {
+  persona: Persona;
+  level: number;
+  cost: number;
+  affordable: boolean;
+  /** 그 속성에서 작업하기 한 번에 얻는 라임(생산배율 포함)의 올리기 전/후 */
+  gainBefore: number;
+  gainAfter: number;
+}
+
+export function previewMusicPower(s: GameState, persona: Persona = 'normal'): MusicPowerPreview {
+  const level = clickPowerOf(s, persona);
+  const cost = musicPowerCost(level, persona);
+  const next = persona === 'normal' ? { ...s, musicPower: level + 1 } : { ...s, dripPower: level + 1 };
+  return {
+    persona,
+    level,
+    cost,
+    affordable: Number.isFinite(cost) && s.coins >= cost,
+    gainBefore: clickGain(s, persona),
+    gainAfter: clickGain(next, persona),
+  };
+}
+
+/** 작업실 외형 단계: 그 속성 작업실 레벨 5마다 한 단계. 기본은 지금 자아의 작업실을 본다. */
+export function roomTier(s: Pick<GameState, 'equipment' | 'darkEquipment' | 'activePersona'>, persona: Persona = s.activePersona): number {
+  return Math.min(4, Math.floor(equipmentOf(s, persona).studio / 5));
 }
 
 /* ---------- 자아 전환 ---------- */

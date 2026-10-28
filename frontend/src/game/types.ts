@@ -54,7 +54,14 @@ export interface GameState {
   switchLockedUntil: number;
   recoveryPenaltyUntil: number;
   recoveryReentryRequired: boolean;
+  /** 일반속성 장비. 일반속성에서만 효과가 난다. */
   equipment: Equipment;
+  /** 어둠속성 장비. 어둠속성에서만 효과가 난다. */
+  darkEquipment: Equipment;
+  /** 순수 음악력 업그레이드 레벨(일반속성). 레벨당 작업하기 한 번에 얻는 기본 라임이 늘어난다. */
+  musicPower: number;
+  /** 음지 드립력 업그레이드 레벨(어둠속성). 효과는 같은 방식이다. */
+  dripPower: number;
   singles: Single[];
   albums: Album[];
   concerts: Record<StageId, ConcertRecord>;

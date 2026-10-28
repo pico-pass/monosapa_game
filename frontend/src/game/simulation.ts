@@ -18,7 +18,8 @@ export function advance(state: GameState, durationMs: number, ctx: AdvanceContex
   const events: EngineEvent[] = [];
   if (!Number.isFinite(durationMs) || durationMs <= 0) return { state, events };
 
-  const mult = productionMultiplier(state);
+  const normalMult = productionMultiplier(state, 'normal');
+  const darkMult = productionMultiplier(state, 'dark');
   const royaltyPerSec = (persona: GameState['activePersona']) => royaltyBreakdown(state, persona).perSec;
   const eff = Math.max(0, ctx.efficiency);
 
@@ -39,7 +40,7 @@ export function advance(state: GameState, durationMs: number, ctx: AdvanceContex
       const penalized = t < penaltyUntil - EPS;
       const seg = penalized ? Math.min(remaining, penaltyUntil - t) : remaining;
       const sec = seg / 1000;
-      const rate = P.normalRate * mult * (penalized ? P.recoveryPenalty : 1);
+      const rate = P.normalRate * normalMult * (penalized ? P.recoveryPenalty : 1);
       normal += rate * sec * eff;
       coins += royaltyPerSec('normal') * sec * eff;
       heat = Math.max(0, heat - P.heatDownPerSec * sec);
@@ -61,7 +62,7 @@ export function advance(state: GameState, durationMs: number, ctx: AdvanceContex
     const toBoundaryMs = ((boundary - heat) / P.heatUpPerSec) * 1000;
     const seg = Math.min(remaining, toBoundaryMs);
     const sec = seg / 1000;
-    const rate = (hot ? P.darkHotRate : P.darkRate) * mult;
+    const rate = (hot ? P.darkHotRate : P.darkRate) * darkMult;
     dark += rate * sec * eff;
     coins += royaltyPerSec('dark') * sec * eff;
     t += seg;

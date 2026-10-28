@@ -6,6 +6,24 @@ import type { EquipmentKind, StageId } from './types';
  */
 export const SCHEMA_VERSION = 1;
 
+/**
+ * 어둠속성 장비 가격은 일반속성 장비에서 계산한다 (사용자 지정).
+ *   최초 비용 = 일반의 12배, 가격이 늘어나는 폭(성장률 − 1) = 일반의 2.4배  → 성장률 = 1 + (일반 성장률 − 1) × 2.4
+ * 효과(레벨당 증가량)는 일반 장비와 같다.
+ */
+const DARK_COST = { baseMult: 12, growthSpanMult: 2.4 };
+const darkCost = (c: { base: number; growth: number }) => ({
+  base: c.base * DARK_COST.baseMult,
+  growth: Math.round((1 + (c.growth - 1) * DARK_COST.growthSpanMult) * 1e4) / 1e4,
+});
+
+const NORMAL_EQUIPMENT = {
+  mic: { base: 50, growth: 1.6 }, // 원안 1.5
+  studio: { base: 150, growth: 1.7 }, // 원안 1.6
+  promotion: { base: 90, growth: 1.6 }, // 원안 1.5
+};
+const NORMAL_MUSIC_POWER = { base: 250, growth: 1.5 };
+
 export const BALANCE = {
   persona: {
     normalRate: 1.0,
@@ -26,11 +44,19 @@ export const BALANCE = {
     recoveryMs: 20000,
     recoveryPenalty: 0.5,
   },
-  production: { micPerLevel: 0.15, studioPerLevel: 0.1 },
+  production: { micPerLevel: 0.15, studioPerLevel: 0.05 }, // 작업실 레벨당 0.10 → 0.05 (사용자 지정, 일반·어둠 공통)
   /** perAlbum[i] = i번째 앨범을 낼 때 인세 배율에 더해지는 값 (누적 합산) */
   royalty: { perFan: 0.02, promotionPerLevel: 0.2, perAlbum: [0.08, 0.1, 0.12] },
   level: { fansPerStep: 20 },
   click: { value: 1, maxPerSec: 3, holdPerSec: 2 },
+  /**
+   * 순수 음악력 업그레이드(사용자 요청으로 추가, 원안에 없음). 코인으로 올리고 최대 레벨은 없다.
+   *   작업하기 한 번의 기본 라임 = click.value + clickPerLevel × 레벨 (여기에 생산배율이 곱해진다)
+   *   비용(코인) = ceil(base × growth^레벨)  → 250, 375, 563, 844, 1266 …
+   */
+  musicPower: { ...NORMAL_MUSIC_POWER, clickPerLevel: 1 },
+  /** 음지 드립력: 어둠속성 전용 클릭 업그레이드. 효과는 같고 가격만 darkCost로 비싸다. */
+  dripPower: { ...darkCost(NORMAL_MUSIC_POWER), clickPerLevel: 1 },
   /**
    * 싱글 발매 비용·효과는 자아별로 따로 센다. n은 그 자아로 이미 낸 싱글 수다.
    *   필요 라임 = ceil(rhymeBase × rhymeGrowth^n), 코인 = floor(coinBase × coinGrowth^n), 팬 = ceil(fanBase × fanGrowth^n)
@@ -59,11 +85,14 @@ export const BALANCE = {
     costs: [10_000, 350_000, 20_000_000],
     fans: [100, 200, 300],
   },
-  equipment: {
+  /** 일반속성 장비. 일반속성에서만 효과가 난다. */
+  equipment: { maxLevel: 20, ...NORMAL_EQUIPMENT },
+  /** 어둠속성 장비(마이크·작업실·홍보). 어둠속성에서만 효과가 나고 레벨당 효과는 일반과 같다. */
+  darkEquipment: {
     maxLevel: 20,
-    mic: { base: 50, growth: 1.6 }, // 원안 1.5
-    studio: { base: 150, growth: 1.7 }, // 원안 1.6
-    promotion: { base: 90, growth: 1.6 }, // 원안 1.5
+    mic: darkCost(NORMAL_EQUIPMENT.mic),
+    studio: darkCost(NORMAL_EQUIPMENT.studio),
+    promotion: darkCost(NORMAL_EQUIPMENT.promotion),
   },
   concert: {
     cooldownMs: 120_000,

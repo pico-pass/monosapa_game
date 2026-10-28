@@ -3,6 +3,7 @@ import {
   abandonConcert,
   beginManualConcert,
   buyEquipment,
+  buyMusicPower,
   finishManualConcert,
   releaseAlbum,
   manualConcertReward,
@@ -17,7 +18,12 @@ import { InputLimiter } from '../input';
 import {
   albumCost,
   albumFans,
+  clickGain,
   equipmentCost,
+  musicPowerCost,
+  previewEquipment,
+  previewMusicPower,
+  roomTier,
   previewSingle,
   previewAlbum,
   singleCoins,
@@ -141,6 +147,139 @@ describe('장비', () => {
   it('20레벨에서 더 못 산다', () => {
     const s = base({ coins: 1e12, equipment: { mic: 20, studio: 0, promotion: 0 } });
     expect(buyEquipment(s, 'mic')).toMatchObject({ ok: false, reason: 'max_level' });
+  });
+});
+
+describe('순수 음악력', () => {
+  it('비용 공식: ceil(250×1.5^레벨) → 250, 375, 563, 844, 1266', () => {
+    expect([0, 1, 2, 3, 4].map((lv) => musicPowerCost(lv))).toEqual([250, 375, 563, 844, 1266]);
+    expect(musicPowerCost(10)).toBe(Math.ceil(B.musicPower.base * B.musicPower.growth ** 10));
+  });
+
+  it('코인 부족이면 아무것도 바뀌지 않고, 충분하면 정확히 차감하며 1레벨 오른다', () => {
+    const poor = base({ coins: 249 });
+    const fail = buyMusicPower(poor);
+    expect(fail).toMatchObject({ ok: false, reason: 'insufficient_coins' });
+    expect(fail.state).toBe(poor);
+
+    const r = buyMusicPower(base({ coins: 625 }));
+    expect(r.ok && r.state.coins).toBe(375);
+    expect(r.ok && r.state.musicPower).toBe(1);
+    expect(r.ok && r.cost).toBe(250);
+    // 다음 레벨은 375코인
+    const r2 = r.ok ? buyMusicPower(r.state) : r;
+    expect(r2.ok && r2.state.coins).toBe(0);
+    expect(r2.ok && r2.state.musicPower).toBe(2);
+  });
+
+  it('최대 레벨이 없다: 레벨이 높아도 코인만 있으면 계속 오른다', () => {
+    const s = base({ coins: 1e12, musicPower: 30 });
+    expect(buyMusicPower(s)).toMatchObject({ ok: true });
+  });
+
+  it('레벨당 작업하기 기본 라임 +1, 생산배율이 곱해진다', () => {
+    expect(clickGain(base())).toBe(1);
+    expect(clickGain(base({ musicPower: 3 }))).toBe(4);
+    const s = base({ musicPower: 2, equipment: { mic: 2, studio: 0, promotion: 0 }, activePersona: 'normal' });
+    const r = work(s);
+    expect(r.ok && r.gained).toBeCloseTo(3 * 1.3, 9);
+    expect(r.ok && r.state.normalRhymes).toBeCloseTo(3 * 1.3, 9);
+  });
+
+  it('미리보기: 올리기 전·후 1회 라임과 구매 가능 여부', () => {
+    const pv = previewMusicPower(base({ coins: 250, musicPower: 0 }));
+    expect(pv).toMatchObject({ level: 0, cost: 250, affordable: true, gainBefore: 1, gainAfter: 2 });
+    expect(previewMusicPower(base({ coins: 249 })).affordable).toBe(false);
+  });
+
+  it('일반속성의 순수 음악력·장비는 어둠 작업하기에 적용되지 않는다', () => {
+    const geared = base({ musicPower: 5, equipment: { mic: 4, studio: 3, promotion: 0 } });
+    expect(clickGain({ ...geared, activePersona: 'normal' })).toBeCloseTo(6 * 1.75, 9);
+    expect(clickGain({ ...geared, activePersona: 'dark' })).toBe(1);
+    const r = work({ ...geared, activePersona: 'dark' });
+    expect(r.ok && r.gained).toBe(1);
+    expect(r.ok && r.state.darkRhymes).toBe(1);
+    // 미리보기는 요청한 속성 기준이다 (기본은 일반)
+    const pv = previewMusicPower({ ...geared, activePersona: 'dark' });
+    expect(pv.gainBefore).toBeCloseTo(6 * 1.75, 9);
+    expect(pv.gainAfter).toBeCloseTo(7 * 1.75, 9);
+  });
+
+  it('자동 생산(초당 라임)에는 영향이 없다', () => {
+    const a = at(base({ musicPower: 0 }), 10_000);
+    const b = at(base({ musicPower: 9 }), 10_000);
+    expect(b.normalRhymes).toBeCloseTo(a.normalRhymes, 9);
+  });
+});
+
+describe('어둠속성 장비·음지 드립력', () => {
+  it('가격: 최초 비용은 일반의 12배, 늘어나는 폭(성장률 − 1)은 일반의 2.4배', () => {
+    expect([equipmentCost('mic', 0, 'dark'), equipmentCost('studio', 0, 'dark'), equipmentCost('promotion', 0, 'dark')]).toEqual([600, 1800, 1080]);
+    expect(musicPowerCost(0, 'dark')).toBe(3000);
+    for (const k of ['mic', 'studio', 'promotion'] as const) {
+      const n = B.equipment[k];
+      const d = B.darkEquipment[k];
+      expect(d.base).toBe(n.base * 12);
+      expect(d.growth - 1).toBeCloseTo((n.growth - 1) * 2.4, 3);
+      expect(equipmentCost(k, 3, 'dark')).toBe(Math.ceil(d.base * d.growth ** 3));
+    }
+    expect(B.dripPower.base).toBe(B.musicPower.base * 12);
+    expect(B.dripPower.growth - 1).toBeCloseTo((B.musicPower.growth - 1) * 2.4, 3);
+    // 일반 가격은 그대로
+    expect(equipmentCost('mic', 0)).toBe(50);
+    expect(musicPowerCost(0)).toBe(250);
+  });
+
+  it('어둠 장비는 일반 장비와 레벨·코인이 따로 간다', () => {
+    const r = buyEquipment(base({ coins: 700 }), 'mic', 'dark');
+    expect(r.ok && r.state.coins).toBe(100);
+    expect(r.ok && r.state.darkEquipment.mic).toBe(1);
+    expect(r.ok && r.state.equipment.mic).toBe(0);
+    const n = buyEquipment(base({ coins: 100 }), 'mic');
+    expect(n.ok && n.state.equipment.mic).toBe(1);
+    expect(n.ok && n.state.darkEquipment.mic).toBe(0);
+    // 어둠 마이크는 일반 마이크 가격으로 살 수 없다
+    expect(buyEquipment(base({ coins: 599 }), 'mic', 'dark')).toMatchObject({ ok: false, reason: 'insufficient_coins' });
+  });
+
+  it('어둠 장비도 20레벨이 최대', () => {
+    const s = base({ coins: 1e15, darkEquipment: { mic: 20, studio: 0, promotion: 0 } });
+    expect(buyEquipment(s, 'mic', 'dark')).toMatchObject({ ok: false, reason: 'max_level' });
+    expect(buyEquipment(s, 'studio', 'dark')).toMatchObject({ ok: true });
+  });
+
+  it('음지 드립력: 어둠에서만 레벨당 작업하기 라임 +1, 어둠 생산배율이 곱해진다', () => {
+    const fail = buyMusicPower(base({ coins: 2999 }), 'dark');
+    expect(fail).toMatchObject({ ok: false, reason: 'insufficient_coins' });
+    const bought = buyMusicPower(base({ coins: 3100 }), 'dark');
+    expect(bought.ok && bought.state.coins).toBe(100);
+    expect(bought.ok && bought.state.dripPower).toBe(1);
+    expect(bought.ok && bought.state.musicPower).toBe(0);
+
+    const s = base({ dripPower: 2, darkEquipment: { mic: 2, studio: 0, promotion: 0 }, activePersona: 'dark' });
+    expect(clickGain(s)).toBeCloseTo(3 * 1.3, 9);
+    const r = work(s);
+    expect(r.ok && r.state.darkRhymes).toBeCloseTo(3 * 1.3, 9);
+    // 같은 레벨이라도 일반속성으로 작업하면 드립력은 적용되지 않는다
+    expect(clickGain({ ...s, activePersona: 'normal' })).toBe(1);
+  });
+
+  it('미리보기는 요청한 속성의 값을 보여준다', () => {
+    const s = base({ coins: 5000, darkEquipment: { mic: 1, studio: 0, promotion: 0 } });
+    const pv = previewEquipment(s, 'mic', 'dark');
+    expect(pv).toMatchObject({ persona: 'dark', level: 1, cost: equipmentCost('mic', 1, 'dark') });
+    expect(pv.before).toBeCloseTo(1.15, 9);
+    expect(pv.after).toBeCloseTo(1.3, 9);
+    expect(pv.rateBefore).toBeCloseTo(1.7 * 1.15, 9);
+    expect(pv.rateAfter).toBeCloseTo(1.7 * 1.3, 9);
+    expect(previewMusicPower(s, 'dark')).toMatchObject({ persona: 'dark', level: 0, cost: 3000, affordable: true });
+  });
+
+  it('작업실 외형 단계는 그 속성의 작업실 레벨을 따른다', () => {
+    const s = base({ equipment: { mic: 0, studio: 10, promotion: 0 }, darkEquipment: { mic: 0, studio: 5, promotion: 0 } });
+    expect(roomTier({ ...s, activePersona: 'normal' })).toBe(2);
+    expect(roomTier({ ...s, activePersona: 'dark' })).toBe(1);
+    expect(roomTier(s, 'dark')).toBe(1);
   });
 });
 
@@ -353,11 +492,18 @@ describe('입력 상한', () => {
     expect(lim.accept(1001)).toBe(true);
   });
 
-  it('작업하기는 생산배율을 곱한 라임을 현재 자아에 더한다', () => {
-    const s = base({ equipment: { mic: 2, studio: 0, promotion: 0 }, activePersona: 'dark' });
-    const r = work(s);
-    expect(r.ok && r.state.darkRhymes).toBeCloseTo(1.3, 9);
-    expect(r.ok && r.state.normalRhymes).toBe(0);
+  it('작업하기는 지금 자아의 장비 생산배율만 곱한다', () => {
+    const gear = { equipment: { mic: 2, studio: 0, promotion: 0 } };
+    const normal = work(base({ ...gear, activePersona: 'normal' }));
+    expect(normal.ok && normal.state.normalRhymes).toBeCloseTo(1.3, 9);
+    expect(normal.ok && normal.state.darkRhymes).toBe(0);
+    // 일반 장비는 어둠 작업하기에 적용되지 않는다
+    const dark = work(base({ ...gear, activePersona: 'dark' }));
+    expect(dark.ok && dark.state.darkRhymes).toBe(1);
+    expect(dark.ok && dark.state.normalRhymes).toBe(0);
+    // 어둠 장비는 어둠 작업하기에 적용된다
+    const darkGear = work(base({ darkEquipment: { mic: 2, studio: 0, promotion: 0 }, activePersona: 'dark' }));
+    expect(darkGear.ok && darkGear.state.darkRhymes).toBeCloseTo(1.3, 9);
   });
 });
 
