@@ -74,7 +74,7 @@ function Game() {
   }, [persona, muted, bgmMuted, ducked]);
 
   return (
-    <div className={`app${g.settings.reducedMotion ? 'reduce-motion' : ''}`} data-persona={persona}>
+    <div className={`app${g.settings.reducedMotion ? ' reduce-motion' : ''}`} data-persona={persona}>
       <TopBar />
       {ui.saveError && (
         <div className="banner banner-warn" role="alert">
