@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { fmt, fmtRate } from '../components/format';
 import { Progress } from '../components/parts';
-import { BALANCE, EQUIPMENT_KINDS } from '../game/balance';
+import { BALANCE, DIAMOND_UPGRADE_KINDS, EQUIPMENT_KINDS } from '../game/balance';
 import { CLICK_POWER_TEXT, EQUIPMENT_TEXT, PERSONA_TEXT } from '../game/content';
-import { equipmentDef, previewEquipment, previewMusicPower, roomTier } from '../game/selectors';
-import type { EquipmentKind, GameState, Persona } from '../game/types';
-import { doBuy, doBuyMusicPower, useUi } from '../store/gameStore';
+import { equipmentDef, previewDiamondUpgrade, previewEquipment, previewMusicPower, roomTier } from '../game/selectors';
+import type { DiamondUpgradeKind, EquipmentKind, GameState, Persona } from '../game/types';
+import { doBuy, doBuyDiamondUpgrade, doBuyMusicPower, useUi } from '../store/gameStore';
 
 export function EquipScreen() {
   const ui = useUi();
@@ -29,7 +29,51 @@ export function EquipScreen() {
         <EquipCard key={`${view}-${kind}`} g={g} kind={kind} persona={view} />
       ))}
       <ClickPowerCard g={g} persona={view} />
+
+      <h2 className="section-title">다이아 업그레이드</h2>
+      <p className="muted">다이아로만 올릴 수 있는 영구 업그레이드예요. 일반·어둠 두 속성 모두에 적용돼요. 최대 레벨 {BALANCE.diamond.upgrade.maxLevel}.</p>
+      {DIAMOND_UPGRADE_KINDS.map((kind) => (
+        <DiamondUpgradeCard key={kind} g={g} kind={kind} />
+      ))}
     </section>
+  );
+}
+
+const DIAMOND_UPGRADE_TEXT = {
+  production: { name: '생산 증폭', icon: '⚡', effect: '자동 생산과 작업하기 라임이 늘어나요 (+5% / 레벨)', label: '생산 배율' },
+  royalty: { name: '인세 증폭', icon: '💰', effect: '초당 인세 코인이 늘어나요 (+5% / 레벨)', label: '인세 배율' },
+} as const;
+
+function DiamondUpgradeCard({ g, kind }: { g: GameState; kind: DiamondUpgradeKind }) {
+  const pv = previewDiamondUpgrade(g, kind);
+  const t = DIAMOND_UPGRADE_TEXT[kind];
+  return (
+    <div className="card equip-card">
+      <div className="card-row">
+        <h3>
+          <span aria-hidden>{t.icon}</span> {t.name} <small>Lv.{pv.level}</small>
+        </h3>
+      </div>
+      <Progress value={pv.level} max={BALANCE.diamond.upgrade.maxLevel} label={`${t.name} 레벨`} />
+      <p className="muted">{t.effect}</p>
+      {pv.maxed ? (
+        <p className="maxed">최대 레벨 도달 ✨</p>
+      ) : (
+        <>
+          <dl className="before-after">
+            <div>
+              <dt>{t.label}</dt>
+              <dd>
+                ×{pv.before.toFixed(2)} → <b>×{pv.after.toFixed(2)}</b>
+              </dd>
+            </div>
+          </dl>
+          <button type="button" className="btn btn-accent btn-wide" disabled={!pv.affordable} onClick={() => doBuyDiamondUpgrade(kind)}>
+            {pv.affordable ? `강화 💎 ${fmt(pv.cost)}` : `💎 ${fmt(pv.cost)} 필요 (보유 ${fmt(Math.floor(g.diamonds))})`}
+          </button>
+        </>
+      )}
+    </div>
   );
 }
 

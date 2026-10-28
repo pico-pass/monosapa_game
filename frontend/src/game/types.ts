@@ -1,5 +1,7 @@
 export type Persona = 'normal' | 'dark';
 export type EquipmentKind = 'mic' | 'studio' | 'promotion';
+/** 다이아로만 올리는 영구 업그레이드. 두 자아 모두에 적용된다. */
+export type DiamondUpgradeKind = 'production' | 'royalty';
 export type StageId = 'room' | 'club' | 'hall' | 'solo' | 'medium' | 'large' | 'arena' | 'world';
 export type AlbumType = 'normal' | 'dark';
 export type DialogueTone = 'original' | 'soft';
@@ -9,6 +11,8 @@ export interface Equipment {
   studio: number;
   promotion: number;
 }
+
+export type DiamondUpgrades = Record<DiamondUpgradeKind, number>;
 
 export interface Single {
   id: string;
@@ -62,6 +66,10 @@ export interface GameState {
   musicPower: number;
   /** 음지 드립력 업그레이드 레벨(어둠속성). 효과는 같은 방식이다. */
   dripPower: number;
+  /** 다이아 재화. 공연장 첫 클리어·앨범 발매·플레이어 레벨업으로 얻는다. */
+  diamonds: number;
+  /** 다이아 전용 영구 업그레이드 레벨 */
+  diamondUpgrades: DiamondUpgrades;
   singles: Single[];
   albums: Album[];
   concerts: Record<StageId, ConcertRecord>;
@@ -90,6 +98,8 @@ export interface AdvanceResult {
 export type FailReason =
   | 'insufficient_rhymes'
   | 'insufficient_coins'
+  | 'insufficient_diamonds'
+  | 'nothing_to_skip'
   | 'max_level'
   | 'locked'
   | 'cooldown'

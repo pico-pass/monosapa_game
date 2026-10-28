@@ -6,7 +6,10 @@ import {
   clickPowerOf,
   equipmentCost,
   equipmentDef,
+  diamondUpgradeCost,
   equipmentOf,
+  isPenaltyActive,
+  levelUpDiamonds,
   musicPowerCost,
   previewAlbum,
   previewSingle,
@@ -20,6 +23,7 @@ import type {
   Album,
   CommandResult,
   EquipmentKind,
+  DiamondUpgradeKind,
   Fail,
   FailReason,
   GameState,
@@ -82,6 +86,8 @@ export interface ReleaseInfo {
   comments: VirtualComment[];
   coins: number;
   fans: number;
+  /** 팬이 늘어 플레이어 레벨이 오르면서 받은 다이아 */
+  diamonds: number;
 }
 
 export function releaseSingle(state: GameState): CommandResult<ReleaseInfo> {
@@ -97,12 +103,15 @@ export function releaseSingle(state: GameState): CommandResult<ReleaseInfo> {
     releasedAt: state.lastSettledAt,
   };
   const rhymeKey = persona === 'normal' ? 'normalRhymes' : 'darkRhymes';
+  const fans = clampResource(state.fans + prev.fans);
+  const diamonds = levelUpDiamonds(state.fans, fans);
   const next: GameState = withFlag(
     {
       ...state,
       [rhymeKey]: Math.max(0, rhymesOf(state, persona) - prev.needRhymes),
       coins: clampResource(state.coins + prev.coins),
-      fans: clampResource(state.fans + prev.fans),
+      fans,
+      diamonds: clampResource(state.diamonds + diamonds),
       singles: [...state.singles, single],
     },
     'release',
@@ -114,6 +123,7 @@ export function releaseSingle(state: GameState): CommandResult<ReleaseInfo> {
     comments: pickComments(persona, prev.n),
     coins: prev.coins,
     fans: prev.fans,
+    diamonds,
   };
 }
 
@@ -153,6 +163,8 @@ export interface AlbumInfo {
   ordinal: number;
   cost: number;
   fans: number;
+  /** 앨범 발매 보상 + 팬이 늘어 레벨이 오르면서 받은 다이아 */
+  diamonds: number;
 }
 
 /** 카탈로그의 다음 앨범을 발매한다. 발매한 싱글과는 무관하다. */
@@ -162,16 +174,19 @@ export function releaseAlbum(state: GameState): CommandResult<AlbumInfo> {
   if (!preview.affordable) return fail(state, 'insufficient_coins');
   const { def, index, cost, fans } = preview;
   const album: Album = { id: def.id, title: def.title, type: def.type, releasedAt: state.lastSettledAt };
+  const newFans = clampResource(state.fans + fans);
+  const diamonds = (BALANCE.diamond.album[index] ?? 0) + levelUpDiamonds(state.fans, newFans);
   const next = withFlag(
     {
       ...state,
       coins: state.coins - cost,
-      fans: clampResource(state.fans + fans),
+      fans: newFans,
+      diamonds: clampResource(state.diamonds + diamonds),
       albums: [...state.albums, album],
     },
     'album',
   );
-  return { ok: true, state: next, album, def, ordinal: index + 1, cost, fans };
+  return { ok: true, state: next, album, def, ordinal: index + 1, cost, fans, diamonds };
 }
 
 /* ---------- 공연 ---------- */
@@ -200,6 +215,8 @@ export interface ConcertOutcome {
   cleared: boolean;
   firstClear: boolean;
   firstClearCoins: number;
+  /** 공연장을 처음 클리어해서 받은 다이아 (이미 클리어한 공연장이면 0) */
+  diamonds: number;
 }
 
 /**
@@ -242,10 +259,12 @@ export function runAutoConcert(state: GameState, id: StageId): CommandResult<{ o
   const rec = state.concerts[id];
   const firstClear = !rec.cleared;
   const bonus = firstClear ? def.firstClearCoins : 0;
+  const diamonds = firstClear ? def.firstClearDiamonds : 0;
   const started = startCooldown(state, id);
   const next: GameState = {
     ...started,
     coins: clampResource(state.coins + def.baseCoins + bonus),
+    diamonds: clampResource(state.diamonds + diamonds),
     concerts: { ...started.concerts, [id]: { ...started.concerts[id], cleared: true } },
   };
   return {
@@ -260,6 +279,7 @@ export function runAutoConcert(state: GameState, id: StageId): CommandResult<{ o
       cleared: true,
       firstClear,
       firstClearCoins: bonus,
+      diamonds,
     },
   };
 }
@@ -297,10 +317,12 @@ export function finishManualConcert(
   const cleared = clearedOverride ?? score >= BALANCE.concert.clearScore;
   const firstClear = cleared && !rec.cleared;
   const bonus = firstClear ? def.firstClearCoins : 0;
+  const diamonds = firstClear ? def.firstClearDiamonds : 0;
   const reward = manualConcertReward(def.baseCoins, score, run.persona, run.game, cleared);
   const next: GameState = {
     ...state,
     coins: clampResource(state.coins + reward + bonus),
+    diamonds: clampResource(state.diamonds + diamonds),
     concerts: {
       ...state.concerts,
       [run.stageId]: {
@@ -323,10 +345,57 @@ export function finishManualConcert(
       cleared,
       firstClear,
       firstClearCoins: bonus,
+      diamonds,
     },
   };
 }
 
 export function abandonConcert(run: ConcertRun): ConcertRun {
   return run.status === 'running' ? { ...run, status: 'abandoned' } : run;
+}
+
+/* ---------- 다이아 사용 ---------- */
+
+/** 쿨다운 중인 공연장의 쿨다운을 다이아로 바로 끝낸다. */
+export function skipConcertCooldown(state: GameState, id: StageId): CommandResult<{ cost: number }> {
+  const st = stageStatus(state, id);
+  if (!st.unlocked) return fail(state, 'locked');
+  if (st.cooldownLeftMs <= 0) return fail(state, 'nothing_to_skip');
+  const cost = BALANCE.diamond.skipCooldown;
+  if (state.diamonds < cost) return fail(state, 'insufficient_diamonds');
+  const next: GameState = {
+    ...state,
+    diamonds: state.diamonds - cost,
+    concerts: { ...state.concerts, [id]: { ...state.concerts[id], cooldownUntil: state.lastSettledAt } },
+  };
+  return { ok: true, state: next, cost };
+}
+
+/** 마이크 압수 회복을 다이아로 바로 끝낸다: 생산 패널티 해제, 어둠 재진입 조건 해소, 과열 0. */
+export function clearSeizure(state: GameState): CommandResult<{ cost: number }> {
+  if (!isPenaltyActive(state)) return fail(state, 'nothing_to_skip');
+  const cost = BALANCE.diamond.clearSeizure;
+  if (state.diamonds < cost) return fail(state, 'insufficient_diamonds');
+  const next: GameState = {
+    ...state,
+    diamonds: state.diamonds - cost,
+    heat: 0,
+    recoveryPenaltyUntil: state.lastSettledAt,
+    recoveryReentryRequired: false,
+  };
+  return { ok: true, state: next, cost };
+}
+
+/** 다이아 전용 영구 업그레이드를 1레벨 올린다. */
+export function buyDiamondUpgrade(state: GameState, kind: DiamondUpgradeKind): CommandResult<{ cost: number; level: number }> {
+  const level = state.diamondUpgrades[kind];
+  if (level >= BALANCE.diamond.upgrade.maxLevel) return fail(state, 'max_level');
+  const cost = diamondUpgradeCost(kind, level);
+  if (state.diamonds < cost) return fail(state, 'insufficient_diamonds');
+  const next: GameState = {
+    ...state,
+    diamonds: state.diamonds - cost,
+    diamondUpgrades: { ...state.diamondUpgrades, [kind]: level + 1 },
+  };
+  return { ok: true, state: next, cost, level: level + 1 };
 }

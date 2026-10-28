@@ -1,4 +1,4 @@
-import type { EquipmentKind, StageId } from './types';
+import type { DiamondUpgradeKind, EquipmentKind, StageId } from './types';
 
 /**
  * 모든 경제 수치는 이 파일 한 곳에서만 수정한다. (기획서 3~7, 11장)
@@ -84,6 +84,24 @@ export const BALANCE = {
   album: {
     costs: [10_000, 350_000, 20_000_000],
     fans: [100, 200, 300],
+  },
+  /**
+   * 다이아 재화(사용자 요청으로 추가, 원안에 없음). 수량은 모두 제안값이라 여기서 조정한다.
+   *   획득: 공연장 첫 클리어(STAGES[].firstClearDiamonds), 앨범 발매(album[i]), 플레이어 레벨이 오를 때마다(levelUp × 오른 레벨 수)
+   *   사용: 공연 쿨다운 즉시 초기화(skipCooldown), 마이크 압수 즉시 해제 + 과열 0(clearSeizure), 다이아 전용 영구 업그레이드
+   * 영구 업그레이드: 생산(자동+작업하기 라임)·인세에 (1 + perLevel × 레벨)이 곱해진다. 일반·어둠 모두에 적용된다.
+   *   비용(다이아) = ceil(base × growth^레벨)
+   */
+  diamond: {
+    album: [30, 60, 120],
+    levelUp: 2,
+    skipCooldown: 5,
+    clearSeizure: 10,
+    upgrade: {
+      maxLevel: 20,
+      production: { base: 5, growth: 1.25, perLevel: 0.05 },
+      royalty: { base: 5, growth: 1.25, perLevel: 0.05 },
+    },
   },
   /** 일반속성 장비. 일반속성에서만 효과가 난다. */
   equipment: { maxLevel: 20, ...NORMAL_EQUIPMENT },
@@ -173,19 +191,21 @@ export interface StageDef {
   id: StageId;
   fans: number;
   firstClearCoins: number;
+  /** 처음 클리어할 때 한 번 받는 다이아 */
+  firstClearDiamonds: number;
   baseCoins: number;
 }
 
 export const STAGES: readonly StageDef[] = [
-  { id: 'room', fans: 100, firstClearCoins: 200, baseCoins: 40 },
-  { id: 'club', fans: 400, firstClearCoins: 500, baseCoins: 80 },
-  { id: 'hall', fans: 1200, firstClearCoins: 1200, baseCoins: 150 },
+  { id: 'room', fans: 100, firstClearCoins: 200, firstClearDiamonds: 5, baseCoins: 40 },
+  { id: 'club', fans: 400, firstClearCoins: 500, firstClearDiamonds: 10, baseCoins: 80 },
+  { id: 'hall', fans: 1200, firstClearCoins: 1200, firstClearDiamonds: 15, baseCoins: 150 },
   // 첫 투어(소형 공연장) 이후의 공연장. 앞 공연장 클리어 + 팬 조건으로 차례로 열린다.
-  { id: 'solo', fans: 3000, firstClearCoins: 3000, baseCoins: 300 },
-  { id: 'medium', fans: 8000, firstClearCoins: 7500, baseCoins: 600 },
-  { id: 'large', fans: 20000, firstClearCoins: 18000, baseCoins: 1200 },
-  { id: 'arena', fans: 50000, firstClearCoins: 45000, baseCoins: 2500 },
-  { id: 'world', fans: 150000, firstClearCoins: 120000, baseCoins: 6000 },
+  { id: 'solo', fans: 3000, firstClearCoins: 3000, firstClearDiamonds: 20, baseCoins: 300 },
+  { id: 'medium', fans: 8000, firstClearCoins: 7500, firstClearDiamonds: 30, baseCoins: 600 },
+  { id: 'large', fans: 20000, firstClearCoins: 18000, firstClearDiamonds: 40, baseCoins: 1200 },
+  { id: 'arena', fans: 50000, firstClearCoins: 45000, firstClearDiamonds: 50, baseCoins: 2500 },
+  { id: 'world', fans: 150000, firstClearCoins: 120000, firstClearDiamonds: 80, baseCoins: 6000 },
 ];
 
 export const STAGE_IDS: readonly StageId[] = STAGES.map((s) => s.id);
@@ -199,3 +219,4 @@ export const LAST_STAGE: StageId = STAGES[STAGES.length - 1].id;
 export const TOUR_STAGE: StageId = 'hall';
 
 export const EQUIPMENT_KINDS: readonly EquipmentKind[] = ['mic', 'studio', 'promotion'];
+export const DIAMOND_UPGRADE_KINDS: readonly DiamondUpgradeKind[] = ['production', 'royalty'];

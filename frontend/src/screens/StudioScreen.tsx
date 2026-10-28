@@ -15,7 +15,7 @@ import {
   royaltyRate,
   switchStatus,
 } from '../game/selectors';
-import { doSwitch, setTab, useUi } from '../store/gameStore';
+import { doClearSeizure, doSwitch, setTab, useUi } from '../store/gameStore';
 
 export function StudioScreen() {
   const ui = useUi();
@@ -80,9 +80,19 @@ export function StudioScreen() {
       <HeatGauge heat={g.heat} persona={persona} />
 
       {penalized && persona === 'normal' && (
-        <p className="seized-note" role="status">
-          🎤 마이크 압수 회복 중 — 앞으로 {Math.ceil((g.recoveryPenaltyUntil - now) / 1000)}초 동안 일반 생산 50%. 재화는 그대로예요.
-        </p>
+        <>
+          <p className="seized-note" role="status">
+            🎤 마이크 압수 회복 중 — 앞으로 {Math.ceil((g.recoveryPenaltyUntil - now) / 1000)}초 동안 일반 생산 50%. 재화는 그대로예요.
+          </p>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            disabled={g.diamonds < BALANCE.diamond.clearSeizure}
+            onClick={doClearSeizure}
+          >
+            💎 {BALANCE.diamond.clearSeizure}로 압수 해제 (과열도 식어요 · 보유 {fmtHave(g.diamonds)})
+          </button>
+        </>
       )}
 
       <div className="rhyme-row">

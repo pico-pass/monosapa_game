@@ -2,13 +2,16 @@ import { describe, expect, it } from 'vitest';
 import {
   abandonConcert,
   beginManualConcert,
+  buyDiamondUpgrade,
   buyEquipment,
   buyMusicPower,
+  clearSeizure,
   finishManualConcert,
   releaseAlbum,
   manualConcertReward,
   releaseSingle,
   runAutoConcert,
+  skipConcertCooldown,
   work,
 } from '../commands';
 import { BALANCE, BALANCE as B, STAGES } from '../balance';
@@ -19,8 +22,13 @@ import {
   albumCost,
   albumFans,
   clickGain,
+  diamondUpgradeCost,
   equipmentCost,
+  levelUpDiamonds,
   musicPowerCost,
+  retroactiveDiamonds,
+  rhymeRate,
+  royaltyRate,
   previewEquipment,
   previewMusicPower,
   roomTier,
@@ -280,6 +288,151 @@ describe('어둠속성 장비·음지 드립력', () => {
     expect(roomTier({ ...s, activePersona: 'normal' })).toBe(2);
     expect(roomTier({ ...s, activePersona: 'dark' })).toBe(1);
     expect(roomTier(s, 'dark')).toBe(1);
+  });
+});
+
+describe('다이아', () => {
+  const T = (s: GameState, ms: number): GameState => ({ ...s, lastSettledAt: s.lastSettledAt + ms });
+
+  it('공연장 첫 클리어에만 다이아를 준다 (자동·직접 공통, 두 번째부터는 0)', () => {
+    const s = base({ fans: 100 });
+    const first = runAutoConcert(s, 'room');
+    expect(first.ok && first.outcome.diamonds).toBe(STAGES[0].firstClearDiamonds);
+    expect(first.ok && first.state.diamonds).toBe(5);
+    const later = first.ok ? runAutoConcert(T(first.state, B.concert.cooldownMs + 1), 'room') : first;
+    expect(later.ok && later.outcome.diamonds).toBe(0);
+    expect(later.ok && later.state.diamonds).toBe(5);
+
+    // 직접 공연: 클리어하면 받고, 실패하면 못 받는다 (실패한 뒤 클리어하면 그때 받는다)
+    const begun = beginManualConcert(base({ fans: 100 }), 'room', 'run-1');
+    if (!begun.ok) throw new Error('begin');
+    const lost = finishManualConcert(begun.state, begun.run, 100);
+    expect(lost.ok && lost.outcome.diamonds).toBe(0);
+    expect(lost.ok && lost.state.diamonds).toBe(0);
+    const begun2 = beginManualConcert(base({ fans: 100 }), 'room', 'run-2');
+    if (!begun2.ok) throw new Error('begin');
+    const won = finishManualConcert(begun2.state, begun2.run, 900);
+    expect(won.ok && won.outcome.diamonds).toBe(5);
+    expect(won.ok && won.state.diamonds).toBe(5);
+  });
+
+  it('공연장마다 값이 다르고 모두 양수', () => {
+    expect(STAGES.map((d) => d.firstClearDiamonds)).toEqual([5, 10, 15, 20, 30, 40, 50, 80]);
+  });
+
+  it('앨범 발매: 앨범별 다이아 (30, 60, 120)', () => {
+    let s = base({ coins: 1e9 });
+    const got: number[] = [];
+    for (let i = 0; i < 3; i++) {
+      const r = releaseAlbum(s);
+      if (!r.ok) throw new Error('album');
+      s = r.state;
+      got.push(r.diamonds);
+    }
+    // 팬은 같은 레벨 구간이 아니므로 레벨업 보너스가 더해졌는지 확인한다
+    const levelBonus = levelUpDiamonds(0, s.fans);
+    expect(got.reduce((a, b) => a + b, 0)).toBe(30 + 60 + 120 + levelBonus);
+    expect(s.diamonds).toBe(210 + levelBonus);
+  });
+
+  it('플레이어 레벨이 오를 때마다 +2 (싱글 발매로 팬이 늘어 레벨이 오를 때)', () => {
+    // 팬 15 + 싱글 첫 곡 팬 5 = 20 → Lv.2
+    const up = releaseSingle(base({ normalRhymes: 200, fans: 15 }));
+    expect(up.ok && up.diamonds).toBe(2);
+    expect(up.ok && up.state.diamonds).toBe(2);
+    // 레벨이 그대로면 0
+    const same = releaseSingle(base({ normalRhymes: 200, fans: 0 }));
+    expect(same.ok && same.diamonds).toBe(0);
+    // 여러 레벨이 한 번에 올라가면 올라간 만큼
+    expect(levelUpDiamonds(0, 80)).toBe(4); // Lv.1 → Lv.3
+    expect(levelUpDiamonds(80, 80)).toBe(0);
+    expect(levelUpDiamonds(80, 0)).toBe(0);
+  });
+
+  it('쿨다운 건너뛰기: 5다이아로 쿨다운만 끝낸다', () => {
+    const cleared = runAutoConcert(base({ fans: 100, diamonds: 7 }), 'room');
+    if (!cleared.ok) throw new Error('auto');
+    expect(stageStatus(cleared.state, 'room').cooldownLeftMs).toBeGreaterThan(0);
+
+    const r = skipConcertCooldown(cleared.state, 'room');
+    expect(r.ok && r.state.diamonds).toBe(cleared.state.diamonds - 5);
+    expect(r.ok && stageStatus(r.state, 'room').cooldownLeftMs).toBe(0);
+    expect(r.ok && stageStatus(r.state, 'room').canRun).toBe(true);
+
+    // 다이아 부족 / 쿨다운 아님 / 잠긴 공연장
+    const poor = { ...cleared.state, diamonds: 4 };
+    expect(skipConcertCooldown(poor, 'room')).toMatchObject({ ok: false, reason: 'insufficient_diamonds' });
+    expect(skipConcertCooldown(base({ fans: 100, diamonds: 50 }), 'room')).toMatchObject({ ok: false, reason: 'nothing_to_skip' });
+    expect(skipConcertCooldown(base({ fans: 0, diamonds: 50 }), 'room')).toMatchObject({ ok: false, reason: 'locked' });
+  });
+
+  it('마이크 압수 해제: 10다이아로 패널티 해제 + 과열 0 + 어둠 재진입 조건 해소', () => {
+    const seized = base({
+      diamonds: 12,
+      heat: 100,
+      activePersona: 'normal',
+      recoveryPenaltyUntil: T0 + 15_000,
+      recoveryReentryRequired: true,
+    });
+    const r = clearSeizure(seized);
+    expect(r.ok && r.state.diamonds).toBe(2);
+    expect(r.ok && r.state.heat).toBe(0);
+    expect(r.ok && r.state.recoveryReentryRequired).toBe(false);
+    expect(r.ok && rhymeRate(r.state, 'normal')).toBeCloseTo(1, 9); // 패널티 ×0.5가 사라졌다
+
+    expect(clearSeizure({ ...seized, diamonds: 9 })).toMatchObject({ ok: false, reason: 'insufficient_diamonds' });
+    expect(clearSeizure(base({ diamonds: 50 }))).toMatchObject({ ok: false, reason: 'nothing_to_skip' });
+  });
+
+  it('영구 업그레이드: 비용 ceil(5×1.25^레벨), 최대 20, 다이아만 쓴다', () => {
+    expect([0, 1, 2, 3].map((lv) => diamondUpgradeCost('production', lv))).toEqual([5, 7, 8, 10]);
+    expect(diamondUpgradeCost('royalty', 4)).toBe(Math.ceil(5 * 1.25 ** 4));
+    const r = buyDiamondUpgrade(base({ diamonds: 6, coins: 1e9 }), 'production');
+    expect(r.ok && r.state.diamonds).toBe(1);
+    expect(r.ok && r.state.diamondUpgrades).toEqual({ production: 1, royalty: 0 });
+    expect(r.ok && r.state.coins).toBe(1e9); // 코인은 건드리지 않는다
+    expect(buyDiamondUpgrade(base({ diamonds: 4 }), 'royalty')).toMatchObject({ ok: false, reason: 'insufficient_diamonds' });
+    const maxed = base({ diamonds: 1e9, diamondUpgrades: { production: 20, royalty: 3 } });
+    expect(buyDiamondUpgrade(maxed, 'production')).toMatchObject({ ok: false, reason: 'max_level' });
+    expect(buyDiamondUpgrade(maxed, 'royalty')).toMatchObject({ ok: true });
+  });
+
+  it('생산 증폭은 두 자아의 자동 생산·작업하기에, 인세 증폭은 인세에 (1 + 0.05×레벨)로 곱해진다', () => {
+    const plain = base({ fans: 100 });
+    const amped = base({ fans: 100, diamondUpgrades: { production: 4, royalty: 10 } }); // ×1.2, ×1.5
+    for (const p of ['normal', 'dark'] as const) {
+      expect(rhymeRate(amped, p)).toBeCloseTo(rhymeRate(plain, p) * 1.2, 9);
+      expect(clickGain(amped, p)).toBeCloseTo(clickGain(plain, p) * 1.2, 9);
+      expect(royaltyRate(amped, p)).toBeCloseTo(royaltyRate(plain, p) * 1.5, 9);
+    }
+    // 시간이 흐를 때도 같다 (자동 생산 + 인세 정산)
+    const a = advance(plain, 10_000).state;
+    const b = advance(amped, 10_000).state;
+    expect(b.normalRhymes).toBeCloseTo(a.normalRhymes * 1.2, 9);
+    expect(b.coins).toBeCloseTo(a.coins * 1.5, 9);
+    const ad = advance({ ...plain, activePersona: 'dark' }, 10_000).state;
+    const bd = advance({ ...amped, activePersona: 'dark' }, 10_000).state;
+    expect(bd.darkRhymes).toBeCloseTo(ad.darkRhymes * 1.2, 9);
+    // 작업하기도 같은 배율
+    const w = work(amped);
+    expect(w.ok && w.gained).toBeCloseTo(1.2, 9);
+  });
+
+  it('소급 지급 계산: 이미 한 일(클리어·앨범·레벨)에 대한 다이아', () => {
+    const s = base({
+      fans: 80, // Lv.3 → +4
+      albums: [
+        { id: 'a1', title: 't', type: 'normal', releasedAt: 0 },
+        { id: 'a2', title: 't', type: 'normal', releasedAt: 0 },
+      ], // 30 + 60
+      concerts: {
+        ...createInitialState(T0).concerts,
+        room: { cleared: true, bestScore: 0, cooldownUntil: 0 }, // 5
+        club: { cleared: true, bestScore: 0, cooldownUntil: 0 }, // 10
+      },
+    });
+    expect(retroactiveDiamonds(s)).toBe(5 + 10 + 30 + 60 + 4);
+    expect(retroactiveDiamonds(base())).toBe(0);
   });
 });
 

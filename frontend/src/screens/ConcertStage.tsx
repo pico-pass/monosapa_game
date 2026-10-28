@@ -259,6 +259,11 @@ function ResultPanel({ result }: { result: ConcertResult }) {
           🪙 코인 <b>+{fmt(result.coins)}</b>
           {result.firstClear && <small> (첫 클리어 보너스 {fmt(result.firstClearCoins)} 포함)</small>}
         </li>
+        {result.diamonds > 0 && (
+          <li>
+            💎 다이아 <b>+{fmt(result.diamonds)}</b> <small>(첫 클리어)</small>
+          </li>
+        )}
         {!result.cleared && (
           <li className="muted">
             {r ? '완주하지 못해서 보상 50%, 첫 클리어로 인정되지 않아요.' : '600점 미만이라 보상 50%, 첫 클리어로 인정되지 않아요.'}

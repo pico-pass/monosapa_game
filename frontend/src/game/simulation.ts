@@ -1,5 +1,5 @@
 import { BALANCE } from './balance';
-import { clampResource, productionMultiplier, royaltyBreakdown } from './selectors';
+import { clampResource, diamondProductionMult, productionMultiplier, royaltyBreakdown } from './selectors';
 import type { AdvanceContext, AdvanceResult, EngineEvent, GameState } from './types';
 
 const P = BALANCE.persona;
@@ -18,8 +18,9 @@ export function advance(state: GameState, durationMs: number, ctx: AdvanceContex
   const events: EngineEvent[] = [];
   if (!Number.isFinite(durationMs) || durationMs <= 0) return { state, events };
 
-  const normalMult = productionMultiplier(state, 'normal');
-  const darkMult = productionMultiplier(state, 'dark');
+  const dMult = diamondProductionMult(state);
+  const normalMult = productionMultiplier(state, 'normal') * dMult;
+  const darkMult = productionMultiplier(state, 'dark') * dMult;
   const royaltyPerSec = (persona: GameState['activePersona']) => royaltyBreakdown(state, persona).perSec;
   const eff = Math.max(0, ctx.efficiency);
 

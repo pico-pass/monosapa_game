@@ -148,7 +148,7 @@ button {
 .resources {
   flex: 1;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
   min-height: 48px;
   padding: 6px 8px;
@@ -164,6 +164,7 @@ button {
   align-items: baseline;
   gap: 4px;
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 .res i {
   font-style: normal;

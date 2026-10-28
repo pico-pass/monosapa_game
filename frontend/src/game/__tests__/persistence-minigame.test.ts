@@ -104,6 +104,33 @@ describe('저장·검증', () => {
     expect(validateState({ ...sampleState(), dripPower: -1 }).ok).toBe(false);
   });
 
+  it('다이아: 왕복 저장되고, 다이아가 없던 예전 저장은 지금까지 한 일만큼 한 번 소급 지급한다', () => {
+    const st = memoryStorage();
+    saveGame(st, { ...sampleState(), diamonds: 42, diamondUpgrades: { production: 3, royalty: 1 } }, T0 + 10);
+    const loaded = loadGame(st);
+    expect(loaded.status === 'ok' && loaded.state.diamonds).toBe(42);
+    expect(loaded.status === 'ok' && loaded.state.diamondUpgrades).toEqual({ production: 3, royalty: 1 });
+
+    // 예전 저장: 방구석 클리어(5) + 앨범 1장(30) + 팬 77(Lv.2 → +2)
+    const { diamonds: _d, diamondUpgrades: _u, ...legacy } = sampleState();
+    const withClear = {
+      ...legacy,
+      concerts: { ...legacy.concerts, room: { cleared: true, bestScore: 0, cooldownUntil: 0 } },
+    };
+    const old = validateState(withClear);
+    expect(old.ok && old.state.diamonds).toBe(5 + 30 + 2);
+    expect(old.ok && old.state.diamondUpgrades).toEqual({ production: 0, royalty: 0 });
+    // 다이아 필드가 있으면 소급 지급하지 않는다 (0이어도 그대로)
+    const zero = validateState({ ...withClear, diamonds: 0 });
+    expect(zero.ok && zero.state.diamonds).toBe(0);
+
+    expect(validateState({ ...sampleState(), diamonds: -1 }).ok).toBe(false);
+    expect(validateState({ ...sampleState(), diamonds: Infinity }).ok).toBe(false);
+    expect(validateState({ ...sampleState(), diamondUpgrades: { production: 21, royalty: 0 } }).ok).toBe(false);
+    expect(validateState({ ...sampleState(), diamondUpgrades: { production: 1.5, royalty: 0 } }).ok).toBe(false);
+    expect(validateState({ ...sampleState(), diamondUpgrades: 'x' }).ok).toBe(false);
+  });
+
   it('10) 손상 JSON·이전/미래 스키마·음수·무한 수치를 거부한다', () => {
     expect(parseSave('{not json').ok).toBe(false);
     expect(parseSave('[]').ok).toBe(false);

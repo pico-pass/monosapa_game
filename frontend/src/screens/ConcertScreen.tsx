@@ -3,7 +3,7 @@ import { PersonaBadge } from '../components/parts';
 import { BALANCE, STAGES, manualGameOf } from '../game/balance';
 import { PERSONA_TEXT, STAGE_TEXT } from '../game/content';
 import { isTourComplete, stageStatus } from '../game/selectors';
-import { doAutoConcert, setTourCardOpen, startManualConcert, useUi } from '../store/gameStore';
+import { doAutoConcert, doSkipCooldown, setTourCardOpen, startManualConcert, useUi } from '../store/gameStore';
 
 /** 모노사파런 안내: 자아에 따라 목표 거리가 다르다 */
 function runNote(persona: 'normal' | 'dark'): string {
@@ -23,7 +23,7 @@ export function ConcertScreen() {
     <section className="screen" aria-label="공연">
       <h2 className="section-title">공연</h2>
       <p className="muted">
-        자동 공연은 기본 코인을 바로 받고 클리어로 인정돼요. 직접 공연(방구석은 마이크 타이밍, 지하 클럽은 모노사파런)은 더 많이 벌 수 있지만 필수는 아니에요. 공연 보상은 코인뿐이에요.
+        자동 공연은 기본 코인을 바로 받고 클리어로 인정돼요. 직접 공연(방구석은 마이크 타이밍, 지하 클럽은 모노사파런)은 더 많이 벌 수 있지만 필수는 아니에요. 공연 보상은 코인이고, 공연장을 처음 클리어하면 다이아도 받아요.
       </p>
 
       {isTourComplete(g) && (
@@ -59,12 +59,22 @@ export function ConcertScreen() {
             </ul>
             <p className="muted">
               기본 🪙 {st.baseCoins}
-              {!st.cleared && <> · 첫 클리어 보너스 🪙 {fmt(st.firstClearCoins)}</>}
+              {!st.cleared && <> · 첫 클리어 보너스 🪙 {fmt(st.firstClearCoins)} · 💎 {fmt(st.firstClearDiamonds)}</>}
             </p>
             {st.unlocked && st.cooldownLeftMs > 0 && (
-              <p className="cooldown" role="status">
-                ⏳ 쿨다운 {fmtCountdown(st.cooldownLeftMs)} (공연장마다 {BALANCE.concert.cooldownMs / 1000}초)
-              </p>
+              <>
+                <p className="cooldown" role="status">
+                  ⏳ 쿨다운 {fmtCountdown(st.cooldownLeftMs)} (공연장마다 {BALANCE.concert.cooldownMs / 1000}초)
+                </p>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  disabled={busy || g.diamonds < BALANCE.diamond.skipCooldown}
+                  onClick={() => doSkipCooldown(def.id)}
+                >
+                  💎 {BALANCE.diamond.skipCooldown}로 쿨다운 건너뛰기 (보유 {fmt(Math.floor(g.diamonds))})
+                </button>
+              </>
             )}
             <div className="btn-row">
               <button type="button" className="btn btn-primary" disabled={!st.canRun || busy} onClick={() => doAutoConcert(def.id)}>

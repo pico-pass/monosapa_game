@@ -1,6 +1,6 @@
 import { BALANCE, STAGES, TOUR_STAGE } from './balance';
 import { ALBUM_CATALOG, singleTitle, type AlbumDef } from './content';
-import type { Equipment, EquipmentKind, GameState, Persona, StageId } from './types';
+import type { DiamondUpgradeKind, Equipment, EquipmentKind, GameState, Persona, StageId } from './types';
 
 const P = BALANCE.persona;
 
@@ -30,16 +30,22 @@ export function productionMultiplier(s: Pick<GameState, 'equipment' | 'darkEquip
   return 1 + BALANCE.production.micPerLevel * e.mic + BALANCE.production.studioPerLevel * e.studio;
 }
 
-type ClickState = Pick<GameState, 'equipment' | 'darkEquipment' | 'musicPower' | 'dripPower' | 'activePersona'>;
+/** 다이아 전용 업그레이드가 주는 배율. 두 자아 모두, 자동 생산과 작업하기 라임 모두에 곱해진다. */
+export const diamondProductionMult = (s: Pick<GameState, 'diamondUpgrades'>): number =>
+  1 + BALANCE.diamond.upgrade.production.perLevel * s.diamondUpgrades.production;
+export const diamondRoyaltyMult = (s: Pick<GameState, 'diamondUpgrades'>): number =>
+  1 + BALANCE.diamond.upgrade.royalty.perLevel * s.diamondUpgrades.royalty;
+
+type ClickState = Pick<GameState, 'equipment' | 'darkEquipment' | 'musicPower' | 'dripPower' | 'activePersona' | 'diamondUpgrades'>;
 
 /** 작업하기 한 번에 얻는 기본 라임(생산배율 곱하기 전). 그 속성의 클릭 업그레이드 레벨당 늘어난다. */
 export function clickValue(s: ClickState, persona: Persona = s.activePersona): number {
   return BALANCE.click.value + clickDef(persona).clickPerLevel * clickPowerOf(s, persona);
 }
 
-/** 작업하기 한 번에 실제로 얻는 라임 = 기본 라임 × 그 속성의 생산배율 */
+/** 작업하기 한 번에 실제로 얻는 라임 = 기본 라임 × 그 속성의 생산배율 × 다이아 생산 증폭 */
 export const clickGain = (s: ClickState, persona: Persona = s.activePersona): number =>
-  clickValue(s, persona) * productionMultiplier(s, persona);
+  clickValue(s, persona) * productionMultiplier(s, persona) * diamondProductionMult(s);
 
 export function playerLevel(fans: number): number {
   return 1 + Math.floor(Math.sqrt(fans / BALANCE.level.fansPerStep));
@@ -54,7 +60,7 @@ export function isPenaltyActive(s: GameState, at: number = s.lastSettledAt): boo
 
 /** 현재(혹은 at 시점) 상태에서의 라임 초당 생산량. 효율(오프라인)은 곱하지 않는다. */
 export function rhymeRate(s: GameState, persona: Persona = s.activePersona, at: number = s.lastSettledAt): number {
-  const mult = productionMultiplier(s, persona);
+  const mult = productionMultiplier(s, persona) * diamondProductionMult(s);
   if (persona === 'normal') {
     return P.normalRate * mult * (isPenaltyActive(s, at) ? P.recoveryPenalty : 1);
   }
@@ -67,18 +73,22 @@ export interface RoyaltyBreakdown {
   promotionMult: number;
   albumMult: number;
   personaMult: number;
+  /** 다이아 인세 증폭 */
+  diamondMult: number;
 }
 
 export function royaltyBreakdown(s: GameState, persona: Persona = s.activePersona): RoyaltyBreakdown {
   const promotionMult = 1 + BALANCE.royalty.promotionPerLevel * equipmentOf(s, persona).promotion;
   const albumMult = 1 + albumRoyaltyBonus(s.albums.length);
   const personaMult = persona === 'normal' ? P.normalRoyaltyMult : P.darkRoyaltyMult;
+  const diamondMult = diamondRoyaltyMult(s);
   return {
-    perSec: s.fans * BALANCE.royalty.perFan * promotionMult * albumMult * personaMult,
+    perSec: s.fans * BALANCE.royalty.perFan * promotionMult * albumMult * personaMult * diamondMult,
     fans: s.fans,
     promotionMult,
     albumMult,
     personaMult,
+    diamondMult,
   };
 }
 
@@ -266,6 +276,57 @@ export function roomTier(s: Pick<GameState, 'equipment' | 'darkEquipment' | 'act
   return Math.min(4, Math.floor(equipmentOf(s, persona).studio / 5));
 }
 
+/* ---------- 다이아 ---------- */
+
+/** 플레이어 레벨이 fansBefore → fansAfter로 오르면서 받는 다이아 */
+export function levelUpDiamonds(fansBefore: number, fansAfter: number): number {
+  return Math.max(0, playerLevel(fansAfter) - playerLevel(fansBefore)) * BALANCE.diamond.levelUp;
+}
+
+/** 다이아 전용 업그레이드 한 종류의 다음 레벨 비용(다이아) */
+export function diamondUpgradeCost(kind: DiamondUpgradeKind, level: number): number {
+  const c = BALANCE.diamond.upgrade[kind];
+  return Math.ceil(c.base * c.growth ** level);
+}
+
+export interface DiamondUpgradePreview {
+  kind: DiamondUpgradeKind;
+  level: number;
+  maxed: boolean;
+  cost: number;
+  affordable: boolean;
+  /** 올리기 전/후 배율 */
+  before: number;
+  after: number;
+}
+
+export function previewDiamondUpgrade(s: GameState, kind: DiamondUpgradeKind): DiamondUpgradePreview {
+  const level = s.diamondUpgrades[kind];
+  const { maxLevel } = BALANCE.diamond.upgrade;
+  const maxed = level >= maxLevel;
+  const perLevel = BALANCE.diamond.upgrade[kind].perLevel;
+  const cost = diamondUpgradeCost(kind, level);
+  return {
+    kind,
+    level,
+    maxed,
+    cost,
+    affordable: !maxed && s.diamonds >= cost,
+    before: 1 + perLevel * level,
+    after: 1 + perLevel * Math.min(level + 1, maxLevel),
+  };
+}
+
+/**
+ * 다이아가 생기기 전의 저장을 불러올 때 지금까지 한 일에 대한 다이아를 한 번에 준다.
+ * (이미 클리어한 공연장, 이미 낸 앨범, 이미 오른 플레이어 레벨)
+ */
+export function retroactiveDiamonds(s: Pick<GameState, 'concerts' | 'albums' | 'fans'>): number {
+  const stages = STAGES.filter((d) => s.concerts[d.id]?.cleared).reduce((a, d) => a + d.firstClearDiamonds, 0);
+  const albums = BALANCE.diamond.album.slice(0, s.albums.length).reduce((a, b) => a + b, 0);
+  return stages + albums + levelUpDiamonds(0, s.fans);
+}
+
 /* ---------- 자아 전환 ---------- */
 
 export interface SwitchStatus {
@@ -332,6 +393,7 @@ export interface StageStatus {
   canRun: boolean;
   baseCoins: number;
   firstClearCoins: number;
+  firstClearDiamonds: number;
 }
 
 export function stageStatus(s: GameState, id: StageId, at: number = s.lastSettledAt): StageStatus {
@@ -354,6 +416,7 @@ export function stageStatus(s: GameState, id: StageId, at: number = s.lastSettle
     canRun: unlocked && cooldownLeftMs <= 0,
     baseCoins: def.baseCoins,
     firstClearCoins: def.firstClearCoins,
+    firstClearDiamonds: def.firstClearDiamonds,
   };
 }
 

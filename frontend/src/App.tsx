@@ -10,6 +10,7 @@ import {
   albumRoyaltyOf,
   clickGain,
   clickPowerOf,
+  diamondProductionMult,
   playerLevel,
   productionMultiplier,
   rhymeRate,
@@ -111,7 +112,7 @@ function TopBar() {
   const zero = g.singles.length === 0;
   return (
     <header className="topbar">
-      <button type="button" className="resources" onClick={() => setBasisOpen(true)} aria-label="코인·팬·레벨. 누르면 계산 근거를 봅니다">
+      <button type="button" className="resources" onClick={() => setBasisOpen(true)} aria-label="코인·팬·레벨·다이아. 누르면 계산 근거를 봅니다">
         <span className="res">
           <i aria-hidden>🪙</i>
           <strong>{fmtHave(g.coins)}</strong>
@@ -126,6 +127,11 @@ function TopBar() {
           <i aria-hidden>⭐</i>
           <strong>Lv.{level}</strong>
           <small>레벨</small>
+        </span>
+        <span className="res">
+          <i aria-hidden>💎</i>
+          <strong>{fmtHave(g.diamonds)}</strong>
+          <small>다이아</small>
         </span>
       </button>
       <button type="button" className="icon-btn" onClick={() => setSettingsOpen(true)} aria-label="설정">
@@ -171,6 +177,11 @@ function Overlays() {
               🪙 코인 <b>+{fmt(cr.coins)}</b>
               {cr.firstClear && <small> (첫 클리어 보너스 {fmt(cr.firstClearCoins)} 포함)</small>}
             </li>
+            {cr.diamonds > 0 && (
+              <li>
+                💎 다이아 <b>+{fmt(cr.diamonds)}</b> <small>(첫 클리어)</small>
+              </li>
+            )}
           </ul>
         </Modal>
       )}
@@ -186,6 +197,11 @@ function Overlays() {
             <li>
               👥 팬 <b>+{fmt(rel.fans)}</b>
             </li>
+            {rel.diamonds > 0 && (
+              <li>
+                💎 다이아 <b>+{fmt(rel.diamonds)}</b> <small>(레벨 업!)</small>
+              </li>
+            )}
           </ul>
           <h3 className="sub-title">가상 댓글</h3>
           <ul className="comments">
@@ -219,6 +235,11 @@ function Overlays() {
             <li>
               👥 팬 <b>+{fmt(alb.fans)}</b>
             </li>
+            {alb.diamonds > 0 && (
+              <li>
+                💎 다이아 <b>+{fmt(alb.diamonds)}</b>
+              </li>
+            )}
             <li>
               📈 인세 배율 <b>+{Math.round(albumRoyaltyOf(alb.ordinal - 1) * 100)}%</b> (누적 +{Math.round(albumRoyaltyBonus(g.albums.length) * 100)}%)
             </li>
@@ -302,9 +323,13 @@ function BasisModal() {
         <dd>
           {g.heat < BALANCE.persona.hotThreshold ? '1.7' : '2.1'} × 어둠 생산배율 = <b>{fmtRate(rhymeRate(g, 'dark'))}</b> (과열 80 이상이면 2.1)
         </dd>
+        <dt>다이아 증폭</dt>
+        <dd>
+          생산 ×{diamondProductionMult(g).toFixed(2)} (자동+작업하기, 두 자아 모두) · 인세 ×{roy.diamondMult.toFixed(2)}
+        </dd>
         <dt>인세 코인/초</dt>
         <dd>
-          팬 {fmtHave(roy.fans)} × 0.02 × 홍보({PERSONA_TEXT[persona].short}) {roy.promotionMult.toFixed(2)} × 앨범 {roy.albumMult.toFixed(2)} × 자아 {roy.personaMult} ={' '}
+          팬 {fmtHave(roy.fans)} × 0.02 × 홍보({PERSONA_TEXT[persona].short}) {roy.promotionMult.toFixed(2)} × 앨범 {roy.albumMult.toFixed(2)} × 자아 {roy.personaMult} × 다이아 {roy.diamondMult.toFixed(2)} ={' '}
           <b>{fmtRate(roy.perSec)}</b> ({PERSONA_TEXT[persona].short})
         </dd>
         <dt>레벨</dt>

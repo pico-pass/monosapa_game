@@ -5,12 +5,15 @@ import { BALANCE, STAGES, TOUR_STAGE } from '../game/balance';
 import {
   abandonConcert as abandonRun,
   beginManualConcert,
+  buyDiamondUpgrade,
   buyEquipment,
   buyMusicPower,
+  clearSeizure,
   finishManualConcert,
   releaseAlbum,
   releaseSingle,
   runAutoConcert,
+  skipConcertCooldown,
   switchPersona,
   work,
   type AlbumInfo,
@@ -36,6 +39,7 @@ import { stageStatus } from '../game/selectors';
 import { makeReport, settleOffline, settleOnline, type OfflineReport } from '../game/simulation';
 import type {
   CommandResult,
+  DiamondUpgradeKind,
   EngineEvent,
   EquipmentKind,
   FailReason,
@@ -114,6 +118,8 @@ export interface UiState {
 const FAIL_TEXT: Record<FailReason, string> = {
   insufficient_rhymes: '라임이 부족해요.',
   insufficient_coins: '코인이 부족해요.',
+  insufficient_diamonds: '다이아가 부족해요.',
+  nothing_to_skip: '지금은 쓸 필요가 없어요.',
   max_level: '이미 최대 레벨이에요.',
   locked: '아직 열리지 않은 공연장이에요.',
   cooldown: '공연장 쿨다운 중이에요.',
@@ -474,6 +480,35 @@ export function doBuyMusicPower(persona: Persona = 'normal'): void {
   if (!r) return;
   if (!r.ok) return failToast(r.reason);
   say('buy', true);
+  sfx.buy();
+  saveNow();
+}
+
+/** 다이아로 공연 쿨다운을 바로 끝낸다. */
+export function doSkipCooldown(stageId: StageId): void {
+  const r = exec((s) => skipConcertCooldown(s, stageId));
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  sfx.buy();
+  toast(`💎 ${r.cost}로 쿨다운을 건너뛰었어요.`, 'good');
+  saveNow();
+}
+
+/** 다이아로 마이크 압수를 바로 해제한다 (과열도 식는다). */
+export function doClearSeizure(): void {
+  const r = exec(clearSeizure);
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  sfx.buy();
+  say('idle', true);
+  toast(`💎 ${r.cost}로 마이크 압수를 풀었어요. 과열도 식었어요.`, 'good');
+  saveNow();
+}
+
+export function doBuyDiamondUpgrade(kind: DiamondUpgradeKind): void {
+  const r = exec((s) => buyDiamondUpgrade(s, kind));
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
   sfx.buy();
   saveNow();
 }

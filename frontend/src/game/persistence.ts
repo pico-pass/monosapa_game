@@ -1,5 +1,6 @@
 import { BALANCE, SCHEMA_VERSION, STAGE_IDS } from './balance';
 import { ALBUM_CATALOG } from './content';
+import { retroactiveDiamonds } from './selectors';
 import type { ConcertRecord, DialogueTone, GameState, Persona, StageId } from './types';
 
 export const SAVE_KEY = 'monosapa.save';
@@ -34,6 +35,8 @@ export function createInitialState(now: number, reducedMotion = false): GameStat
     darkEquipment: { mic: 0, studio: 0, promotion: 0 },
     musicPower: 0,
     dripPower: 0,
+    diamonds: 0,
+    diamondUpgrades: { production: 0, royalty: 0 },
     singles: [],
     albums: [],
     concerts,
@@ -133,6 +136,16 @@ export function validateState(input: unknown): Validation {
         promotion: int(darkRaw, 'promotion', 0, darkMaxLv, 'darkEquipment.promotion'),
       };
     }
+    let diamondUpgrades = { production: 0, royalty: 0 };
+    if (o.diamondUpgrades !== undefined) {
+      const dRaw = o.diamondUpgrades;
+      if (!isObj(dRaw)) return bad('diamondUpgrades가 올바르지 않습니다.');
+      const dMax = BALANCE.diamond.upgrade.maxLevel;
+      diamondUpgrades = {
+        production: int(dRaw, 'production', 0, dMax, 'diamondUpgrades.production'),
+        royalty: int(dRaw, 'royalty', 0, dMax, 'diamondUpgrades.royalty'),
+      };
+    }
     const musicPower = o.musicPower === undefined ? 0 : int(o, 'musicPower', 0, 1000, 'musicPower');
     const dripPower = o.dripPower === undefined ? 0 : int(o, 'dripPower', 0, 1000, 'dripPower');
 
@@ -207,12 +220,16 @@ export function validateState(input: unknown): Validation {
       darkEquipment,
       musicPower,
       dripPower,
+      diamonds: o.diamonds === undefined ? 0 : num(o, 'diamonds', 0, R),
+      diamondUpgrades,
       singles,
       albums,
       concerts,
       tutorialFlags,
       settings,
     };
+    // 다이아가 없던 예전 저장: 지금까지 한 일에 대한 다이아를 한 번 소급 지급한다.
+    if (o.diamonds === undefined) state.diamonds = retroactiveDiamonds(state);
     return { ok: true, state };
   } catch (e) {
     if (e instanceof Invalid) return { ok: false, error: e.message };
