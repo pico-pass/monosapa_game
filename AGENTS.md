@@ -14,6 +14,12 @@ npm run build         # frontend + backend 빌드
 npm run sim           # 성장 속도 시뮬레이션 (frontend/scripts/simulate.ts)
 ```
 
+## 구조 원칙 (backend)
+
+- NestJS 권장 구조: 기능마다 `src/<기능>/` 폴더에 `*.module.ts`(모듈) · `*.controller.ts`(HTTP 입출력만) · `*.service.ts`(로직, `@Injectable`, 생성자 주입) · `dto/`(요청·응답 클래스)를 둔다. 컨트롤러에 로직을 넣지 않는다.
+- `src/app.module.ts` 루트 모듈이 기능 모듈을 `imports`로 모은다. `src/config/app.config.ts`가 포트·접두사·CORS 설정을 담고 환경 변수는 여기서만 읽는다. `src/main.ts`는 부트스트랩만 한다.
+- 현재 기능 모듈은 `health`(GET /api/health) 하나다.
+
 backend는 Nest CLI가 TypeScript 6 API를 쓰므로 backend 안에 typescript@6을 따로 둔다(frontend는 7). ESM 패키지라 상대 import에 `.js` 확장자를 붙인다.
 
 ## 구조 원칙 (frontend)

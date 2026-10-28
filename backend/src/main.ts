@@ -1,15 +1,15 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module.js';
+import { AppConfig } from './config/app.config.js';
 
-async function bootstrap() {
+async function bootstrap(): Promise<void> {
+  const config = new AppConfig();
   const app = await NestFactory.create(AppModule);
-  app.setGlobalPrefix('api');
-  // 개발 중 프런트엔드(Vite)가 직접 호출해도 되도록 로컬 오리진만 허용한다.
-  app.enableCors({ origin: [/^http:\/\/localhost:\d+$/, /^http:\/\/127\.0\.0\.1:\d+$/] });
-  const port = Number(process.env.PORT ?? 3000);
-  await app.listen(port);
-  console.log(`backend listening on http://localhost:${port}/api`);
+  app.setGlobalPrefix(config.globalPrefix);
+  app.enableCors({ origin: [...config.corsOrigins] });
+  await app.listen(config.port);
+  console.log(`backend listening on http://localhost:${config.port}/${config.globalPrefix}`);
 }
 
 void bootstrap();

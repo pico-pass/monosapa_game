@@ -11,7 +11,7 @@ npm workspaces 모노레포다.
 
 ```text
 frontend/   React + TypeScript + Vite 게임 클라이언트 (게임 규칙·UI·테스트·시뮬레이션 전부)
-backend/    NestJS + TypeScript 서버 골격 (GET /api/health 하나뿐, 게임은 아직 서버를 쓰지 않는다)
+backend/    NestJS + TypeScript 서버 골격 (GET /api/health 하나뿐, 게임은 아직 서버를 쓰지 않는다). 기능별 모듈 구조: src/health/{health.module,health.controller,health.service,dto/}, src/config/app.config.ts, src/app.module.ts, src/main.ts
 ```
 
 ```bash
