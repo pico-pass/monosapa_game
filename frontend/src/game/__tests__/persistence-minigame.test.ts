@@ -5,8 +5,6 @@ import {
   SAVE_KEY,
   createInitialState,
   discardCorrupt,
-  exportSave,
-  importSave,
   loadGame,
   parseSave,
   recoverFromBackup,
@@ -106,10 +104,10 @@ describe('저장·검증', () => {
 
   it('다이아: 왕복 저장되고, 다이아가 없던 예전 저장은 지금까지 한 일만큼 한 번 소급 지급한다', () => {
     const st = memoryStorage();
-    saveGame(st, { ...sampleState(), diamonds: 42, diamondUpgrades: { production: 3, royalty: 1 } }, T0 + 10);
+    saveGame(st, { ...sampleState(), diamonds: 42, diamondUpgrades: { production: 3, royalty: 1, offline: 0 } }, T0 + 10);
     const loaded = loadGame(st);
     expect(loaded.status === 'ok' && loaded.state.diamonds).toBe(42);
-    expect(loaded.status === 'ok' && loaded.state.diamondUpgrades).toEqual({ production: 3, royalty: 1 });
+    expect(loaded.status === 'ok' && loaded.state.diamondUpgrades).toEqual({ production: 3, royalty: 1, offline: 0 });
 
     // 예전 저장: 방구석 클리어(5) + 앨범 1장(30) + 팬 77(Lv.2 → +2)
     const { diamonds: _d, diamondUpgrades: _u, ...legacy } = sampleState();
@@ -119,16 +117,50 @@ describe('저장·검증', () => {
     };
     const old = validateState(withClear);
     expect(old.ok && old.state.diamonds).toBe(5 + 30 + 2);
-    expect(old.ok && old.state.diamondUpgrades).toEqual({ production: 0, royalty: 0 });
+    expect(old.ok && old.state.diamondUpgrades).toEqual({ production: 0, royalty: 0, offline: 0 });
     // 다이아 필드가 있으면 소급 지급하지 않는다 (0이어도 그대로)
     const zero = validateState({ ...withClear, diamonds: 0 });
     expect(zero.ok && zero.state.diamonds).toBe(0);
 
     expect(validateState({ ...sampleState(), diamonds: -1 }).ok).toBe(false);
     expect(validateState({ ...sampleState(), diamonds: Infinity }).ok).toBe(false);
-    expect(validateState({ ...sampleState(), diamondUpgrades: { production: 21, royalty: 0 } }).ok).toBe(false);
-    expect(validateState({ ...sampleState(), diamondUpgrades: { production: 1.5, royalty: 0 } }).ok).toBe(false);
+    expect(validateState({ ...sampleState(), diamondUpgrades: { production: 21, royalty: 0, offline: 0 } }).ok).toBe(false);
+    expect(validateState({ ...sampleState(), diamondUpgrades: { production: 1.5, royalty: 0, offline: 0 } }).ok).toBe(false);
     expect(validateState({ ...sampleState(), diamondUpgrades: 'x' }).ok).toBe(false);
+  });
+
+  it('스트리밍: 왕복 저장되고, 없던 예전 저장은 0에서 시작하며, 이상한 값은 거부·보정한다', () => {
+    const st = memoryStorage();
+    const streaming = {
+      totals: { spotify: 120.5, ytmusic: 80, melon: 40.25, applemusic: 10 },
+      settled: 90,
+      lastClaimAt: T0 + 5,
+      seed: 4000000000,
+    };
+    saveGame(st, { ...sampleState(), streaming }, T0 + 10);
+    const loaded = loadGame(st);
+    expect(loaded.status === 'ok' && loaded.state.streaming).toEqual(streaming);
+
+    // 예전 저장: 기록 0, 마지막 정산 시각은 저장의 마지막 정산 시각, 씨앗은 저장 시각에서 결정적으로 만든다
+    const { streaming: _s, ...legacy } = sampleState();
+    const old = validateState(legacy);
+    expect(old.ok && old.state.streaming.totals).toEqual({ spotify: 0, ytmusic: 0, melon: 0, applemusic: 0 });
+    expect(old.ok && old.state.streaming.settled).toBe(0);
+    expect(old.ok && old.state.streaming.lastClaimAt).toBe(legacy.lastSettledAt);
+    const again = validateState(legacy);
+    expect(again.ok && again.state.streaming.seed).toBe(old.ok && old.state.streaming.seed);
+
+    // 정산한 양이 쌓인 양보다 클 수는 없다
+    const over = validateState({ ...sampleState(), streaming: { ...streaming, settled: 1e9 } });
+    expect(over.ok && over.state.streaming.settled).toBe(120.5 + 80 + 40.25 + 10);
+
+    expect(validateState({ ...sampleState(), streaming: 'x' }).ok).toBe(false);
+    expect(validateState({ ...sampleState(), streaming: { ...streaming, totals: null } }).ok).toBe(false);
+    expect(validateState({ ...sampleState(), streaming: { ...streaming, totals: { ...streaming.totals, melon: -1 } } }).ok).toBe(false);
+    expect(validateState({ ...sampleState(), streaming: { ...streaming, totals: { spotify: 1, ytmusic: 1, melon: 1 } } }).ok).toBe(false);
+    expect(validateState({ ...sampleState(), streaming: { ...streaming, seed: 1.5 } }).ok).toBe(false);
+    expect(validateState({ ...sampleState(), streaming: { ...streaming, seed: 2 ** 32 } }).ok).toBe(false);
+    expect(validateState({ ...sampleState(), streaming: { ...streaming, lastClaimAt: NaN } }).ok).toBe(false);
   });
 
   it('10) 손상 JSON·이전/미래 스키마·음수·무한 수치를 거부한다', () => {
@@ -205,16 +237,6 @@ describe('저장·검증', () => {
     const st = memoryStorage();
     expect(saveGame(st, { ...sampleState(), coins: NaN }, T0).ok).toBe(false);
     expect(st.data.has(SAVE_KEY)).toBe(false);
-  });
-
-  it('내보내기 → 불러오기, 불러오기는 lastSettledAt을 현재로 맞춘다', () => {
-    const st = memoryStorage();
-    const text = exportSave({ ...sampleState(), lastSettledAt: T0 - 10 * 3600_000 }, T0);
-    const r = importSave(st, text, T0 + 5);
-    expect(r.ok).toBe(true);
-    if (r.ok) expect(r.state.lastSettledAt).toBe(T0 + 5);
-    expect(importSave(st, '{bad', T0).ok).toBe(false);
-    expect(loadGame(st).status).toBe('ok');
   });
 });
 

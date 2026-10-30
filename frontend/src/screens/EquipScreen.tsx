@@ -31,7 +31,7 @@ export function EquipScreen() {
       <ClickPowerCard g={g} persona={view} />
 
       <h2 className="section-title">다이아 업그레이드</h2>
-      <p className="muted">다이아로만 올릴 수 있는 영구 업그레이드예요. 일반·어둠 두 속성 모두에 적용돼요. 최대 레벨 {BALANCE.diamond.upgrade.maxLevel}.</p>
+      <p className="muted">다이아로만 올릴 수 있는 영구 업그레이드예요. 일반·어둠 두 속성 모두에 적용돼요. 최대 레벨은 항목마다 달라요.</p>
       {DIAMOND_UPGRADE_KINDS.map((kind) => (
         <DiamondUpgradeCard key={kind} g={g} kind={kind} />
       ))}
@@ -42,7 +42,10 @@ export function EquipScreen() {
 const DIAMOND_UPGRADE_TEXT = {
   production: { name: '생산 증폭', icon: '⚡', effect: '자동 생산과 작업하기 라임이 늘어나요 (+5% / 레벨)', label: '생산 배율' },
   royalty: { name: '인세 증폭', icon: '💰', effect: '초당 인세 코인이 늘어나요 (+5% / 레벨)', label: '인세 배율' },
+  offline: { name: '오프라인 정산 확장', icon: '🌙', effect: '자리를 비운 동안 쌓이는 시간 상한이 30분 늘어나요 (기본 2시간)', label: '정산 상한' },
 } as const;
+
+const fmtHours = (ms: number) => `${Math.round((ms / 3600_000) * 10) / 10}시간`;
 
 function DiamondUpgradeCard({ g, kind }: { g: GameState; kind: DiamondUpgradeKind }) {
   const pv = previewDiamondUpgrade(g, kind);
@@ -54,7 +57,7 @@ function DiamondUpgradeCard({ g, kind }: { g: GameState; kind: DiamondUpgradeKin
           <span aria-hidden>{t.icon}</span> {t.name} <small>Lv.{pv.level}</small>
         </h3>
       </div>
-      <Progress value={pv.level} max={BALANCE.diamond.upgrade.maxLevel} label={`${t.name} 레벨`} />
+      <Progress value={pv.level} max={pv.maxLevel} label={`${t.name} 레벨`} />
       <p className="muted">{t.effect}</p>
       {pv.maxed ? (
         <p className="maxed">최대 레벨 도달 ✨</p>
@@ -64,7 +67,15 @@ function DiamondUpgradeCard({ g, kind }: { g: GameState; kind: DiamondUpgradeKin
             <div>
               <dt>{t.label}</dt>
               <dd>
-                ×{pv.before.toFixed(2)} → <b>×{pv.after.toFixed(2)}</b>
+                {kind === 'offline' ? (
+                  <>
+                    {fmtHours(pv.before)} → <b>{fmtHours(pv.after)}</b>
+                  </>
+                ) : (
+                  <>
+                    ×{pv.before.toFixed(2)} → <b>×{pv.after.toFixed(2)}</b>
+                  </>
+                )}
               </dd>
             </div>
           </dl>

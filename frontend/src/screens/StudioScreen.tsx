@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { StudioScene, type Mood } from '../components/StudioScene';
 import { HeatGauge, PersonaBadge, WorkPad } from '../components/parts';
-import { fmtHave, fmtRate } from '../components/format';
+import { fmtDuration, fmtHave, fmtRate } from '../components/format';
 import { BALANCE } from '../game/balance';
-import { CLICK_POWER_TEXT, PERSONA_TEXT } from '../game/content';
+import { titleText } from '../game/achievements';
+import { CAMPAIGN_TEXT, CLICK_POWER_TEXT, PERSONA_TEXT, SNACK_TEXT } from '../game/content';
 import {
   clickGain,
   clickPowerOf,
@@ -35,6 +36,8 @@ export function StudioScreen() {
   }, [ui.workPulse]);
 
   const mood: Mood = penalized && persona === 'normal' ? 'seized' : hot ? 'hot' : working ? 'work' : 'idle';
+  const snack = g.buffs.snack && g.buffs.snack.until > now ? g.buffs.snack : null;
+  const campaign = g.buffs.campaign && g.buffs.campaign.until > now ? g.buffs.campaign : null;
   const hint = currentHint(g);
   const preview = previewSingle(g);
 
@@ -49,6 +52,7 @@ export function StudioScreen() {
         )}
         <div className="scene-tag">
           <PersonaBadge persona={persona} /> {PERSONA_TEXT[persona].name}
+          {titleText(g) && <em className="scene-title"> 「{titleText(g)}」</em>}
         </div>
       </div>
 
@@ -78,6 +82,21 @@ export function StudioScreen() {
       </p>
 
       <HeatGauge heat={g.heat} persona={persona} />
+
+      {(snack || campaign) && (
+        <div className="buff-row" role="status">
+          {snack && (
+            <button type="button" className="buff-chip" onClick={() => setTab('shop')}>
+              {SNACK_TEXT[snack.id].icon} 작업 라임 +{Math.round(BALANCE.shop.snacks[snack.id].bonus * 100)}% · {fmtDuration(snack.until - now)}
+            </button>
+          )}
+          {campaign && (
+            <button type="button" className="buff-chip" onClick={() => setTab('shop')}>
+              {CAMPAIGN_TEXT[campaign.id].icon} 팬 ×{BALANCE.shop.campaigns[campaign.id].mult} · {fmtDuration(campaign.until - now)}
+            </button>
+          )}
+        </div>
+      )}
 
       {penalized && persona === 'normal' && (
         <>

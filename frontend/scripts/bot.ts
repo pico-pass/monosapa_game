@@ -1,10 +1,12 @@
 /**
  * 시뮬레이션 봇. 게임 엔진·명령을 그대로 호출하며 1초 단위로 플레이한다.
- * 정책: 발매 가능하면 즉시 발매, 앨범·장비 중 가장 싼 것부터 구매(어둠을 쓰는 전략은 어둠 장비도), 공연은 자동 공연.
+ * 정책: 발매 가능하면 즉시 발매, 앨범·장비 중 가장 싼 것부터 구매(어둠을 쓰는 전략은 어둠 장비도), 공연은 자동 공연,
+ * 스트리밍은 정산 간격이 되는 즉시 정산.
  */
 import { STAGES, TOUR_STAGE } from '../src/game/balance';
 import {
   buyEquipment,
+  claimStreaming,
   releaseAlbum,
   releaseSingle,
   runAutoConcert,
@@ -30,6 +32,8 @@ export interface Scenario {
   label: string;
   strategy: Strategy;
   clicksPerSec: number;
+  /** false면 스트리밍 정산을 하지 않는다(스트리밍 추가 전 성장 속도와 비교용). 기본은 정산 간격이 되는 대로 정산한다. */
+  claimStreaming?: boolean;
 }
 
 export interface Milestones {
@@ -94,6 +98,12 @@ export function run(sc: Scenario): { m: Milestones; end: GameState } {
       const other = s.activePersona === 'normal' ? 'dark' : 'normal';
       const cur = previewSingle(s);
       if (!cur.affordable && rhymesOf(s, other) >= cur.needRhymes && switchStatus(s, other).allowed) trySwitch(other);
+    }
+
+    // 스트리밍 정산 (정산 간격이 지났고 받을 코인이 있을 때만 성공한다)
+    if (sc.claimStreaming !== false) {
+      const claim = claimStreaming(s);
+      if (claim.ok) s = claim.state;
     }
 
     // 발매

@@ -1,5 +1,7 @@
 import { BALANCE } from './balance';
-import { clampResource, diamondProductionMult, productionMultiplier, royaltyBreakdown } from './selectors';
+import { clampResource, diamondProductionMult, offlineCapMs, productionMultiplier, royaltyBreakdown, streamTotal } from './selectors';
+import { bonuses } from './packdata';
+import { accrueStreams } from './streaming';
 import type { AdvanceContext, AdvanceResult, EngineEvent, GameState } from './types';
 
 const P = BALANCE.persona;
@@ -19,8 +21,9 @@ export function advance(state: GameState, durationMs: number, ctx: AdvanceContex
   if (!Number.isFinite(durationMs) || durationMs <= 0) return { state, events };
 
   const dMult = diamondProductionMult(state);
-  const normalMult = productionMultiplier(state, 'normal') * dMult;
-  const darkMult = productionMultiplier(state, 'dark') * dMult;
+  const bonus = bonuses(state);
+  const normalMult = productionMultiplier(state, 'normal') * dMult * (1 + bonus.rhyme.normal);
+  const darkMult = productionMultiplier(state, 'dark') * dMult * (1 + bonus.rhyme.dark);
   const royaltyPerSec = (persona: GameState['activePersona']) => royaltyBreakdown(state, persona).perSec;
   const eff = Math.max(0, ctx.efficiency);
 
@@ -33,6 +36,9 @@ export function advance(state: GameState, durationMs: number, ctx: AdvanceContex
   let dark = state.darkRhymes;
   let penaltyUntil = state.recoveryPenaltyUntil;
   let reentry = state.recoveryReentryRequired;
+  let seizures = 0;
+  let normalMs = 0;
+  let darkMs = 0;
 
   // 구간 수는 유한하다: 어둠→(80)→(100)→일반 이후에는 일반에서 경계가 하나뿐이다.
   for (let guard = 0; guard < 16 && t < end - EPS; guard++) {
@@ -43,6 +49,7 @@ export function advance(state: GameState, durationMs: number, ctx: AdvanceContex
       const sec = seg / 1000;
       const rate = P.normalRate * normalMult * (penalized ? P.recoveryPenalty : 1);
       normal += rate * sec * eff;
+      normalMs += seg;
       coins += royaltyPerSec('normal') * sec * eff;
       heat = Math.max(0, heat - P.heatDownPerSec * sec);
       t += seg;
@@ -55,6 +62,7 @@ export function advance(state: GameState, durationMs: number, ctx: AdvanceContex
       heat = P.maxHeat;
       penaltyUntil = t + P.recoveryMs;
       reentry = true;
+      seizures++;
       events.push({ type: 'micSeized' });
       continue;
     }
@@ -65,6 +73,7 @@ export function advance(state: GameState, durationMs: number, ctx: AdvanceContex
     const sec = seg / 1000;
     const rate = (hot ? P.darkHotRate : P.darkRate) * darkMult;
     dark += rate * sec * eff;
+    darkMs += seg;
     coins += royaltyPerSec('dark') * sec * eff;
     t += seg;
     if (seg >= toBoundaryMs - EPS) {
@@ -75,6 +84,7 @@ export function advance(state: GameState, durationMs: number, ctx: AdvanceContex
         persona = 'normal';
         penaltyUntil = t + P.recoveryMs;
         reentry = true;
+        seizures++;
         events.push({ type: 'micSeized' });
       }
     } else {
@@ -93,6 +103,11 @@ export function advance(state: GameState, durationMs: number, ctx: AdvanceContex
       darkRhymes: clampResource(dark),
       recoveryPenaltyUntil: penaltyUntil,
       recoveryReentryRequired: reentry,
+      counters: seizures > 0 ? { ...state.counters, seizures: state.counters.seizures + seizures } : state.counters,
+      // 결산(Wrapped)용: 생산이 지급된 시간만 자아별로 센다.
+      stats: eff > 0 && (normalMs > 0 || darkMs > 0) ? { ...state.stats, normalMs: state.stats.normalMs + normalMs, darkMs: state.stats.darkMs + darkMs } : state.stats,
+      // 스트리밍은 팬 수에만 비례하고 자아·과열과 무관해서 위 구간 계산과 따로 더한다.
+      streaming: accrueStreams(state.streaming, state.fans, state.lastSettledAt, end, eff),
     },
     events,
   };
@@ -113,8 +128,18 @@ export function clampTimers(state: GameState, now: number): GameState {
   }
   const lock = cap(state.switchLockedUntil, P.switchLockMs);
   const pen = cap(state.recoveryPenaltyUntil, P.recoveryMs);
-  if (!changed && lock === state.switchLockedUntil && pen === state.recoveryPenaltyUntil) return state;
-  return { ...state, concerts, switchLockedUntil: lock, recoveryPenaltyUntil: pen };
+  // 마지막 정산 시각이 미래면 다음 정산이 정산 간격보다 늦어지므로 지금으로 당겨 놓는다.
+  const claimAt = Math.min(state.streaming.lastClaimAt, now);
+  if (!changed && lock === state.switchLockedUntil && pen === state.recoveryPenaltyUntil && claimAt === state.streaming.lastClaimAt) {
+    return state;
+  }
+  return {
+    ...state,
+    concerts,
+    switchLockedUntil: lock,
+    recoveryPenaltyUntil: pen,
+    streaming: claimAt === state.streaming.lastClaimAt ? state.streaming : { ...state.streaming, lastClaimAt: claimAt },
+  };
 }
 
 export interface SettleResult {
@@ -140,13 +165,13 @@ export function settleOnline(state: GameState, now: number): SettleResult {
 }
 
 /**
- * 오프라인 정산. 앞쪽 2시간만 효율 70%로 지급하고 나머지는 보상 없이 시간만 흘려보낸다.
+ * 오프라인 정산. 앞쪽 2시간(다이아 업그레이드로 최대 6시간)만 효율 70%로 지급하고 나머지는 보상 없이 시간만 흘려보낸다.
  * (과열 회복·잠금 해제는 실제 시간 100%.) 정산 후 lastSettledAt은 now가 된다.
  */
 export function settleOffline(state: GameState, now: number): SettleResult {
   const gap = Math.max(now - state.lastSettledAt, 0);
   if (gap === 0) return settleOnline(state, now);
-  const paid = Math.min(gap, BALANCE.offline.capMs);
+  const paid = Math.min(gap, offlineCapMs(state));
   const first = advance(state, paid, OFFLINE);
   const rest = gap - paid;
   const second = rest > 0 ? advance(first.state, rest, { efficiency: 0 }) : { state: first.state, events: [] };
@@ -166,6 +191,8 @@ export interface OfflineReport {
   coins: number;
   normalRhymes: number;
   darkRhymes: number;
+  /** 자리를 비운 동안 쌓인 스트리밍 (정산은 통계 탭에서) */
+  streams: number;
   micSeized: boolean;
   startedPersona: GameState['activePersona'];
 }
@@ -178,6 +205,7 @@ export function makeReport(before: GameState, r: SettleResult): OfflineReport {
     coins: r.state.coins - before.coins,
     normalRhymes: r.state.normalRhymes - before.normalRhymes,
     darkRhymes: r.state.darkRhymes - before.darkRhymes,
+    streams: streamTotal(r.state.streaming) - streamTotal(before.streaming),
     micSeized: r.events.some((e) => e.type === 'micSeized'),
     startedPersona: before.activePersona,
   };

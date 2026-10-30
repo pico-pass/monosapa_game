@@ -317,7 +317,7 @@ describe('다이아', () => {
   });
 
   it('공연장마다 값이 다르고 모두 양수', () => {
-    expect(STAGES.map((d) => d.firstClearDiamonds)).toEqual([5, 10, 15, 20, 30, 40, 50, 80]);
+    expect(STAGES.map((d) => d.firstClearDiamonds)).toEqual([5, 10, 15, 20, 30, 40, 50, 80, 100, 150, 200]);
   });
 
   it('앨범 발매: 앨범별 다이아 (30, 60, 120)', () => {
@@ -389,17 +389,17 @@ describe('다이아', () => {
     expect(diamondUpgradeCost('royalty', 4)).toBe(Math.ceil(5 * 1.25 ** 4));
     const r = buyDiamondUpgrade(base({ diamonds: 6, coins: 1e9 }), 'production');
     expect(r.ok && r.state.diamonds).toBe(1);
-    expect(r.ok && r.state.diamondUpgrades).toEqual({ production: 1, royalty: 0 });
+    expect(r.ok && r.state.diamondUpgrades).toEqual({ production: 1, royalty: 0, offline: 0 });
     expect(r.ok && r.state.coins).toBe(1e9); // 코인은 건드리지 않는다
     expect(buyDiamondUpgrade(base({ diamonds: 4 }), 'royalty')).toMatchObject({ ok: false, reason: 'insufficient_diamonds' });
-    const maxed = base({ diamonds: 1e9, diamondUpgrades: { production: 20, royalty: 3 } });
+    const maxed = base({ diamonds: 1e9, diamondUpgrades: { production: 20, royalty: 3, offline: 0 } });
     expect(buyDiamondUpgrade(maxed, 'production')).toMatchObject({ ok: false, reason: 'max_level' });
     expect(buyDiamondUpgrade(maxed, 'royalty')).toMatchObject({ ok: true });
   });
 
   it('생산 증폭은 두 자아의 자동 생산·작업하기에, 인세 증폭은 인세에 (1 + 0.05×레벨)로 곱해진다', () => {
     const plain = base({ fans: 100 });
-    const amped = base({ fans: 100, diamondUpgrades: { production: 4, royalty: 10 } }); // ×1.2, ×1.5
+    const amped = base({ fans: 100, diamondUpgrades: { production: 4, royalty: 10, offline: 0 } }); // ×1.2, ×1.5
     for (const p of ['normal', 'dark'] as const) {
       expect(rhymeRate(amped, p)).toBeCloseTo(rhymeRate(plain, p) * 1.2, 9);
       expect(clickGain(amped, p)).toBeCloseTo(clickGain(plain, p) * 1.2, 9);
@@ -607,7 +607,7 @@ describe('공연', () => {
 
   it('소형 공연장 이후 단콘→중형→중대형→대형→월클 순서로 열린다', () => {
     const order = ['hall', 'solo', 'medium', 'large', 'arena', 'world'] as const;
-    expect(STAGES.map((d) => d.id)).toEqual(['room', 'club', ...order]);
+    expect(STAGES.filter((d) => !d.darkOnly).map((d) => d.id)).toEqual(['room', 'club', ...order]);
     // 팬이 충분해도 앞 공연장을 클리어해야 열린다
     let s = fanned(1e6);
     expect(stageStatus(s, 'solo').unlocked).toBe(false);

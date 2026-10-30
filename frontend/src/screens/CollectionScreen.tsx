@@ -1,7 +1,7 @@
 import { PersonaBadge } from '../components/parts';
 import { STAGES } from '../game/balance';
 import { ALBUM_CATALOG, STAGE_TEXT } from '../game/content';
-import { isTourComplete } from '../game/selectors';
+import { isTourComplete, stageStatus } from '../game/selectors';
 import type { Persona, Single } from '../game/types';
 import { useUi } from '../store/gameStore';
 
@@ -15,7 +15,9 @@ const SINGLE_GROUPS: { persona: Persona; title: string }[] = [
 export function CollectionScreen() {
   const { game: g } = useUi();
   const singlesOf = (p: Persona) => g.singles.filter((s) => s.persona === p);
-  const clearedStages = STAGES.filter((d) => g.concerts[d.id].cleared).length;
+  // 비밀 공연장은 열리기 전에는 도감에도 보이지 않는다.
+  const stages = STAGES.filter((d) => stageStatus(g, d.id).visible);
+  const clearedStages = stages.filter((d) => g.concerts[d.id].cleared).length;
 
   return (
     <section className="screen" aria-label="도감">
@@ -37,7 +39,7 @@ export function CollectionScreen() {
         </div>
         <div>
           <strong>
-            {clearedStages}/{STAGES.length}
+            {clearedStages}/{stages.length}
           </strong>
           <span>클리어 공연장</span>
         </div>
@@ -50,7 +52,7 @@ export function CollectionScreen() {
 
       <h3 className="sub-title">공연 기록</h3>
       <ul className="collection">
-        {STAGES.map((def) => {
+        {stages.map((def) => {
           const rec = g.concerts[def.id];
           return (
             <li key={def.id} className="collect">

@@ -1,6 +1,7 @@
-import { BALANCE, STAGES, TOUR_STAGE } from './balance';
+import { BALANCE, SECRET_STAGE_IDS, STAGES, STREAM_PLATFORMS, TOUR_STAGE, WORLD_STAGE, type AchievementMetric, type MissionMetric } from './balance';
 import { ALBUM_CATALOG, singleTitle, type AlbumDef } from './content';
-import type { DiamondUpgradeKind, Equipment, EquipmentKind, GameState, Persona, StageId } from './types';
+import { bonuses, completedSets, mascotStage, photoDistinct, songCardOf, type BonusState } from './packdata';
+import type { CounterKey, DiamondUpgradeKind, Equipment, EquipmentKind, GameState, Persona, StageId, Streaming } from './types';
 
 const P = BALANCE.persona;
 
@@ -36,16 +37,52 @@ export const diamondProductionMult = (s: Pick<GameState, 'diamondUpgrades'>): nu
 export const diamondRoyaltyMult = (s: Pick<GameState, 'diamondUpgrades'>): number =>
   1 + BALANCE.diamond.upgrade.royalty.perLevel * s.diamondUpgrades.royalty;
 
-type ClickState = Pick<GameState, 'equipment' | 'darkEquipment' | 'musicPower' | 'dripPower' | 'activePersona' | 'diamondUpgrades'>;
+/* ---------- 상점 버프 ---------- */
+
+/** 지금(정산된 시각) 켜져 있는 간식의 작업하기 라임 배율. 없거나 끝났으면 1. */
+export function snackMult(s: Pick<GameState, 'buffs' | 'lastSettledAt'>): number {
+  const b = s.buffs.snack;
+  return b && b.until > s.lastSettledAt ? 1 + BALANCE.shop.snacks[b.id].bonus : 1;
+}
+
+/** 지금 켜져 있는 홍보 캠페인의 팬 획득 배율. 없거나 끝났으면 1. */
+export function campaignMult(s: Pick<GameState, 'buffs' | 'lastSettledAt'>): number {
+  const b = s.buffs.campaign;
+  return b && b.until > s.lastSettledAt ? BALANCE.shop.campaigns[b.id].mult : 1;
+}
+
+/** 상점 코인 가격: 기본가 × 25 × (1 + 0.25 × (플레이어 레벨 − 1)) */
+export function shopPrice(base: number, fans: number): number {
+  return Math.ceil(base * BALANCE.shop.priceMult * (1 + BALANCE.shop.priceLevelStep * (playerLevel(fans) - 1)));
+}
+
+/** 오프라인 정산으로 인정하는 최대 시간(ms). 기본 2시간 + 다이아 업그레이드. */
+export function offlineCapMs(s: Pick<GameState, 'diamondUpgrades'> & Partial<BonusState>): number {
+  const u = BALANCE.diamond.upgrade.offline;
+  const extra = s.cards && s.photo && s.feat && s.mascot && s.singles ? bonuses(s as BonusState).offlineMs : 0;
+  return BALANCE.offline.capMs + u.perLevelMs * s.diamondUpgrades.offline + extra;
+}
+
+/** 수집품(곡 카드·피처링·포토 세트·마스코트)이 주는 그 자아의 라임 생산 배율 */
+export const collectionProductionMult = (s: BonusState, persona: Persona): number => 1 + bonuses(s).rhyme[persona];
+
+/** 싱글·앨범·모노그램으로 얻는 팬에 곱하는 배율: 홍보 캠페인 × 수집 팬 보너스 */
+export const fanGainMult = (s: Pick<GameState, 'buffs' | 'lastSettledAt'> & BonusState): number => campaignMult(s) * (1 + bonuses(s).fan);
+
+type ClickState = Pick<
+  GameState,
+  'equipment' | 'darkEquipment' | 'musicPower' | 'dripPower' | 'activePersona' | 'diamondUpgrades' | 'buffs' | 'lastSettledAt'
+> &
+  BonusState;
 
 /** 작업하기 한 번에 얻는 기본 라임(생산배율 곱하기 전). 그 속성의 클릭 업그레이드 레벨당 늘어난다. */
 export function clickValue(s: ClickState, persona: Persona = s.activePersona): number {
   return BALANCE.click.value + clickDef(persona).clickPerLevel * clickPowerOf(s, persona);
 }
 
-/** 작업하기 한 번에 실제로 얻는 라임 = 기본 라임 × 그 속성의 생산배율 × 다이아 생산 증폭 */
+/** 작업하기 한 번에 실제로 얻는 라임 = 기본 라임 × 그 속성의 생산배율 × 다이아 생산 증폭 × 간식 */
 export const clickGain = (s: ClickState, persona: Persona = s.activePersona): number =>
-  clickValue(s, persona) * productionMultiplier(s, persona) * diamondProductionMult(s);
+  clickValue(s, persona) * productionMultiplier(s, persona) * diamondProductionMult(s) * snackMult(s) * collectionProductionMult(s, persona);
 
 export function playerLevel(fans: number): number {
   return 1 + Math.floor(Math.sqrt(fans / BALANCE.level.fansPerStep));
@@ -60,7 +97,7 @@ export function isPenaltyActive(s: GameState, at: number = s.lastSettledAt): boo
 
 /** 현재(혹은 at 시점) 상태에서의 라임 초당 생산량. 효율(오프라인)은 곱하지 않는다. */
 export function rhymeRate(s: GameState, persona: Persona = s.activePersona, at: number = s.lastSettledAt): number {
-  const mult = productionMultiplier(s, persona) * diamondProductionMult(s);
+  const mult = productionMultiplier(s, persona) * diamondProductionMult(s) * collectionProductionMult(s, persona);
   if (persona === 'normal') {
     return P.normalRate * mult * (isPenaltyActive(s, at) ? P.recoveryPenalty : 1);
   }
@@ -75,6 +112,8 @@ export interface RoyaltyBreakdown {
   personaMult: number;
   /** 다이아 인세 증폭 */
   diamondMult: number;
+  /** 수집품(곡 카드·피처링·포토 세트) 인세 보너스 */
+  collectionMult: number;
 }
 
 export function royaltyBreakdown(s: GameState, persona: Persona = s.activePersona): RoyaltyBreakdown {
@@ -82,17 +121,48 @@ export function royaltyBreakdown(s: GameState, persona: Persona = s.activePerson
   const albumMult = 1 + albumRoyaltyBonus(s.albums.length);
   const personaMult = persona === 'normal' ? P.normalRoyaltyMult : P.darkRoyaltyMult;
   const diamondMult = diamondRoyaltyMult(s);
+  const collectionMult = 1 + bonuses(s).coin;
   return {
-    perSec: s.fans * BALANCE.royalty.perFan * promotionMult * albumMult * personaMult * diamondMult,
+    perSec: s.fans * BALANCE.royalty.perFan * promotionMult * albumMult * personaMult * diamondMult * collectionMult,
     fans: s.fans,
     promotionMult,
     albumMult,
     personaMult,
     diamondMult,
+    collectionMult,
   };
 }
 
 export const royaltyRate = (s: GameState, persona: Persona = s.activePersona) => royaltyBreakdown(s, persona).perSec;
+
+/* ---------- 스트리밍 ---------- */
+
+/** 초당 스트리밍 = 팬 수 × perFanPerSec. 자아·장비와 무관하다. */
+export const streamRate = (s: Pick<GameState, 'fans'>): number => s.fans * BALANCE.streaming.perFanPerSec;
+
+export const streamTotal = (st: Streaming): number => STREAM_PLATFORMS.reduce((sum, p) => sum + st.totals[p], 0);
+
+/** 아직 코인으로 정산하지 않은 스트리밍 */
+export const streamsPending = (st: Streaming): number => Math.max(0, streamTotal(st) - st.settled);
+
+export interface StreamClaimStatus {
+  /** 정산 대기 스트리밍 */
+  pending: number;
+  /** 지금 정산하면 받는 코인 */
+  coins: number;
+  /** 다음 정산까지 남은 시간(ms). 0이면 간격은 지났다. */
+  waitMs: number;
+  /** 간격이 지났고 받을 코인이 있다 */
+  ready: boolean;
+}
+
+/** 정산 상태. 시계는 정산이 끝난 state.lastSettledAt을 쓴다. */
+export function streamClaimStatus(s: GameState): StreamClaimStatus {
+  const pending = streamsPending(s.streaming);
+  const coins = Math.floor(pending / BALANCE.streaming.streamsPerCoin + 1e-9);
+  const waitMs = Math.max(0, s.streaming.lastClaimAt + BALANCE.streaming.claimIntervalMs - s.lastSettledAt);
+  return { pending, coins, waitMs, ready: waitMs === 0 && coins > 0 };
+}
 
 /* ---------- 싱글 ---------- */
 
@@ -283,6 +353,10 @@ export function levelUpDiamonds(fansBefore: number, fansAfter: number): number {
   return Math.max(0, playerLevel(fansAfter) - playerLevel(fansBefore)) * BALANCE.diamond.levelUp;
 }
 
+/** 다이아 전용 업그레이드 한 종류의 최대 레벨. 오프라인 확장만 따로 정해져 있다. */
+export const diamondUpgradeMaxLevel = (kind: DiamondUpgradeKind): number =>
+  kind === 'offline' ? BALANCE.diamond.upgrade.offline.maxLevel : BALANCE.diamond.upgrade.maxLevel;
+
 /** 다이아 전용 업그레이드 한 종류의 다음 레벨 비용(다이아) */
 export function diamondUpgradeCost(kind: DiamondUpgradeKind, level: number): number {
   const c = BALANCE.diamond.upgrade[kind];
@@ -292,29 +366,25 @@ export function diamondUpgradeCost(kind: DiamondUpgradeKind, level: number): num
 export interface DiamondUpgradePreview {
   kind: DiamondUpgradeKind;
   level: number;
+  maxLevel: number;
   maxed: boolean;
   cost: number;
   affordable: boolean;
-  /** 올리기 전/후 배율 */
+  /** 올리기 전/후 값. 생산·인세는 배율, 오프라인은 정산 상한(ms) */
   before: number;
   after: number;
 }
 
 export function previewDiamondUpgrade(s: GameState, kind: DiamondUpgradeKind): DiamondUpgradePreview {
   const level = s.diamondUpgrades[kind];
-  const { maxLevel } = BALANCE.diamond.upgrade;
+  const maxLevel = diamondUpgradeMaxLevel(kind);
   const maxed = level >= maxLevel;
-  const perLevel = BALANCE.diamond.upgrade[kind].perLevel;
   const cost = diamondUpgradeCost(kind, level);
-  return {
-    kind,
-    level,
-    maxed,
-    cost,
-    affordable: !maxed && s.diamonds >= cost,
-    before: 1 + perLevel * level,
-    after: 1 + perLevel * Math.min(level + 1, maxLevel),
-  };
+  const at = (lv: number) =>
+    kind === 'offline'
+      ? BALANCE.offline.capMs + BALANCE.diamond.upgrade.offline.perLevelMs * lv
+      : 1 + BALANCE.diamond.upgrade[kind].perLevel * lv;
+  return { kind, level, maxLevel, maxed, cost, affordable: !maxed && s.diamonds >= cost, before: at(level), after: at(Math.min(level + 1, maxLevel)) };
 }
 
 /**
@@ -394,6 +464,12 @@ export interface StageStatus {
   baseCoins: number;
   firstClearCoins: number;
   firstClearDiamonds: number;
+  /** 어둠속성으로만 입장하는 비밀 공연장 */
+  darkOnly: boolean;
+  /** 지금 자아로 입장할 수 있다 (비밀 공연장은 어둠일 때만) */
+  personaOk: boolean;
+  /** 목록에 보이는 공연장. 비밀 공연장은 앞 공연장을 클리어해야 나타난다. */
+  visible: boolean;
 }
 
 export function stageStatus(s: GameState, id: StageId, at: number = s.lastSettledAt): StageStatus {
@@ -404,6 +480,8 @@ export function stageStatus(s: GameState, id: StageId, at: number = s.lastSettle
   const fansOk = s.fans >= def.fans;
   const unlocked = fansOk && previousCleared;
   const cooldownLeftMs = Math.max(0, rec.cooldownUntil - at);
+  const darkOnly = !!def.darkOnly;
+  const personaOk = !darkOnly || s.activePersona === 'dark';
   return {
     id,
     fansRequired: def.fans,
@@ -413,10 +491,13 @@ export function stageStatus(s: GameState, id: StageId, at: number = s.lastSettle
     cleared: rec.cleared,
     bestScore: rec.bestScore,
     cooldownLeftMs,
-    canRun: unlocked && cooldownLeftMs <= 0,
+    canRun: unlocked && personaOk && cooldownLeftMs <= 0,
     baseCoins: def.baseCoins,
     firstClearCoins: def.firstClearCoins,
     firstClearDiamonds: def.firstClearDiamonds,
+    darkOnly,
+    personaOk,
+    visible: !darkOnly || previousCleared,
   };
 }
 
@@ -430,6 +511,73 @@ export function stageDifficulty(id: StageId): number {
 export const stageTaskGrowth = (id: StageId): number => BALANCE.concert.stageTaskGrowth[id] ?? BALANCE.concert.taskDifficultyGrowth;
 
 export const isTourComplete = (s: GameState) => s.concerts[TOUR_STAGE].cleared;
+
+/** 아직 보이지 않는 첫 비밀 공연장 (월클을 클리어하면 사라진다). 목록에 "???" 안내를 띄울 때 쓴다. */
+export const hiddenSecretStage = (s: GameState): StageId | null =>
+  s.concerts[WORLD_STAGE].cleared ? null : (SECRET_STAGE_IDS[0] ?? null);
+
+/* ---------- 업적·미션 지표 ---------- */
+
+/** 평생 누적 횟수 하나 */
+export const counterOf = (s: Pick<GameState, 'counters'>, key: CounterKey): number => s.counters[key] ?? 0;
+
+/** 모든 업적 지표의 현재 값. 목록 길이나 카운터에서 바로 읽을 수 있는 것만 있다. */
+export function achievementValue(s: GameState, metric: AchievementMetric): number {
+  switch (metric) {
+    case 'singles':
+      return s.singles.length;
+    case 'albums':
+      return s.albums.length;
+    case 'fans':
+      return Math.floor(s.fans);
+    case 'level':
+      return playerLevel(s.fans);
+    case 'stages':
+      return STAGES.filter((d) => !d.darkOnly && s.concerts[d.id]?.cleared).length;
+    case 'tour':
+      return s.concerts[TOUR_STAGE].cleared ? 1 : 0;
+    case 'world':
+      return s.concerts[WORLD_STAGE].cleared ? 1 : 0;
+    case 'secrets':
+      return SECRET_STAGE_IDS.filter((id) => s.concerts[id]?.cleared).length;
+    case 'maxedEquip':
+      return (
+        EQUIPMENT_KIND_LIST.filter((k) => s.equipment[k] >= BALANCE.equipment.maxLevel).length +
+        EQUIPMENT_KIND_LIST.filter((k) => s.darkEquipment[k] >= BALANCE.darkEquipment.maxLevel).length
+      );
+    case 'upgradeLevels':
+      return s.diamondUpgrades.production + s.diamondUpgrades.royalty + s.diamondUpgrades.offline;
+    case 'themes':
+      return s.cosmetics.themes.filter((t) => t !== 'default').length;
+    case 'streams':
+      return Math.floor(streamTotal(s.streaming));
+    case 'photoCards':
+      return photoDistinct(s.photo.owned);
+    case 'photoSets':
+      return completedSets(s.photo.owned).length;
+    case 'featOwned':
+      return Object.keys(s.feat.owned).length;
+    case 'mascotStage':
+      return Math.max(mascotStage(s.mascot.normal.xp), mascotStage(s.mascot.dark.xp));
+    case 'towerBest':
+      return s.arcade.tower.best;
+    case 'survivalBest':
+      return s.arcade.survival.best;
+    case 'lyricBest':
+      return s.arcade.lyric.best;
+    case 'ticketBest':
+      return s.arcade.ticketing.best;
+    case 'ssrCards':
+      return s.singles.filter((x) => songCardOf(s.cards, x).rarity === 'SSR').length;
+    default:
+      return counterOf(s, metric);
+  }
+}
+
+const EQUIPMENT_KIND_LIST: readonly EquipmentKind[] = ['mic', 'studio', 'promotion'];
+
+/** 미션 지표의 현재 값(평생 누적). 진행도는 이 값에서 그날(그 주) 시작할 때의 값을 뺀 것이다. */
+export const missionMetricValue = (s: Pick<GameState, 'counters'>, metric: MissionMetric): number => counterOf(s, metric);
 
 /* ---------- 튜토리얼(문맥 안내) ---------- */
 

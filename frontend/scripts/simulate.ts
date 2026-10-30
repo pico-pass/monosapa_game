@@ -1,5 +1,6 @@
 /**
  * 성장 속도 시뮬레이션 (기획서 10장·14장 12번). 실행: npm run sim
+ * 스트리밍 정산 없이 돌려 보려면: npm run sim -- --no-streaming
  */
 import { run, type Scenario } from './bot';
 
@@ -10,6 +11,7 @@ const fmt = (sec: number | undefined) => {
   return `${String(m).padStart(3)}분${String(s).padStart(2, '0')}초`;
 };
 
+const claim = !process.argv.includes('--no-streaming');
 const scenarios: Scenario[] = [
   { label: '방치·일반만', strategy: 'normal', clicksPerSec: 0 },
   { label: '방치·어둠우선', strategy: 'dark', clicksPerSec: 0 },
@@ -17,7 +19,7 @@ const scenarios: Scenario[] = [
   { label: '클릭1/s·일반만', strategy: 'normal', clicksPerSec: 1 },
   { label: '클릭1/s·혼합', strategy: 'mixed', clicksPerSec: 1 },
   { label: '풀클릭2/s·혼합', strategy: 'mixed', clicksPerSec: 2 },
-];
+].map((sc) => ({ ...sc, claimStreaming: claim }) as Scenario);
 
 console.log('시나리오'.padEnd(22), '첫발매    첫구매    첫앨범    팬100     방구석    팬400     지하클럽  팬1200    첫투어');
 for (const sc of scenarios) {

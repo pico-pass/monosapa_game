@@ -1,7 +1,31 @@
-import { BALANCE, SCHEMA_VERSION, STAGE_IDS } from './balance';
-import { ALBUM_CATALOG } from './content';
+import { ACHIEVEMENTS, BALANCE, CAMPAIGN_IDS, MISSION_METRICS, POST_KINDS, SCHEMA_VERSION, SNACK_IDS, STAGE_IDS, STREAM_PLATFORMS, THEME_IDS } from './balance';
+import { ALBUM_CATALOG, mailTemplateById } from './content';
+import { emptyFanMail } from './fanmail';
+import { emptyMissions } from './missions';
+import { emptyMonogram } from './monogram';
+import { Invalid, MAX_TIME, bad, bool, int, isObj, num, persona, str, type Obj } from './parse';
+import { emptyArcade, emptyCards, emptyFeat, emptyMascots, emptyPhoto, emptyStats, packSeeds, parseArcade, parseCards, parseFeat, parseMascots, parsePhoto, parseStats } from './pack-state';
 import { retroactiveDiamonds } from './selectors';
-import type { ConcertRecord, DialogueTone, GameState, Persona, StageId } from './types';
+import { streamSeedFrom, zeroTotals } from './streaming';
+import { COUNTER_KEYS, zeroCounters } from './tracking';
+import type {
+  Buffs,
+  CampaignId,
+  ConcertRecord,
+  Cosmetics,
+  Counters,
+  DialogueTone,
+  FanMail,
+  GameState,
+  Mail,
+  MissionState,
+  Monogram,
+  Post,
+  SnackId,
+  StageId,
+  Streaming,
+  ThemeId,
+} from './types';
 
 export const SAVE_KEY = 'monosapa.save';
 export const BACKUP_KEY = 'monosapa.save.backup';
@@ -36,7 +60,22 @@ export function createInitialState(now: number, reducedMotion = false): GameStat
     musicPower: 0,
     dripPower: 0,
     diamonds: 0,
-    diamondUpgrades: { production: 0, royalty: 0 },
+    diamondUpgrades: { production: 0, royalty: 0, offline: 0 },
+    buffs: { snack: null, campaign: null },
+    cosmetics: { themes: ['default'], theme: 'default', title: null },
+    counters: zeroCounters(),
+    achievements: {},
+    missions: emptyMissions(),
+    fanMail: emptyFanMail(now, streamSeedFrom(now + 1)),
+    monogram: emptyMonogram(streamSeedFrom(now + 2)),
+    cards: emptyCards(packSeeds(now).cards),
+    photo: emptyPhoto(packSeeds(now).photo),
+    feat: emptyFeat(packSeeds(now).feat),
+    mascot: emptyMascots(),
+    arcade: emptyArcade(),
+    stats: emptyStats(),
+    // 첫 정산은 시작 후 정산 간격이 지나야 한다.
+    streaming: { totals: zeroTotals(), settled: 0, lastClaimAt: now, seed: streamSeedFrom(now) },
     singles: [],
     albums: [],
     concerts,
@@ -48,43 +87,6 @@ export function createInitialState(now: number, reducedMotion = false): GameStat
 /* ---------- 검증 ---------- */
 
 export type Validation = { ok: true; state: GameState } | { ok: false; error: string };
-
-class Invalid extends Error {}
-const bad = (msg: string): never => {
-  throw new Invalid(msg);
-};
-
-type Obj = Record<string, unknown>;
-const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);
-
-function num(o: Obj, key: string, min: number, max: number, label = key): number {
-  const v = o[key];
-  if (typeof v !== 'number' || !Number.isFinite(v)) return bad(`${label}: 숫자가 아니거나 비정상 값입니다.`);
-  if (v < min || v > max) return bad(`${label}: 허용 범위(${min}~${max})를 벗어났습니다.`);
-  return v;
-}
-function int(o: Obj, key: string, min: number, max: number, label = key): number {
-  const v = num(o, key, min, max, label);
-  if (!Number.isInteger(v)) return bad(`${label}: 정수여야 합니다.`);
-  return v;
-}
-function str(o: Obj, key: string, maxLen = 200, label = key): string {
-  const v = o[key];
-  if (typeof v !== 'string' || v.length === 0 || v.length > maxLen) return bad(`${label}: 문자열이 올바르지 않습니다.`);
-  return v;
-}
-function bool(o: Obj, key: string, label = key): boolean {
-  const v = o[key];
-  if (typeof v !== 'boolean') return bad(`${label}: true/false 값이어야 합니다.`);
-  return v;
-}
-function persona(o: Obj, key: string, label = key): Persona {
-  const v = o[key];
-  if (v !== 'normal' && v !== 'dark') return bad(`${label}: 알 수 없는 자아입니다.`);
-  return v;
-}
-
-const MAX_TIME = 8.64e15;
 
 /** 스키마 버전 이동. 새 버전이 생기면 여기에 (from → from+1) 변환을 추가한다. */
 const MIGRATIONS: Record<number, (raw: Obj) => Obj> = {};
@@ -106,6 +108,117 @@ export function migrate(raw: Obj): Obj {
     version = cur.schemaVersion as number;
   }
   return cur;
+}
+
+/* ---------- 나중에 추가된 필드의 검증 ---------- */
+
+/** 숫자는 엄격하게, 알 수 없는 ID나 사라진 항목은 조용히 버린다. */
+function parseBuffs(raw: unknown): Buffs {
+  const buffs: Buffs = { snack: null, campaign: null };
+  if (raw === undefined) return buffs;
+  if (!isObj(raw)) return bad('buffs가 올바르지 않습니다.');
+  if (raw.snack != null) {
+    if (!isObj(raw.snack)) return bad('buffs.snack이 올바르지 않습니다.');
+    const id = raw.snack.id;
+    const until = num(raw.snack, 'until', 0, MAX_TIME, 'buffs.snack.until');
+    if (SNACK_IDS.includes(id as SnackId)) buffs.snack = { id: id as SnackId, until };
+  }
+  if (raw.campaign != null) {
+    if (!isObj(raw.campaign)) return bad('buffs.campaign이 올바르지 않습니다.');
+    const id = raw.campaign.id;
+    const until = num(raw.campaign, 'until', 0, MAX_TIME, 'buffs.campaign.until');
+    if (CAMPAIGN_IDS.includes(id as CampaignId)) buffs.campaign = { id: id as CampaignId, until };
+  }
+  return buffs;
+}
+
+function parseCosmetics(raw: unknown): Cosmetics {
+  if (raw === undefined) return { themes: ['default'], theme: 'default', title: null };
+  if (!isObj(raw)) return bad('cosmetics가 올바르지 않습니다.');
+  const owned = Array.isArray(raw.themes) ? raw.themes.filter((t): t is ThemeId => THEME_IDS.includes(t as ThemeId)) : [];
+  const themes = [...new Set<ThemeId>(['default', ...owned])];
+  const theme = themes.includes(raw.theme as ThemeId) ? (raw.theme as ThemeId) : 'default';
+  const title = typeof raw.title === 'string' && raw.title.length > 0 && raw.title.length <= 40 ? raw.title : null;
+  return { themes, theme, title };
+}
+
+function parseCounters(raw: unknown): Counters {
+  const counters = zeroCounters();
+  if (raw === undefined) return counters;
+  if (!isObj(raw)) return bad('counters가 올바르지 않습니다.');
+  for (const k of COUNTER_KEYS) if (raw[k] !== undefined) counters[k] = int(raw, k, 0, 1e12, `counters.${k}`);
+  return counters;
+}
+
+function parseAchievements(raw: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (raw === undefined) return out;
+  if (!isObj(raw)) return bad('achievements가 올바르지 않습니다.');
+  for (const def of ACHIEVEMENTS) if (raw[def.id] !== undefined) out[def.id] = num(raw, def.id, 0, MAX_TIME, `achievements.${def.id}`);
+  return out;
+}
+
+function parseMissions(raw: unknown): MissionState {
+  const m = emptyMissions();
+  if (raw === undefined) return m;
+  if (!isObj(raw)) return bad('missions가 올바르지 않습니다.');
+  const shortStr = (v: unknown) => (typeof v === 'string' && v.length <= 12 ? v : '');
+  const base = (b: unknown, label: string): Record<string, number> => {
+    const out: Record<string, number> = {};
+    if (b === undefined) return out;
+    if (!isObj(b)) return bad(`${label}가 올바르지 않습니다.`);
+    for (const k of MISSION_METRICS) if (b[k] !== undefined) out[k] = int(b, k, 0, 1e12, `${label}.${k}`);
+    return out;
+  };
+  return {
+    day: shortStr(raw.day),
+    week: shortStr(raw.week),
+    dayBase: base(raw.dayBase, 'missions.dayBase'),
+    weekBase: base(raw.weekBase, 'missions.weekBase'),
+    claimed: Array.isArray(raw.claimed) ? raw.claimed.filter((x): x is string => typeof x === 'string' && x.length <= 12).slice(0, 40) : [],
+    streak: raw.streak === undefined ? 0 : int(raw, 'streak', 0, 100000, 'missions.streak'),
+    lastAttend: shortStr(raw.lastAttend),
+  };
+}
+
+function parseFanMail(raw: unknown, lastSettledAt: number, seed: number): FanMail {
+  const fresh = emptyFanMail(lastSettledAt, seed);
+  if (raw === undefined) return fresh;
+  if (!isObj(raw)) return bad('fanMail이 올바르지 않습니다.');
+  const inbox: Mail[] = [];
+  if (Array.isArray(raw.inbox)) {
+    for (const x of raw.inbox.slice(-BALANCE.fanMail.cap)) {
+      if (!isObj(x) || !mailTemplateById(String(x.tpl))) continue; // 사라진 템플릿의 DM은 버린다
+      inbox.push({ id: str(x, 'id', 40, 'fanMail.inbox.id'), tpl: str(x, 'tpl', 40, 'fanMail.inbox.tpl'), nick: str(x, 'nick', 60, 'fanMail.inbox.nick'), at: num(x, 'at', 0, MAX_TIME, 'fanMail.inbox.at') });
+    }
+  }
+  return {
+    seed: int(raw, 'seed', 0, 0xffffffff, 'fanMail.seed'),
+    seq: int(raw, 'seq', 0, 1e12, 'fanMail.seq'),
+    nextAt: num(raw, 'nextAt', 0, MAX_TIME, 'fanMail.nextAt'),
+    inbox,
+  };
+}
+
+function parseMonogram(raw: unknown, seed: number): Monogram {
+  const g = BALANCE.monogram;
+  if (raw === undefined) return emptyMonogram(seed);
+  if (!isObj(raw)) return bad('monogram이 올바르지 않습니다.');
+  const slots = int(raw, 'slots', g.baseSlots, g.baseSlots + g.slotCosts.length, 'monogram.slots');
+  const posts: Post[] = [];
+  if (Array.isArray(raw.posts)) {
+    for (const x of raw.posts.slice(0, slots)) {
+      if (!isObj(x) || !POST_KINDS.includes(x.kind as Post['kind'])) continue;
+      posts.push({
+        id: str(x, 'id', 40, 'monogram.posts.id'),
+        kind: x.kind as Post['kind'],
+        persona: persona(x, 'persona', 'monogram.posts.persona'),
+        at: num(x, 'at', 0, MAX_TIME, 'monogram.posts.at'),
+        endsAt: num(x, 'endsAt', 0, MAX_TIME, 'monogram.posts.endsAt'),
+      });
+    }
+  }
+  return { seed: int(raw, 'seed', 0, 0xffffffff, 'monogram.seed'), seq: int(raw, 'seq', 0, 1e12, 'monogram.seq'), slots, posts };
 }
 
 export function validateState(input: unknown): Validation {
@@ -136,7 +249,7 @@ export function validateState(input: unknown): Validation {
         promotion: int(darkRaw, 'promotion', 0, darkMaxLv, 'darkEquipment.promotion'),
       };
     }
-    let diamondUpgrades = { production: 0, royalty: 0 };
+    let diamondUpgrades = { production: 0, royalty: 0, offline: 0 };
     if (o.diamondUpgrades !== undefined) {
       const dRaw = o.diamondUpgrades;
       if (!isObj(dRaw)) return bad('diamondUpgrades가 올바르지 않습니다.');
@@ -144,10 +257,37 @@ export function validateState(input: unknown): Validation {
       diamondUpgrades = {
         production: int(dRaw, 'production', 0, dMax, 'diamondUpgrades.production'),
         royalty: int(dRaw, 'royalty', 0, dMax, 'diamondUpgrades.royalty'),
+        // 오프라인 확장은 나중에 추가돼서 없는 예전 저장은 0레벨이다.
+        offline: dRaw.offline === undefined ? 0 : int(dRaw, 'offline', 0, BALANCE.diamond.upgrade.offline.maxLevel, 'diamondUpgrades.offline'),
       };
     }
     const musicPower = o.musicPower === undefined ? 0 : int(o, 'musicPower', 0, 1000, 'musicPower');
     const dripPower = o.dripPower === undefined ? 0 : int(o, 'dripPower', 0, 1000, 'dripPower');
+
+    // 스트리밍도 나중에 추가된 필드다. 없는 예전 저장은 0에서 시작하고, 첫 정산은 바로 가능하다(복귀 정산분만 쌓여 있다).
+    let streaming: Streaming = {
+      totals: zeroTotals(),
+      settled: 0,
+      lastClaimAt: num(o, 'lastSettledAt', 0, MAX_TIME),
+      seed: streamSeedFrom(num(o, 'savedAt', 0, MAX_TIME)),
+    };
+    if (o.streaming !== undefined) {
+      const stRaw = o.streaming;
+      if (!isObj(stRaw) || !isObj(stRaw.totals)) return bad('streaming이 올바르지 않습니다.');
+      const totals = zeroTotals();
+      let sum = 0;
+      for (const p of STREAM_PLATFORMS) {
+        totals[p] = num(stRaw.totals, p, 0, R, `streaming.totals.${p}`);
+        sum += totals[p];
+      }
+      streaming = {
+        totals,
+        // 정산한 양이 쌓인 양보다 많을 수는 없다. 고쳐진 파일이어도 정산 대기분이 음수가 되지 않게 맞춘다.
+        settled: Math.min(num(stRaw, 'settled', 0, R * STREAM_PLATFORMS.length, 'streaming.settled'), sum),
+        lastClaimAt: num(stRaw, 'lastClaimAt', 0, MAX_TIME, 'streaming.lastClaimAt'),
+        seed: int(stRaw, 'seed', 0, 0xffffffff, 'streaming.seed'),
+      };
+    }
 
     if (!Array.isArray(o.singles) || o.singles.length > BALANCE.maxSingles) return bad('singles 목록이 올바르지 않습니다.');
     const singleIds = new Set<string>();
@@ -202,6 +342,24 @@ export function validateState(input: unknown): Validation {
       reducedMotion: sRaw.reducedMotion === true,
     };
 
+    // 아래 필드는 모두 나중에 추가된 것이라 없는 예전 저장은 기본값으로 읽는다.
+    const savedAtSeed = num(o, 'savedAt', 0, MAX_TIME);
+    const buffs = parseBuffs(o.buffs);
+    const cosmetics = parseCosmetics(o.cosmetics);
+    const counters = parseCounters(o.counters);
+    const achievements = parseAchievements(o.achievements);
+    const missions = parseMissions(o.missions);
+    const fanMail = parseFanMail(o.fanMail, num(o, 'lastSettledAt', 0, MAX_TIME), streamSeedFrom(savedAtSeed + 1));
+    const monogram = parseMonogram(o.monogram, streamSeedFrom(savedAtSeed + 2));
+    const seeds = packSeeds(savedAtSeed);
+    const singleIdSet = new Set(singles.map((x) => x.id));
+    const cards = parseCards(o.cards, seeds.cards, singleIdSet);
+    const photo = parsePhoto(o.photo, seeds.photo);
+    const feat = parseFeat(o.feat, seeds.feat);
+    const mascot = parseMascots(o.mascot);
+    const arcade = parseArcade(o.arcade, singleIdSet);
+    const stats = parseStats(o.stats);
+
     const state: GameState = {
       schemaVersion: SCHEMA_VERSION,
       revision: int(o, 'revision', 0, Number.MAX_SAFE_INTEGER),
@@ -222,6 +380,20 @@ export function validateState(input: unknown): Validation {
       dripPower,
       diamonds: o.diamonds === undefined ? 0 : num(o, 'diamonds', 0, R),
       diamondUpgrades,
+      buffs,
+      cosmetics,
+      counters,
+      achievements,
+      missions,
+      fanMail,
+      monogram,
+      cards,
+      photo,
+      feat,
+      mascot,
+      arcade,
+      stats,
+      streaming,
       singles,
       albums,
       concerts,
@@ -319,46 +491,6 @@ export function discardCorrupt(storage: StorageLike): void {
       storage.setItem(CORRUPT_KEY, raw);
     } catch {
       /* 보관 실패는 무시 */
-    }
-  }
-  storage.removeItem(SAVE_KEY);
-}
-
-export function exportSave(state: GameState, now: number): string {
-  return JSON.stringify({ ...state, savedAt: now }, null, 2);
-}
-
-/**
- * 불러오기. 검증에 실패하면 현재 저장을 건드리지 않는다.
- * 가져온 파일의 lastSettledAt은 now로 맞춘다: 오래된 파일을 반복해서 불러와 오프라인 보상을 재청구할 수 없다.
- */
-export function importSave(storage: StorageLike, text: string, now: number): SaveResult {
-  const v = parseSave(text);
-  if (!v.ok) return { ok: false, error: v.error };
-  const current = safeGet(storage, SAVE_KEY);
-  if (current !== null) {
-    try {
-      storage.setItem(BACKUP_KEY, current);
-    } catch {
-      /* 백업 실패는 불러오기를 막지 않는다 */
-    }
-  }
-  const state: GameState = { ...v.state, lastSettledAt: now };
-  try {
-    storage.setItem(SAVE_KEY, serialize({ ...state, savedAt: now }));
-  } catch {
-    return { ok: false, error: '브라우저 저장소에 쓸 수 없습니다.' };
-  }
-  return { ok: true, state };
-}
-
-export function resetSave(storage: StorageLike): void {
-  const current = safeGet(storage, SAVE_KEY);
-  if (current !== null) {
-    try {
-      storage.setItem(BACKUP_KEY, current);
-    } catch {
-      /* ignore */
     }
   }
   storage.removeItem(SAVE_KEY);

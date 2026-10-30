@@ -16,6 +16,10 @@ export function setMuted(value: boolean): void {
   muted = value;
 }
 
+/** 샘플러처럼 같은 AudioContext를 써야 하는 곳을 위한 접근자. 첫 사용자 입력 전에는 null이다. */
+export const audioContext = (): AudioContext | null => ctx;
+export const isSfxMuted = (): boolean => muted;
+
 /** 첫 사용자 입력에서 호출한다. */
 export function unlockAudio(): void {
   try {
@@ -133,6 +137,26 @@ export const sfx = {
   },
   fail() {
     play([{ freq: 200, slideTo: 140, dur: 0.18, type: 'square', gain: 0.04 }]);
+  },
+  /** 가챠: 높은 등급일수록 화려하다 */
+  pull(rare: boolean) {
+    if (rare)
+      play([
+        { freq: 523, dur: 0.12, type: 'triangle' },
+        { freq: 659, dur: 0.12, at: 0.1, type: 'triangle' },
+        { freq: 784, dur: 0.12, at: 0.2, type: 'triangle' },
+        { freq: 1047, dur: 0.12, at: 0.3, type: 'triangle' },
+        { freq: 1568, dur: 0.4, at: 0.4, type: 'triangle', gain: 0.1 },
+      ]);
+    else play([{ freq: 740, dur: 0.1, type: 'triangle', gain: 0.06 }, { freq: 988, dur: 0.12, at: 0.08, type: 'triangle', gain: 0.05 }]);
+  },
+  /** 마스코트를 쓰다듬는 소리 */
+  mascot() {
+    play([{ freq: 880, slideTo: 1320, dur: 0.1, type: 'sine', gain: 0.06 }, { freq: 1175, slideTo: 1568, dur: 0.1, at: 0.09, type: 'sine', gain: 0.05 }]);
+  },
+  /** 리듬게임 레인 탭 */
+  tap(lane: number) {
+    play([{ freq: [523, 587, 659, 784][lane % 4], dur: 0.05, type: 'square', gain: 0.03 }]);
   },
   beat(strong: boolean) {
     play([

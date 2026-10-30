@@ -2,7 +2,7 @@ import { fmt, fmtCountdown } from '../components/format';
 import { PersonaBadge } from '../components/parts';
 import { BALANCE, STAGES, manualGameOf } from '../game/balance';
 import { PERSONA_TEXT, STAGE_TEXT } from '../game/content';
-import { isTourComplete, stageStatus } from '../game/selectors';
+import { hiddenSecretStage, isTourComplete, stageStatus } from '../game/selectors';
 import { doAutoConcert, doSkipCooldown, setTourCardOpen, startManualConcert, useUi } from '../store/gameStore';
 
 /** 모노사파런 안내: 자아에 따라 목표 거리가 다르다 */
@@ -34,6 +34,7 @@ export function ConcertScreen() {
 
       {STAGES.map((def) => {
         const st = stageStatus(g, def.id, now);
+        if (!st.visible) return null;
         const text = STAGE_TEXT[def.id];
         const idx = STAGES.findIndex((s) => s.id === def.id);
         const prevName = idx > 0 ? STAGE_TEXT[STAGES[idx - 1].id].name : null;
@@ -76,6 +77,11 @@ export function ConcertScreen() {
                 </button>
               </>
             )}
+            {st.darkOnly && (
+              <p className={st.personaOk ? 'muted' : 'cooldown'} role="status">
+                🕶️ 비밀 공연장 — 어둠속성으로만 입장해요{st.personaOk ? '.' : ' (지금은 일반속성이에요. 작업실에서 어둠으로 바꿔요)'}
+              </p>
+            )}
             <div className="btn-row">
               <button type="button" className="btn btn-primary" disabled={!st.canRun || busy} onClick={() => doAutoConcert(def.id)}>
                 자동 공연
@@ -92,6 +98,15 @@ export function ConcertScreen() {
           </div>
         );
       })}
+      {hiddenSecretStage(g) && (
+        <div className="card stage-card stage-locked">
+          <div className="card-row">
+            <h3>🔒 ???</h3>
+            <span className="muted">비밀 공연장</span>
+          </div>
+          <p className="muted">월클 콘서트를 클리어하면 어둠속성만 설 수 있는 비밀 공연장이 열려요.</p>
+        </div>
+      )}
     </section>
   );
 }
