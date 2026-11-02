@@ -1,4 +1,4 @@
-import type { AlbumType, CampaignId, CardRarity, DialogueTone, Persona, PostKind, SnackId, StageId, StreamPlatform, ThemeId, Vibe, VirtualComment } from './types';
+import type { AlbumType, CampaignId, CardRarity, CostumeId, DialogueTone, Persona, PostKind, SnackId, StageId, StreamPlatform, ThemeId, Vibe, VirtualComment } from './types';
 
 /* 대사·제목·댓글·공연장 이름. 모두 게임용 창작 문구이며 실제 인물의 곡·발언이 아니다.
    가상의 상대·자기디스·황당한 상황만 다루고, 현실 이용자나 실제 인물을 겨냥하지 않는다. */
@@ -252,7 +252,41 @@ const SINGLE_TITLES: Record<Persona, readonly string[]> = {
     '憎惡는 愛着의 충분조건이다',
     'KISS HEELS',
     'Celine & Dior',
-    
+    "Lips & Tongue",
+    "빌어먹을(feat.Scails)",
+    "Blank Theme",
+    "Blank:론리청춘",
+    "Love:17.2% ABV",
+    "사랑한적없다해줘차라리날[monosapa remix]",
+    "날사랑한다면같이마약을하고하늘날아가자",
+    "존재의 증명[存在の證明] (feat.해든)",
+    "너가원한대로날죽여줘",
+    "cartier+wrist @33nimb",
+    "저는 인터넷을 싫어합니다만, 이 여자가 인터넷 망•령•녀 였습니다?!",
+    "Voyage:Digital Star(feat.릴예서 & Nuki Hotel)",
+    "Voyage:unspecial",
+    "Blank:Interlude",
+    "Love Theme",
+    "Love:no faith in my romance",
+    "Love: 憎惡⟹愛着",
+    "hybrid! (feat. icyshy33)",
+    "TROUBLE.",
+    "빗치",
+    "착각하지마(Axhia & monosapa)",
+    "소리내",
+    "경찰레이지",
+    "꺼내줘",
+    "l o v e w i t h c i g",
+    "happy happy happy",
+    "하나만물어볼게요",
+    "technology interlude",
+    "아니아카이브계정까지왜찾아듣조ㅈㄴ웃기네사랑해고마워",
+    "만들다만거2",
+    "캄보디아편도티켓(feat.릴예서)",
+    "신림역(monosapa cover)",
+    "✮⋆˙ 마법소녀 ˚₊‧꒰ა 𓂋 ໒꒱ ‧₊˚ 𝓶𝓪𝓰𝓲𝓬𝓪𝓵 𝓰𝓲𝓻𝓵 ˚₊‧꒰ა 𓂋 ໒꒱ ‧₊˚ 魔法少女 ˙⋆✮(monosapa&nixsi)",
+    "Around the world ♫•*¨*•.¸¸♪(monosapa&소희)",
+    "개소리(feat.ch1tkey)",
   ],
   // 어둠속성 싱글도 이 순서대로 발매된다. (제작자가 지정한 목록)
   dark: [
@@ -301,6 +335,14 @@ const SINGLE_TITLES: Record<Persona, readonly string[]> = {
     'L을가져와(feat.강*유시)',
     '슬레이어보지',
     '니엄마빨통',
+    "브액가져와 ㅋ.ㅋ",
+    "하늘로 ㅋ.ㅋ(릴예서+오방곤듀나현)",
+    "잘생긴오빠랑 ㅋ.ㅋ",
+    "빠리투나잇 ㅋ.ㅋ",
+    "나는시발정키ㅋ.ㅋ",
+    "상태 ㅋ.ㅋ",
+    "미안해 ㅋ.ㅋ",
+    "오방가서미안해(토끼이빨유빈+릴예서)"
   ],
 };
 
@@ -325,12 +367,12 @@ export interface AlbumTrack {
 }
 
 /**
- * 발매할 수 있는 앨범은 여기에 적은 묶음뿐이고, 위에서부터 차례로 낸다. (발매한 싱글과 무관)
- * type은 앨범의 속성(일반/어둠)이다. 지금은 효과 차이 없이 표시에만 쓴다.
+ * 발매할 수 있는 앨범은 여기에 적은 묶음뿐이다. (발매한 싱글과 무관)
+ * type은 앨범의 속성(일반/어둠)이고, 속성마다 따로 위에서부터 차례로 낸다(`albumSeries`). 두 속성의 앨범은 서로 기다리지 않는다.
  */
 export interface AlbumDef {
   id: string;
-  kind: 'EP' | '싱글';
+  kind: 'EP' | '싱글' | '정규';
   title: string;
   type: AlbumType;
   tracks: readonly AlbumTrack[];
@@ -374,9 +416,77 @@ export const ALBUM_CATALOG: readonly AlbumDef[] = [
       { title: 'i wanna livin in your pathos' },
     ],
   },
+  {
+    id: 'album-4',
+    kind: '정규',
+    title: 'Voyage, Love & Blank',
+    type: 'normal',
+    tracks: [
+      { title: 'Voyage Theme' },
+      { title: 'Voyage unspecial' },
+      { title: 'Voyage:Digital Star' },
+      { title: 'LoveTheme' },
+      { title: 'Love:憎惡⟹愛着' },
+      { title: 'Love:17.2% ABV' },
+      { title: 'Blank:Interlude' },
+      { title: 'Blank Theme' },
+      { title: 'Blank:론리청춘' },
+      { title: 'Love:no faith in my romance' },
+      { title: 'Love:Rockstar' },
+    ],
+  },
+  {
+    id: 'album-5',
+    kind: 'EP',
+    title: 'why my *GIRLS* not stereo',
+    type: 'normal',
+    tracks: [
+      { title: 'ki-eok III' },
+      { title: '@mensa_kr' },
+      { title: 'KISS HEELS' },
+      { title: 'ICED OUT' },
+      { title: 'not 4 sale' },
+      { title: 'what means "jerk" in korean?' },
+      { title: 'why my rizz is only available on snapchat' },
+    ],
+  },
+  {
+    id: 'album-6',
+    kind: '싱글',
+    title: 'why my *GIRL* not mono',
+    type: 'normal',
+    tracks: [{ title: '싸가지' }, { title: '우리의 사랑은 왜 베일에 쌓였을까' }],
+  },
+  {
+    id: 'album-dark-1',
+    kind: 'EP',
+    title: '...정병러브...',
+    type: 'dark',
+    tracks: [
+      { title: '정신병자러브', isTitle: true },
+      { title: '이상형이정신병자면 어떡해요' },
+      { title: '외모정병내가고쳐준다니까(feat.ruletheworldboi)' },
+    ],
+  },
+  {
+    id: 'album-dark-2',
+    kind: 'EP',
+    title: '니엄마는...',
+    type: 'dark',
+    tracks: [{ title: '니엄마대가리에서눈이와' }, { title: '니엄마의배꼽에다나는송곳을박아' }, { title: '니네엄마한테위고비를맞혀' }],
+  },
+  {
+    id: 'album-dark-3',
+    kind: 'EP',
+    title: '트롯사파 팩',
+    type: 'dark',
+    tracks: [{ title: '트롯사파' }, { title: '트롯사파2(feat.한결행복가든)' }],
+  },
 ];
 
 export const albumDefById = (id: string): AlbumDef | undefined => ALBUM_CATALOG.find((d) => d.id === id);
+/** 한 속성의 앨범을 발매 순서대로 */
+export const albumSeries = (type: AlbumType): readonly AlbumDef[] => ALBUM_CATALOG.filter((d) => d.type === type);
 
 /* ---------- 가상 댓글 ---------- */
 
@@ -430,6 +540,9 @@ export const CLICK_POWER_TEXT: Record<Persona, { name: string; short: string; ef
   dark: { name: '음지 드립력', short: '드립력', effect: '작업하기 한 번에 얻는 기본 라임 +1 / 레벨 (생산배율이 곱해져요)', icon: '🕶️' },
 };
 
+/** 유통사 호감도 카드 문구. 코인으로 올리는 스트리밍 수익 업그레이드이고 최대 레벨이 없다. */
+export const DISTRIBUTOR_TEXT = { name: '유통사 호감도', icon: '🤝', effect: '스트리밍을 코인으로 정산할 때 받는 코인 +5% / 레벨 (레벨끼리 더해져요)' };
+
 /** 스트리밍 통계 화면의 플랫폼 표시. 로고 대신 이모지와 막대 색만 쓰고, 색은 구분하기 쉽게 고른 값이다. */
 export const STREAM_PLATFORM_TEXT: Record<StreamPlatform, { name: string; icon: string; color: string }> = {
   spotify: { name: 'Spotify', icon: '🟢', color: '#1db954' },
@@ -466,6 +579,30 @@ export const THEME_TEXT: Record<ThemeId, { name: string; icon: string; blurb: st
   pastel: { name: '파스텔 지뢰계', icon: '🎀', blurb: '분홍과 하늘색, 리본, 새벽에도 귀엽게.' },
   mono: { name: '흑백 레트로', icon: '📼', blurb: '낡은 카세트처럼 회색조로.' },
   neon: { name: '야광 네온', icon: '🌃', blurb: '어두운 방에서 혼자 빛나는 색.' },
+};
+
+export const COSTUME_TEXT: Record<CostumeId, { name: string; icon: string; blurb: string }> = {
+  jirai: { name: '지뢰사파', icon: '🎀', blurb: '분홍 블라우스에 하트 리본. 새벽 감성 풀장착.' },
+  hype: { name: '텐션업 사파', icon: '✨', blurb: '눈이 반짝반짝. 오늘은 무대에서 다 터뜨릴 거야.' },
+  angry: { name: '화난사파', icon: '💢', blurb: '볼은 빵빵, 머리에서 김이 난다. 건드리지 마.' },
+  maid: { name: '메이드사파', icon: '🧹', blurb: '두 손 모으고 공손하게. 표정만 그대로.' },
+  bunny: { name: '토끼사파', icon: '🐰', blurb: '축 처진 귀 후드. 몸도 마음도 포근하게.' },
+  fallen: { name: '타락천사 사파', icon: '🪽', blurb: '검은 날개와 은빛 헤일로. 떨어진 건 분위기뿐.' },
+  bear: { name: '곰도리사파', icon: '🧸', blurb: '곰 잠옷에 꿰맨 곰인형을 꼭 안고.' },
+  nun: { name: '수녀 사파', icon: '✝️', blurb: '두 손을 모으고 기도한다. 소원은 비밀.' },
+  vampire: { name: '뱀파이어사파', icon: '🧛', blurb: '붉은 망토에 송곳니 하나. 밤이 제 시간.' },
+  butler: { name: '냥집사 사파', icon: '🐱', blurb: '고양이 귀와 꼬리에 방울 리본. 주인님 오셨어요.' },
+  bride: { name: '유령신부 사파', icon: '🥀', blurb: '검은 레이스 베일과 시든 장미 한 송이.' },
+  dbunny: { name: '검은토끼사파', icon: '🐇', blurb: '피어싱 단 토끼 후드, 품에는 엑스 눈 토끼 인형.' },
+  band: { name: '지뢰밴드 사파', icon: '🎸', blurb: '찢어진 니트에 자물쇠 초커, 마이크 스탠드를 붙잡고.' },
+  king: { name: '어둠의왕사파', icon: '👑', blurb: '은빛 왕관에 붉은 안감 망토. 밤의 왕이 납신다.' },
+  milk: { name: '딸기우유사파', icon: '🍓', blurb: '토끼 트레이닝복에 딸기우유 한 팩. 빨대는 물고 있다.' },
+  dbear: { name: '곰도리어둠사파', icon: '🧵', blurb: '기운 자국투성이 코트에 꿰맨 곰인형, 붉은 실패를 들고.' },
+  postman: { name: '편지배달부사파', icon: '💌', blurb: '박쥐 날개 가방에 하트 봉인 편지. 배달은 밤에만.' },
+  cultist: { name: '어둠의교주 사파', icon: '🕯️', blurb: '십자 수가 놓인 검은 사제복, 성경 한 권과 붉은 장미.' },
+  clown: { name: '삐에로 사파', icon: '🤡', blurb: '마름모무늬 광대복에 붉은 방울. 송곳니가 슬쩍 보인다.' },
+  dnurse: { name: '어둠의간호사파', icon: '🩹', blurb: '검정과 분홍 간호복, 안대 낀 곰인형을 꼭 안고.' },
+  dbride: { name: '어둠의신부사파', icon: '🥀', blurb: '찢어진 레이스 베일과 붉은 장미 부케, 손을 내민다.' },
 };
 
 /* ---------- 모노그램 ---------- */
@@ -744,7 +881,7 @@ export const ACHIEVEMENT_TEXT: Record<string, { name: string; desc: string; icon
   'five-singles': { name: '다작 입문', desc: '싱글 5곡을 발매했어요.', icon: '🎶' },
   'ten-singles': { name: '다작왕', desc: '싱글 10곡을 발매했어요.', icon: '🎼', title: '다작왕' },
   'album-1': { name: '첫 앨범', desc: '앨범을 처음 발매했어요.', icon: '📀' },
-  'album-3': { name: '디스코그래피', desc: '앨범 3장을 모두 발매했어요.', icon: '🗂️', title: '디스코그래피' },
+  'album-3': { name: '디스코그래피', desc: '앨범을 3장 발매했어요.', icon: '🗂️', title: '디스코그래피' },
   'fans-100': { name: '동네 래퍼', desc: '팬 100명을 모았어요.', icon: '👥', title: '동네 래퍼' },
   'fans-1k': { name: '이름 있는 래퍼', desc: '팬 1,000명을 모았어요.', icon: '👥' },
   'fans-10k': { name: '만 명의 귀', desc: '팬 10,000명을 모았어요.', icon: '📣', title: '만 명의 귀' },
@@ -797,7 +934,7 @@ export const ACHIEVEMENT_TEXT: Record<string, { name: string; desc: string; icon
   'photoset-1': { name: '첫 세트 완성', desc: '포토카드 세트 하나를 완성했어요.', icon: '🗂️' },
   'photoset-6': { name: '세트 마스터', desc: '포토카드 6세트를 모두 완성했어요.', icon: '🏆', title: '세트 마스터' },
   'feat-5': { name: '피처링 5명', desc: '피처링 래퍼 5명과 계약했어요.', icon: '🤝' },
-  'feat-12': { name: '피처링 올스타', desc: '피처링 래퍼 12명과 모두 계약했어요.', icon: '🌟', title: '피처링 올스타' },
+  'feat-12': { name: '피처링 올스타', desc: '피처링 래퍼 21명과 모두 계약했어요.', icon: '🌟', title: '피처링 올스타' },
   'card-ssr': { name: 'SSR 곡', desc: 'SSR 등급 곡 카드를 얻었어요.', icon: '✨' },
   'pet-adult': { name: '다 큰 마스코트', desc: '마스코트를 성체까지 키웠어요.', icon: '🐇' },
   'pet-legend': { name: '전설의 마스코트', desc: '마스코트를 전설 단계까지 키웠어요.', icon: '🦄', title: '전설 조련사' },
@@ -855,19 +992,31 @@ export function photoCardName(set: number, grade: number): string {
   return `${PHOTO_SET_TEXT[set - 1]?.name ?? '?'} — ${PHOTO_SCENES[grade - 1] ?? '?'}`;
 }
 
+/** 피처링 등급 이름 (등급 코드는 곡 카드와 같은 N·R·SR·SSR) */
+export const FEAT_RARITY_NAME: Record<CardRarity, string> = { N: '일반', R: '레어', SR: '에픽', SSR: '전설' };
+
 export const FEAT_TEXT: Record<string, { name: string; blurb: string; icon: string }> = {
-  'f-han': { name: '한강뷰', blurb: '한강 다리 위에서 라임을 줍는 래퍼.', icon: '🌉' },
-  'f-conv': { name: '편의점 야간알바', blurb: '삼각김밥 유통기한으로 가사를 쓴다.', icon: '🍙' },
-  'f-bus': { name: '막차놓침', blurb: '막차를 놓친 팬이 제일 많은 래퍼.', icon: '🚌' },
-  'f-roof': { name: '옥상문 열림', blurb: '잠겨 있어야 할 문을 열고 들어온다.', icon: '🚪' },
-  'f-rain': { name: '장마 3일차', blurb: '눅눅한 목소리로 박자를 적신다.', icon: '🌧️' },
-  'f-pc': { name: 'PC방 야간권', blurb: '밤샘 요금으로 밤샘 작업을 한다.', icon: '🖱️' },
-  'f-study': { name: '야간자율학습', blurb: '필기 대신 가사를 적는 뒷자리의 래퍼.', icon: '📚' },
-  'f-diary': { name: '비공개 일기장', blurb: '아무도 못 보게 쓴 줄이 제일 잘 팔린다.', icon: '🔒' },
-  'f-dawn': { name: '새벽 4시 33분', blurb: '해 뜨기 직전에만 나타나는 목소리.', icon: '🌌' },
-  'f-moon': { name: '달이 두 개인 밤', blurb: '두 자아를 모두 알아보는 단 하나의 피처링.', icon: '🌗' },
-  'f-heart': { name: '밤새 하트 눌러준 사람', blurb: '이름은 모르지만 늘 거기 있었다.', icon: '💗' },
-  'f-void': { name: '빈 방의 목소리', blurb: '아무도 없는 방에서 대답이 돌아온다.', icon: '🕳️' },
+  'f-alfrado': { name: 'Alfrado', blurb: '한 줄만 얹어도 라임이 길어진다.', icon: '✍️' },
+  'f-haname': { name: '한아메', blurb: '이름이 걸린 곡은 인세가 차곡차곡 쌓인다.', icon: '🪙' },
+  'f-seungcheon': { name: '†昇天†', blurb: '무대에 서면 팬이 따라 올라온다.', icon: '🕊️' },
+  'f-0ik2': { name: '0ik2', blurb: '마이크를 잡으면 분위기가 달라진다.', icon: '⚡' },
+  'f-saerim': { name: '새림', blurb: '박자 사이사이에 라임을 끼워 넣는다.', icon: '📝' },
+  'f-gangyusi': { name: '강유시', blurb: '조용히 얹은 한 소절이 오래 팔린다.', icon: '💿' },
+  'f-upia': { name: 'Upia', blurb: '벌스 끝에 붙는 라임이 유난히 길다.', icon: '🎙️' },
+  'f-feiz': { name: 'feiz', blurb: '피처링 표기만 봐도 팬이 먼저 알아본다.', icon: '📣' },
+  'f-p4rki': { name: 'p4rki', blurb: '후렴에 들어오면 곡의 힘이 한 칸 올라간다.', icon: '🔥' },
+  'f-nunalgogi': { name: '눈알고기', blurb: '이상하게 자꾸 재생되는 곡을 만든다.', icon: '👁️' },
+  'f-sohee': { name: '소희', blurb: '가사 한 줄이 두 줄 라임이 된다.', icon: '🌸' },
+  'f-truman': { name: 'Truman', blurb: '스트리밍 숫자 옆에 늘 이름이 붙는다.', icon: '🎬' },
+  'f-pshine': { name: 'pshine', blurb: '무대 조명이 켜지면 팬석이 먼저 일어난다.', icon: '✨' },
+  'f-ch1tkey': { name: 'ch1tkey', blurb: '한 번 터지면 막을 수 없는 에너지.', icon: '🗝️' },
+  'f-k4ton': { name: 'k4ton', blurb: '짧게 끊어 치는 라임이 끝없이 이어진다.', icon: '🥁' },
+  'f-rtw': { name: '룰더', blurb: '이름만 올라와도 댓글창이 붐빈다.', icon: '🌍' },
+  'f-scails': { name: 'Scails', blurb: '두 자아를 모두 알아보는 피처링.', icon: '🌗' },
+  'f-hamo': { name: 'hamo', blurb: '곡이 나오기 전부터 팬이 모여든다.', icon: '💗' },
+  'f-ghostclub': { name: '고스트클럽', blurb: '아무도 없는 방에서 박수가 터져 나온다.', icon: '👻' },
+  'f-choisung': { name: '최성', blurb: '이 이름이 붙은 곡은 인세가 마르지 않는다.', icon: '👑' },
+  'f-ruru': { name: 'ruru', blurb: '어느 곡에 넣어도 라임이 한 겹 더 쌓인다.', icon: '💎' },
 };
 
 export const MASCOT_TEXT: Record<Persona, { name: string; stages: readonly string[]; icons: readonly string[] }> = {
@@ -884,10 +1033,10 @@ export const MOOD_TEXT: Record<'happy' | 'hungry' | 'sulk', { name: string; line
 /* ---------- 콘텐츠 팩 2: 아케이드 ---------- */
 
 export const ARCADE_TEXT: Record<'rhythm' | 'survival' | 'lyric' | 'tower' | 'ticketing', { name: string; icon: string; blurb: string }> = {
-  rhythm: { name: '리듬 모드', icon: '🎵', blurb: '내가 낸 싱글이 채보가 돼요. 4개의 레인에 맞춰 눌러요.' },
+  rhythm: { name: '리듬 모드', icon: '🎵', blurb: '어둠속성 「정신병자러브」 음원에 맞춰 4개의 레인을 눌러요.' },
   survival: { name: '새벽 생존', icon: '🌙', blurb: '3분 동안 몰려오는 악플을 마이크로 쓸어내요. 레벨업마다 가사 스킬을 골라요.' },
   lyric: { name: '가사 덱', icon: '📝', blurb: '가사 카드로 한 곡을 완성해요. 같은 모음을 이으면 라임 체인!' },
-  tower: { name: '무한의 계단', icon: '🪜', blurb: '한 층씩 올라가는 자동 전투. 약점 자아로 도전하면 유리해요. 매주 월요일에 1층부터 다시 시작해요.' },
+  tower: { name: '무한의 계단', icon: '🪜', blurb: '한 층에 보스 한 명. 직접 움직여 탄을 피하면서 쓰러뜨려요. 전투력이 높을수록 내 탄이 세지고, 약점 자아로 도전하면 더 세져요. 매주 월요일에 1층부터 다시 시작해요.' },
   ticketing: { name: '피켓팅', icon: '🎟️', blurb: '오픈 신호에 누르고 보안문자를 입력해요. 성공하면 다음 공연 코인이 늘어나요.' },
 };
 
@@ -931,4 +1080,11 @@ export const LYRIC_CARD_TEXT: Record<string, string> = {
   'l-bridge': '브릿지',
   'l-sweat': '식은땀',
   'l-punch': '펀치라인',
+};
+
+export const DIFFICULTY_TEXT: Record<'easy' | 'normal' | 'hard' | 'brutal', string> = {
+  easy: '여유',
+  normal: '보통',
+  hard: '어려움',
+  brutal: '매우 어려움',
 };

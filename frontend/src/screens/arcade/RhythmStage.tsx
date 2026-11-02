@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { sfx } from '../../audio/sfx';
+import { TrackClock, loadTrack } from '../../audio/track';
+import { audioContext, isSfxMuted, sfx } from '../../audio/sfx';
 import type { ArcadeRun } from '../../game/arcade';
 import { BALANCE } from '../../game/balance';
 import { RHYTHM_LEVEL_TEXT } from '../../game/content';
 import { MinigameClock, type Judgement } from '../../game/minigame';
 import { buildChart, createRhythm, isRhythmFinished, pressLane, rhythmScore, tickTo, type RhythmState } from '../../game/rhythm';
-import { abandonArcadeRun, finishArcadeRun } from '../../store/gameStore';
+import { trackOfRun } from '../../game/songcharts';
+import { abandonArcadeRun, finishArcadeRun, getUi } from '../../store/gameStore';
 
 const R = BALANCE.rhythm;
 const COUNTDOWN_MS = 3000;
+/** 음원을 못 받고 있어도 이만큼(시작부터)까지는 기다린다. 넘으면 소리 없이 진행한다. */
+const TRACK_WAIT_MS = 12_000;
 const W = 360;
 const H = 520;
 const HIT_Y = 440;
@@ -51,10 +55,18 @@ function draw(ctx: CanvasRenderingContext2D, st: RhythmState, persona: ArcadeRun
   for (let l = 0; l < R.lanes; l++) ctx.fillText(KEYS[l].toUpperCase(), l * laneW + laneW / 2, HIT_Y + 40);
 }
 
+type Clock = Pick<MinigameClock, 'start' | 'read' | 'pause' | 'resume'>;
+type AudioPhase = 'none' | 'loading' | 'ready' | 'failed';
+
 export function RhythmPlay({ run }: { run: ArcadeRun }) {
-  const chart = useMemo(() => buildChart(run.seed, run.persona, run.level), [run.seed, run.persona, run.level]);
+  // 음원 곡이면 고정 채보와 음원 시계, 아니면 곡 번호로 자동 생성한 채보와 일반 시계를 쓴다.
+  const track = useMemo(() => trackOfRun(getUi().game.singles, run), [run.id]);
+  const chart = useMemo(() => buildChart(run.seed, run.persona, run.level, track), [run.seed, run.persona, run.level, track]);
   const stRef = useRef<RhythmState>(createRhythm(chart, run.power));
-  const clock = useRef(new MinigameClock());
+  const clock = useRef<Clock>(new MinigameClock());
+  const trackClock = useRef<TrackClock | null>(null);
+  const audioPhase = useRef<AudioPhase>(chart.audio ? 'loading' : 'none');
+  const [audioNote, setAudioNote] = useState<'loading' | 'failed' | null>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const doneRef = useRef(false);
   const startedRef = useRef(false);
@@ -73,7 +85,7 @@ export function RhythmPlay({ run }: { run: ArcadeRun }) {
       const t = clock.current.read(performance.now());
       const r = pressLane(stRef.current, lane, t);
       stRef.current = r.state;
-      sfx.tap(lane);
+      if (!trackClock.current) sfx.tap(lane); // 음원이 나올 때는 건반음을 겹치지 않는다
       if (r.judgement) {
         sfx.judge(r.judgement);
         flash(r.judgement);
@@ -92,6 +104,15 @@ export function RhythmPlay({ run }: { run: ArcadeRun }) {
         const left = Math.max(0, COUNTDOWN_MS - (nowPerf - beganAt.current));
         setCountdown(left);
         if (left <= 0) {
+          // 음원을 아직 받는 중이면 기다린다(너무 오래 걸리면 소리 없이 진행)
+          if (audioPhase.current === 'loading' && nowPerf - beganAt.current < TRACK_WAIT_MS) {
+            setAudioNote('loading');
+            if (ctx) draw(ctx, stRef.current, run.persona, -R.leadInMs);
+            return;
+          }
+          if (audioPhase.current === 'ready' && trackClock.current) clock.current = trackClock.current;
+          else if (audioPhase.current === 'loading') audioPhase.current = 'failed';
+          setAudioNote(audioPhase.current === 'failed' ? 'failed' : null);
           startedRef.current = true;
           clock.current.start(nowPerf);
         }
@@ -124,6 +145,33 @@ export function RhythmPlay({ run }: { run: ArcadeRun }) {
     };
   }, [run.id, run.persona, flash]);
 
+  // 음원 곡: 시작하면 바로 받아 디코딩해 둔다. 소리를 껐거나 오디오를 쓸 수 없으면 소리 없이 일반 시계로 진행한다.
+  useEffect(() => {
+    const audio = chart.audio;
+    if (!audio) return;
+    audioPhase.current = 'loading';
+    const actx = audioContext();
+    if (!actx || isSfxMuted() || actx.state === 'closed') {
+      audioPhase.current = 'none';
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      if (actx.state === 'suspended') await actx.resume().catch(() => undefined);
+      const loaded = actx.state === 'running' ? await loadTrack(actx, audio.trackId) : null;
+      if (cancelled) return;
+      if (loaded) {
+        trackClock.current = new TrackClock(actx, loaded, audio);
+        audioPhase.current = 'ready';
+      } else audioPhase.current = 'failed';
+    })();
+    return () => {
+      cancelled = true;
+      trackClock.current?.stop();
+      trackClock.current = null;
+    };
+  }, [chart]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.repeat) return;
@@ -139,7 +187,10 @@ export function RhythmPlay({ run }: { run: ArcadeRun }) {
       <div className="stage-head">
         <div>
           <strong>리듬 모드 · {RHYTHM_LEVEL_TEXT[run.level]}</strong>
-          <div className="muted">{chart.notes.length}노트 · BPM {chart.bpm}</div>
+          <div className="muted">
+            {track ? `♪ ${track.title} · ` : ''}
+            {chart.notes.length}노트 · BPM {chart.bpm}
+          </div>
         </div>
         <div className="stage-score">
           <strong>{hud.score}</strong>
@@ -164,9 +215,11 @@ export function RhythmPlay({ run }: { run: ArcadeRun }) {
           <div className="run-countdown">
             <strong className="big-score">{Math.ceil(countdown / 1000)}</strong>
             <small>레인을 누르거나 D F J K 키</small>
+            {audioNote === 'loading' && <small>음원을 불러오는 중…</small>}
           </div>
         )}
       </div>
+      {audioNote === 'failed' && <p className="muted" role="status">음원을 불러오지 못해 소리 없이 진행해요.</p>}
       <button type="button" className="btn btn-ghost" onClick={abandonArcadeRun}>
         나가기 (쿨다운은 유지돼요)
       </button>

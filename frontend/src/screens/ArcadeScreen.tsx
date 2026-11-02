@@ -4,12 +4,13 @@ import { fmt, fmtCountdown } from '../components/format';
 import { arcadeBlocked, arcadeCooldownLeft } from '../game/arcade';
 import type { RhythmLevel } from '../game/arcade';
 import { BALANCE, LYRIC_CARDS } from '../game/balance';
-import { ARCADE_TEXT, LYRIC_CARD_TEXT, PERSONA_TEXT, RHYTHM_LEVEL_TEXT } from '../game/content';
+import { ARCADE_TEXT, DIFFICULTY_TEXT, LYRIC_CARD_TEXT, PERSONA_TEXT, RHYTHM_LEVEL_TEXT } from '../game/content';
 import { deckSize } from '../game/lyricdeck';
+import { TRACKS, trackOfSingle, trackSingles } from '../game/songcharts';
 import type { ArcadeKind, GameState, Persona } from '../game/types';
 import { towerStatus } from '../game/tower';
 import { bonuses } from '../game/packdata';
-import { doClimbTower, doTrimLyricCard, setTab, startArcade, useUi } from '../store/gameStore';
+import { doTrimLyricCard, setTab, startArcade, startTower, useUi } from '../store/gameStore';
 
 const LEVELS: RhythmLevel[] = ['easy', 'normal', 'hard'];
 
@@ -19,7 +20,7 @@ function StartButton({ g, kind, onStart, label }: { g: GameState; kind: ArcadeKi
   const left = arcadeCooldownLeft(g, kind);
   return (
     <button type="button" className="btn btn-primary btn-wide" disabled={blocked !== null} onClick={onStart}>
-      {blocked === 'need_single' ? '첫 싱글을 발매하면 열려요' : left > 0 ? `쿨다운 ${fmtCountdown(left)}` : label}
+      {blocked === 'need_single' ? '첫 싱글을 발매하면 열려요' : blocked === 'need_track' ? '음원 곡을 발매하면 열려요' : left > 0 ? `쿨다운 ${fmtCountdown(left)}` : label}
     </button>
   );
 }
@@ -57,29 +58,44 @@ function Head({ k }: { k: 'rhythm' | 'survival' | 'lyric' | 'tower' | 'ticketing
 }
 
 function RhythmCard({ g }: { g: GameState }) {
-  const songs = [...g.singles].reverse();
+  // 리듬 모드는 음원이 있는 곡으로만 플레이한다.
+  const songs = trackSingles([...g.singles].reverse());
   const [pick, setPick] = useState('');
   const [level, setLevel] = useState<RhythmLevel>('normal');
   const target = songs.some((s) => s.id === pick) ? pick : (songs[0]?.id ?? '');
   const cfg = BALANCE.rhythm.levels[level];
+  const track = trackOfSingle(songs.find((s) => s.id === target));
   return (
     <div className="card">
       <Head k="rhythm" />
       {songs.length === 0 ? (
-        <p className="empty">싱글을 발매하면 그 곡으로 플레이할 수 있어요.</p>
+        <p className="empty">
+          {TRACKS.map((t) => `${PERSONA_TEXT[t.persona].short}속성 「${t.title}」`).join(', ')} 싱글을 발매하면 플레이할 수 있어요.
+        </p>
       ) : (
         <>
-          <label className="field">
-            <small className="muted">곡 고르기</small>
-            <select value={target} onChange={(e) => setPick(e.target.value)}>
-              {songs.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {PERSONA_TEXT[s.persona].short} · {s.title}
-                  {g.arcade.rhythm.songs[s.id] ? ` (최고 ${g.arcade.rhythm.songs[s.id]})` : ''}
-                </option>
-              ))}
-            </select>
-          </label>
+          {songs.length > 1 ? (
+            <label className="field">
+              <small className="muted">곡 고르기</small>
+              <select value={target} onChange={(e) => setPick(e.target.value)}>
+                {songs.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {PERSONA_TEXT[s.persona].short} · {s.title}
+                    {g.arcade.rhythm.songs[s.id] ? ` (최고 ${g.arcade.rhythm.songs[s.id]})` : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <p>
+              <span aria-hidden>♪</span> <strong>{songs[0].title}</strong>
+              <small className="muted">
+                {' '}
+                · {PERSONA_TEXT[songs[0].persona].short}
+                {g.arcade.rhythm.songs[songs[0].id] ? ` · 최고 ${g.arcade.rhythm.songs[songs[0].id]}` : ''}
+              </small>
+            </p>
+          )}
           <div className="seg" role="group" aria-label="난이도">
             {LEVELS.map((l) => (
               <button key={l} type="button" aria-pressed={level === l} onClick={() => setLevel(l)}>
@@ -88,7 +104,7 @@ function RhythmCard({ g }: { g: GameState }) {
             ))}
           </div>
           <small className="muted">
-            {cfg.beats}박 · 보상 ×{cfg.mult} · 최고 {g.arcade.rhythm.best}점 · {g.counters.rhythms}번 플레이
+            {track ? `♪ 음원 곡 ${track.playMs / 1000}초 · ${track.bpm} BPM` : `${cfg.beats}박`} · 보상 ×{cfg.mult} · 최고 {g.arcade.rhythm.best}점 · {g.counters.rhythms}번 플레이
           </small>
         </>
       )}
@@ -185,17 +201,17 @@ function TowerCard({ g }: { g: GameState }) {
       </small>
       <div className="tower-row">
         {personas.map((p) => (
-          <button key={p} type="button" className={`btn ${p === e.weak ? 'btn-primary' : 'btn-ghost'} tower-btn`} disabled={locked || st.cooldownLeftMs > 0} onClick={() => doClimbTower(p)}>
+          <button key={p} type="button" className={`btn ${p === e.weak ? 'btn-primary' : 'btn-ghost'} tower-btn`} disabled={locked || st.cooldownLeftMs > 0} onClick={() => startTower(p)}>
             <span>{PERSONA_TEXT[p].short}으로 도전</span>
             <small>
-              전투력 {fmt(Math.round(st.power[p]))} · 승산 {Math.round(st.chance[p] * 100)}%
+              전투력 {fmt(Math.round(st.power[p]))} · {DIFFICULTY_TEXT[st.difficulty[p]]}
             </small>
           </button>
         ))}
       </div>
       {locked && <small className="muted">첫 싱글을 발매하면 열려요.</small>}
-      {st.cooldownLeftMs > 0 && <small className="muted">쉬는 중 {fmtCountdown(st.cooldownLeftMs)}</small>}
-      <p className="fineprint">매주 월요일에 1층으로 돌아가고 이번 주에 처음 깬 층만 보상을 줘요(보스층·{BALANCE.tower.milestoneEvery}층마다 다이아). 역대 최고 층은 랭킹에 올라요.</p>
+      {st.cooldownLeftMs > 0 && <small className="muted">다시 도전까지 {fmtCountdown(st.cooldownLeftMs)}</small>}
+      <p className="fineprint">매주 월요일에 1층으로 돌아가고 이번 주에 처음 깬 층만 보상을 줘요(보스층·{BALANCE.tower.milestoneEvery}층마다 다이아). 시작하면 {BALANCE.tower.failCooldownMs / 1000}초 쿨다운이 정해지고 이기면 바로 풀려요. 역대 최고 층은 랭킹에 올라요.</p>
       <button type="button" className="btn btn-ghost" onClick={() => setTab('ranking')}>
         🏆 계단 랭킹 보러 가기
       </button>

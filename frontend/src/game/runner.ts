@@ -1,5 +1,5 @@
 import { BALANCE } from './balance';
-import type { Persona } from './types';
+import type { Persona, StageId } from './types';
 
 /*
  * 모노사파런: 달리면서 점점 빨라지고, 코스 끝까지 완주하면 성공. 점수는 먹은 젤리 비율(0~1000).
@@ -51,8 +51,12 @@ export function speedAt(course: Pick<Course, 'lengthU' | 'startSpeed' | 'endSpee
   return lerp(course.startSpeed, course.endSpeed, Math.max(0, Math.min(1, x / course.lengthU)));
 }
 
-export function buildCourse(persona: Persona, seed: number): Course {
-  const cfg = R.persona[persona];
+/** 이 공연장·자아의 코스 수치. stageCourse에 없는 공연장은 persona의 기본 코스다. */
+export const courseConfig = (stage: StageId, persona: Persona): Pick<Course, 'goalM' | 'lengthU' | 'startSpeed' | 'endSpeed'> =>
+  R.stageCourse[stage]?.[persona] ?? R.persona[persona];
+
+export function buildCourse(persona: Persona, seed: number, stage: StageId): Course {
+  const cfg = courseConfig(stage, persona);
   const rng = mulberry32(seed);
   const course: Course = {
     persona,
@@ -126,8 +130,8 @@ export class RunGame {
   private obstacleIdx = 0;
   private jellyIdx = 0;
 
-  constructor(persona: Persona, seed: number) {
-    this.course = buildCourse(persona, seed);
+  constructor(persona: Persona, seed: number, stage: StageId) {
+    this.course = buildCourse(persona, seed, stage);
     this.collected = this.course.jellies.map(() => false);
   }
 
@@ -154,8 +158,10 @@ export class RunGame {
     return speedAt(this.course, this.x) * (this.invincibleMs > 0 ? R.stumbleSpeedMult : 1);
   }
 
+  /** 달린 거리(m). 달리는 동안은 정수로 내림하고, 결승선에 닿으면 목표 거리 그대로다(697.4m처럼 소수일 수 있다). */
   get distanceM(): number {
-    return Math.min(this.course.goalM, Math.floor((this.x / this.course.lengthU) * this.course.goalM));
+    const { goalM, lengthU } = this.course;
+    return this.x >= lengthU ? goalM : Math.floor((this.x / lengthU) * goalM);
   }
 
   get progress(): number {

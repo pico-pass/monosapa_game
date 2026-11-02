@@ -7,6 +7,7 @@ import { BALANCE } from './game/balance';
 import { CLICK_POWER_TEXT, PERSONA_TEXT, STAGE_TEXT } from './game/content';
 import { moreAlerts } from './game/alerts';
 import { bonuses } from './game/packdata';
+import { trackOfRun } from './game/songcharts';
 import {
   albumRoyaltyBonus,
   albumRoyaltyOf,
@@ -44,6 +45,7 @@ import { SamplerScreen } from './screens/SamplerScreen';
 import { SettingsSheet } from './screens/SettingsSheet';
 import { ShopScreen } from './screens/ShopScreen';
 import { StatsScreen } from './screens/StatsScreen';
+import { TowerStage } from './screens/TowerStage';
 import { StudioScreen } from './screens/StudioScreen';
 import { WrappedScreen } from './screens/WrappedScreen';
 import {
@@ -122,12 +124,14 @@ function Game() {
   const g = ui.game;
   const persona = g.activePersona;
   const { muted, bgmMuted } = g.settings;
-  const ducked = !!ui.concertRun || !!ui.arcadeRun;
+  const ducked = !!ui.concertRun || !!ui.arcadeRun || !!ui.towerRun;
+  // 리듬 모드에서 음원 곡을 플레이하는 동안에는 배경음악이 겹치지 않게 끈다.
+  const trackPlaying = !!trackOfRun(g.singles, ui.arcadeRun);
 
   // 배경음악: 자아가 바뀌면 곡이 교차 페이드되고, 직접 공연 중에는 작아진다.
   useEffect(() => {
-    bgm.configure({ persona, muted, bgmMuted, ducked });
-  }, [persona, muted, bgmMuted, ducked]);
+    bgm.configure({ persona, muted, bgmMuted: bgmMuted || trackPlaying, ducked });
+  }, [persona, muted, bgmMuted, ducked, trackPlaying]);
 
   const inMore = MORE_TABS.includes(ui.tab);
   const navTab: TabId = inMore ? 'more' : ui.tab;
@@ -246,6 +250,7 @@ function Overlays() {
     <>
       {ui.concertRun && <ConcertStage run={ui.concertRun} />}
       {ui.arcadeRun && !ui.concertRun && <ArcadeStage run={ui.arcadeRun} />}
+      {ui.towerRun && !ui.arcadeRun && !ui.concertRun && <TowerStage run={ui.towerRun} />}
       {ui.offlineReport && <OfflineModal />}
       {!ui.offlineReport && !ui.concertRun && cr && (
         <Modal title={cr.cleared ? '자동 공연 완료' : '공연 결과'} onClose={closeConcertResult} tone={cr.cleared ? 'gold' : 'normal'}>
@@ -321,7 +326,7 @@ function Overlays() {
               </li>
             )}
             <li>
-              📈 인세 배율 <b>+{Math.round(albumRoyaltyOf(alb.ordinal - 1) * 100)}%</b> (누적 +{Math.round(albumRoyaltyBonus(g.albums.length) * 100)}%)
+              📈 인세 배율 <b>+{Math.round(albumRoyaltyOf(alb.def.type, alb.ordinal - 1) * 100)}%</b> (누적 +{Math.round(albumRoyaltyBonus(g.albums) * 100)}%)
             </li>
           </ul>
         </Modal>
@@ -336,8 +341,8 @@ function Overlays() {
           <p className="muted">엔딩이지만 끝은 아니에요. 단콘부터 월클 콘서트까지 더 큰 무대가 기다려요.</p>
         </Modal>
       )}
-      {!ui.arcadeRun && !ui.offlineReport && !ui.concertRun && <GachaModal />}
-      {!ui.arcadeRun && !ui.offlineReport && !ui.concertRun && !ui.gachaResult && <TowerModal />}
+      {!ui.arcadeRun && !ui.towerRun && !ui.offlineReport && !ui.concertRun && <GachaModal />}
+      {!ui.arcadeRun && !ui.towerRun && !ui.offlineReport && !ui.concertRun && !ui.gachaResult && <TowerModal />}
       {ui.settingsOpen && <SettingsSheet />}
       {ui.basisOpen && <BasisModal />}
     </>

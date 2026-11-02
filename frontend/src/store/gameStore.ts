@@ -8,6 +8,7 @@ import {
   abandonConcert as abandonRun,
   beginManualConcert,
   buyDiamondUpgrade,
+  buyDistributor,
   buyEquipment,
   buyMusicPower,
   claimStreaming,
@@ -32,12 +33,12 @@ import { claimPresent, feedMascot, giftMascot, playMascot } from '../game/mascot
 import { buyTickets, craftPhoto, dismantlePhoto, giveCard, photoPull, takeCard, type PhotoPullResult } from '../game/photocards';
 import { applyChallengeClaim, applyChallengePosted, applyChartClaim } from '../game/serverRewards';
 import { remasterCard, toggleDeck } from '../game/songcards';
-import { climbTower, rollTower, type TowerOutcome } from '../game/tower';
-import { ACHIEVEMENT_TEXT, CAMPAIGN_TEXT, SNACK_TEXT, STAGE_TEXT, THEME_TEXT, pickLine, type Situation } from '../game/content';
+import { abandonTower, beginTower, finishTower, rollTower, type TowerOutcome, type TowerRun } from '../game/tower';
+import { ACHIEVEMENT_TEXT, CAMPAIGN_TEXT, COSTUME_TEXT, SNACK_TEXT, STAGE_TEXT, THEME_TEXT, pickLine, type Situation } from '../game/content';
 import { replyMail, rollMail } from '../game/fanmail';
 import { claimAttendance, claimMission, rollMissions } from '../game/missions';
 import { buySlot, collectPost, startPost } from '../game/monogram';
-import { buyCampaign, buySnack, buyTheme, setTheme } from '../game/shop';
+import { buyCampaign, buyCostume, buySnack, buyTheme, setCostume, setTheme } from '../game/shop';
 import { InputLimiter } from '../game/input';
 import type { Judgement } from '../game/minigame';
 import {
@@ -49,11 +50,13 @@ import {
   SAVE_KEY,
   type StorageLike,
 } from '../game/persistence';
-import { playerLevel, stageStatus } from '../game/selectors';
+import { stageStatus } from '../game/selectors';
 import { makeReport, settleOffline, settleOnline, type OfflineReport } from '../game/simulation';
 import type {
+  AlbumType,
   CampaignId,
   CommandResult,
+  CostumeId,
   DiamondUpgradeKind,
   EngineEvent,
   EquipmentKind,
@@ -173,6 +176,8 @@ export interface UiState {
   /** 가사 덱을 끝낸 뒤 고를 수 있는 카드 후보 */
   lyricDraft: string[] | null;
   gachaResult: GachaResult | null;
+  /** 진행 중인 계단 보스전. 전체화면이라 이 동안은 다른 탭으로 나갈 수 없다. */
+  towerRun: TowerRun | null;
   towerResult: TowerOutcome | null;
 }
 
@@ -201,6 +206,7 @@ const FAIL_TEXT: Record<FailReason, string> = {
   owned: '이미 가지고 있어요.',
   not_owned: '아직 가지고 있지 않아요.',
   need_single: '첫 싱글을 발매한 뒤에 쓸 수 있어요.',
+  need_track: '리듬 모드는 어둠속성 「정신병자러브」로만 플레이할 수 있어요.',
   no_ticket: '티켓이 부족해요.',
   need_duplicate: '중복으로 가진 카드만 쓸 수 있어요.',
   full_slots: '자리가 가득 찼어요.',
@@ -278,6 +284,7 @@ let ui: UiState = {
   arcadeResult: null,
   lyricDraft: null,
   gachaResult: null,
+  towerRun: null,
   towerResult: null,
 };
 
@@ -639,6 +646,16 @@ export function doBuyMusicPower(persona: Persona = 'normal'): void {
   saveNow();
 }
 
+/** 코인으로 유통사 호감도를 올린다(스트리밍 수익 업그레이드). */
+export function doBuyDistributor(): void {
+  const r = exec(buyDistributor);
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  sfx.buy();
+  toast(`🤝 유통사 호감도 Lv.${r.level} — 스트리밍 수익 +${Math.round(BALANCE.distributor.perLevel * r.level * 100)}% (🪙 ${fmt(r.cost)})`, 'good');
+  saveNow();
+}
+
 /** 다이아로 공연 쿨다운을 바로 끝낸다. */
 export function doSkipCooldown(stageId: StageId): void {
   const r = exec((s) => skipConcertCooldown(s, stageId));
@@ -709,6 +726,22 @@ export function doBuyTheme(id: ThemeId): void {
 
 export function doSetTheme(id: ThemeId): void {
   const r = exec((s) => setTheme(s, id));
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  saveNow();
+}
+
+export function doBuyCostume(id: CostumeId): void {
+  const r = exec((s) => buyCostume(s, id));
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  sfx.buy();
+  toast(`${COSTUME_TEXT[id].icon} ${COSTUME_TEXT[id].name} 코스튬을 샀어요. 💎 ${r.cost}`, 'good');
+  saveNow();
+}
+
+export function doSetCostume(persona: Persona, id: CostumeId | null): void {
+  const r = exec((s) => setCostume(s, persona, id));
   if (!r) return;
   if (!r.ok) return failToast(r.reason);
   saveNow();
@@ -785,8 +818,8 @@ export function doBuySlot(): void {
   saveNow();
 }
 
-export function doAlbum(): void {
-  const r = exec(releaseAlbum);
+export function doAlbum(type: AlbumType): void {
+  const r = exec((s) => releaseAlbum(s, type));
   if (!r) return;
   if (!r.ok) return failToast(r.reason);
   set({ albumResult: r });
@@ -918,7 +951,7 @@ export function doToggleFeat(id: string): void {
 }
 
 export function doFeedMascot(persona: Persona): void {
-  const r = exec((s) => feedMascot(s, persona, playerLevel(s.fans)));
+  const r = exec((s) => feedMascot(s, persona));
   if (!r) return;
   if (!r.ok) return failToast(r.reason);
   sfx.mascot();
@@ -1009,13 +1042,39 @@ export function doTrimLyricCard(id: string): void {
   saveNow();
 }
 
-export function doClimbTower(persona: Persona): void {
-  const r = exec((s) => climbTower(s, persona));
+let towerSeq = 0;
+
+/** 계단 보스전 시작: 쿨다운은 이 시점에 확정된다. 중간에 나가거나 져도 돌아오지 않고, 이기면 풀린다. */
+export function startTower(persona: Persona): void {
+  if (ui.towerRun || ui.arcadeRun || ui.concertRun) return;
+  const r = exec((s) => beginTower(s, persona, `tower-${Date.now().toString(36)}-${++towerSeq}`));
   if (!r) return;
   if (!r.ok) return failToast(r.reason);
-  sfx.finish(r.outcome.win);
-  set({ towerResult: r.outcome });
+  set({ towerRun: r.run, towerResult: null });
   saveNow();
+}
+
+/** 보스전 종료. 같은 도전은 한 번만 정산된다. */
+export function finishTowerRun(runId: string, won: boolean): void {
+  const run = ui.towerRun;
+  if (!run || run.id !== runId || run.status !== 'running') return;
+  const r = exec((s) => finishTower(s, run, won));
+  if (!r) return;
+  if (!r.ok) {
+    set({ towerRun: null });
+    return failToast(r.reason);
+  }
+  sfx.finish(r.outcome.win);
+  set({ towerRun: null, towerResult: r.outcome });
+  saveNow();
+}
+
+export function abandonTowerRun(): void {
+  const run = ui.towerRun;
+  if (!run) return;
+  abandonTower(run);
+  toast('보스전에서 나왔어요. 쿨다운은 그대로 유지돼요.', 'warn');
+  set({ towerRun: null });
 }
 
 export const closeTowerResult = () => set({ towerResult: null });
@@ -1175,6 +1234,7 @@ function resetRuntime(): void {
     arcadeResult: null,
     lyricDraft: null,
     gachaResult: null,
+    towerRun: null,
     towerResult: null,
     tab: 'studio',
   });

@@ -1,4 +1,4 @@
-import type { CampaignId, CardRarity, CounterKey, DiamondUpgradeKind, EquipmentKind, PostKind, SnackId, StageId, StreamPlatform, ThemeId, Vibe } from './types';
+import type { CampaignId, CardRarity, CostumeId, CounterKey, DarkCostumeId, DiamondUpgradeKind, EquipmentKind, Persona, PostKind, SnackId, StageId, StreamPlatform, ThemeId, Vibe } from './types';
 
 /**
  * 모든 경제 수치는 이 파일 한 곳에서만 수정한다. (기획서 3~7, 11장)
@@ -45,8 +45,15 @@ export const BALANCE = {
     recoveryPenalty: 0.5,
   },
   production: { micPerLevel: 0.15, studioPerLevel: 0.05 }, // 작업실 레벨당 0.10 → 0.05 (사용자 지정, 일반·어둠 공통)
-  /** perAlbum[i] = i번째 앨범을 낼 때 인세 배율에 더해지는 값 (누적 합산) */
-  royalty: { perFan: 0.02, promotionPerLevel: 0.2, perAlbum: [0.08, 0.1, 0.12] },
+  /**
+   * perAlbum[속성][i] = 그 속성의 i번째 앨범을 낼 때 인세 배율에 더해지는 값 (누적 합산).
+   * 어느 속성의 앨범이든 일반·어둠 두 자아의 인세에 모두 곱해진다.
+   */
+  royalty: {
+    perFan: 0.02,
+    promotionPerLevel: 0.2,
+    perAlbum: { normal: [0.08, 0.1, 0.12, 0.14, 0.16, 0.18], dark: [0.12, 0.24, 0.4] },
+  },
   level: { fansPerStep: 20 },
   click: { value: 1, maxPerSec: 3, holdPerSec: 2 },
   /**
@@ -80,20 +87,32 @@ export const BALANCE = {
       fanGrowth: 1.8,
     },
   },
-  /** 앨범은 ALBUM_CATALOG 순서대로 낸다. i번째 앨범의 비용(코인)·획득 팬은 사용자 지정 값이다. */
+  /**
+   * 앨범은 속성마다 ALBUM_CATALOG 순서대로 낸다. 속성별로 i번째 앨범의 비용(코인)·획득 팬이다.
+   * 일반 1~3번째와 어둠 1~3번째는 사용자 지정 값이다. 일반 4~6번째(사용자가 앨범 구성만 줬다)는 같은 흐름으로 이은 제안값이다
+   * (비용은 앞 앨범의 50배씩 10억 · 500억 · 2.5조, 팬은 +100씩). 일반 4~6번째의 인세 배율(royalty.perAlbum)과 발매 다이아(diamond.album)도 제안값이다.
+   * 어둠 앨범 비용 100,000 · 6,900,000 · 740,000,000코인, 팬 +124 · +300 · +740, 인세 +12% · +24% · +40%, 발매 다이아 💎100 · 200 · 400.
+   * 일반 6장을 모두 내면 인세 ×1.78, 어둠 3장까지 모두 내면 ×2.54.
+   */
   album: {
-    costs: [10_000, 350_000, 20_000_000],
-    fans: [100, 200, 300],
+    normal: {
+      costs: [10_000, 350_000, 20_000_000, 1_000_000_000, 50_000_000_000, 2_500_000_000_000],
+      fans: [100, 200, 300, 400, 500, 600],
+    },
+    dark: {
+      costs: [100_000, 6_900_000, 740_000_000],
+      fans: [124, 300, 740],
+    },
   },
   /**
    * 다이아 재화(사용자 요청으로 추가, 원안에 없음). 수량은 모두 제안값이라 여기서 조정한다.
-   *   획득: 공연장 첫 클리어(STAGES[].firstClearDiamonds), 앨범 발매(album[i]), 플레이어 레벨이 오를 때마다(levelUp × 오른 레벨 수)
+   *   획득: 공연장 첫 클리어(STAGES[].firstClearDiamonds), 앨범 발매(album[속성][i]), 플레이어 레벨이 오를 때마다(levelUp × 오른 레벨 수)
    *   사용: 공연 쿨다운 즉시 초기화(skipCooldown), 마이크 압수 즉시 해제 + 과열 0(clearSeizure), 다이아 전용 영구 업그레이드
    * 영구 업그레이드: 생산(자동+작업하기 라임)·인세에 (1 + perLevel × 레벨)이 곱해진다. 일반·어둠 모두에 적용된다.
    *   비용(다이아) = ceil(base × growth^레벨)
    */
   diamond: {
-    album: [30, 60, 120],
+    album: { normal: [30, 60, 120, 200, 300, 400], dark: [100, 200, 400] },
     levelUp: 2,
     skipCooldown: 5,
     clearSeizure: 10,
@@ -128,6 +147,11 @@ export const BALANCE = {
       billboard: { base: 30000, mult: 3, durationMs: 6 * 3600_000 },
     } as Record<CampaignId, { base: number; mult: number; durationMs: number }>,
     themes: { default: 0, pastel: 30, mono: 30, neon: 50 } as Record<ThemeId, number>,
+    /** 코스튬(사용자 지정): 일반속성 11종은 각 50다이아, 어둠속성 10종은 각 66다이아. 모양만 바뀐다. */
+    costumes: {
+      jirai: 50, hype: 50, angry: 50, maid: 50, bunny: 50, fallen: 50, bear: 50, nun: 50, vampire: 50, butler: 50, bride: 50,
+      dbunny: 66, band: 66, king: 66, milk: 66, dbear: 66, postman: 66, cultist: 66, clown: 66, dnurse: 66, dbride: 66,
+    } as Record<CostumeId, number>,
   },
   /**
    * 모노그램(가상 SNS). 게시물을 올려 두면 durationMs 뒤에 팬이 모인다.
@@ -189,6 +213,12 @@ export const BALANCE = {
    *   그 뒤 사용자 요청으로 팬당 초당 스트리밍을 0.85에서 0.2로 낮췄다. 지금은 팬 1명당 초당 약 0.0067코인(= 0.2 ÷ 30).
    */
   streaming: { perFanPerSec: 0.2, streamsPerCoin: 30, claimIntervalMs: 3600_000, shareBucketMs: 600_000 },
+  /**
+   * 유통사 호감도(사용자 요청): 코인으로 올리는 스트리밍 수익 업그레이드. 최대 레벨은 없다.
+   *   스트리밍 정산으로 받는 코인 = 정산 대기 스트리밍 ÷ streamsPerCoin × (1 + perLevel × 레벨)
+   *   비용 = ceil(base × growth^레벨) 코인 (첫 5,000, 이후 1.4배씩). 스트리밍 수·누적 기록은 그대로고 코인으로 바꾸는 비율만 바뀐다.
+   */
+  distributor: { base: 5000, growth: 1.4, perLevel: 0.05 },
   /** 일반속성 장비. 일반속성에서만 효과가 난다. */
   equipment: { maxLevel: 20, ...NORMAL_EQUIPMENT },
   /** 어둠속성 장비(마이크·작업실·홍보). 어둠속성에서만 효과가 나고 레벨당 효과는 일반과 같다. */
@@ -231,6 +261,10 @@ export const BALANCE = {
    * 모노사파런 (지하 클럽의 직접 공연). 달리면서 점점 빨라지고, 목표 거리를 완주하면 성공, 점수는 젤리를 먹은 비율(0~1000)이다.
    * 스크롤 단위(u)로 게임을 돌리고, 화면에 보이는 거리(m)는 코스 길이에 비례해 환산한다. 시작→끝 속도는 u/s.
    * 어둠은 더 길고 더 빠른 대신 보상이 일반의 4배다(rewardMult). 실패 시 보상 비율은 concert.failRewardRate를 쓴다.
+   * 코스는 공연장마다 따로 정할 수 있다(stageCourse). 지하 클럽은 사용자 요청으로 짧아진 대신 훨씬 빨라진다:
+   *   목표 일반 400m · 어둠 697.4m, 속도 일반 8→20 · 어둠 11→28(u/s). 달리는 시간은 약 69초/86초(원래 약 130초/151초).
+   *   같은 자동 플레이어로 돌려 보면 점프 타이밍이 ±0.1초 흔들려도 원래 일반 코스보다 피격이 적다.
+   *   stageCourse에 없는 공연장(폐건물 지하)은 persona의 원래 코스를 쓴다.
    */
   run: {
     viewUnits: 32,
@@ -255,6 +289,12 @@ export const BALANCE = {
       normal: { goalM: 2600, lengthU: 1500, startSpeed: 8, endSpeed: 16, rewardMult: 1 },
       dark: { goalM: 6900, lengthU: 2400, startSpeed: 11, endSpeed: 22, rewardMult: 4 },
     },
+    stageCourse: {
+      club: {
+        normal: { goalM: 400, lengthU: 900, startSpeed: 8, endSpeed: 20 },
+        dark: { goalM: 697.4, lengthU: 1570, startSpeed: 11, endSpeed: 28 },
+      },
+    } as Partial<Record<StageId, Record<Persona, { goalM: number; lengthU: number; startSpeed: number; endSpeed: number }>>>,
   },
   /**
    * 콘텐츠 팩 2(사용자 요청으로 추가, 원안에 없음). 아래 수치는 모두 제안값이고 설계는 docs/pack2-design.md에 있다.
@@ -302,28 +342,30 @@ export const BALANCE = {
     maxTickets: 999,
   },
   /**
-   * 피처링: NPC 래퍼 12명. 한 번 뽑는 데 pullCost 다이아(10연은 tenCost). SSR은 rates.SSR, pityAt회째에 SSR 확정.
-   * SSR은 이번 주 픽업이 pickupRate 확률이고, 빗나가면 다음 SSR은 픽업이 확정이다. 10연의 마지막은 SR 이상이 확정이다.
+   * 피처링: 래퍼 21명(일반 5 · 레어 5 · 에픽 6 · 전설 5, 등급 코드는 N·R·SR·SSR). 한 번 뽑는 데 pullCost 다이아(10연은 tenCost).
+   * 전설은 rates.SSR, pityAt회째에 전설 확정. 전설은 이번 주 픽업이 pickupRate 확률이고, 빗나가면 다음 전설은 픽업이 확정이다.
+   * 10연의 마지막은 레어 이상이 확정이다. 등급 확률은 예전 3등급(R 85 · SR 13 · SSR 2)의 SR을 레어 8 + 에픽 5로 나눈 값이다.
    * 중복은 별이 오르고(최대 maxStar), 넘치면 dupRefund 다이아로 돌려받는다. 장착한 slots명의 패시브가 영구로 붙는다.
    *   패시브 = passive[등급] × (1 + starBonus × (별 − 1))
    */
   feat: {
     pullCost: 10,
     tenCost: 90,
-    rates: { SSR: 0.02, SR: 0.13 },
+    rates: { SSR: 0.02, SR: 0.05, R: 0.08, N: 0.85 },
     pityAt: 50,
     pickupRate: 0.5,
     slots: 3,
     maxStar: 6,
     starBonus: 0.1,
-    passive: { R: 0.03, SR: 0.06, SSR: 0.1 },
-    dupRefund: { R: 1, SR: 3, SSR: 8 },
+    passive: { N: 0.03, R: 0.05, SR: 0.07, SSR: 0.1 },
+    dupRefund: { N: 1, R: 2, SR: 4, SSR: 8 },
     pickupWeekMs: 7 * 24 * 3600_000,
   },
   /**
    * 마스코트: 자아마다 하나. xp가 stageXp를 넘을 때마다 단계가 오르고 단계별 생산 보너스(그 자아의 라임)가 붙는다.
    * 기분: 배부름(fullUntil까지) → 배고픔(hungryMs 동안, 보너스 절반) → 삐짐(보너스 없음). 간식을 주면 풀린다.
-   *   간식 값(코인) = ceil(baseCoins × growth^(레벨−1)), 놀아주기는 무료(쿨다운), 선물은 다이아.
+   *   간식 값(코인) = ceil(baseCoins × growth^min(그 마스코트에게 간식을 준 횟수, maxRaises)), 놀아주기는 무료(쿨다운), 선물은 다이아.
+   *   (처음에는 growth 1.05로 플레이어 레벨이 오를수록 비쌌지만, 요청으로 줄 때마다 1.0175배씩 오르고 maxRaises(500)번 뒤로는 오르지 않게 바꿨다. 시작 값은 처음 40이었다가 90으로 올렸다. 상한 값은 90×1.0175^500 ≈ 526,565코인.)
    *   배부를 때는 presentMs마다 선물(현재 인세 coinSecs초 분량 코인, diamondChance 확률로 다이아 1)을 받을 수 있다.
    */
   mascot: {
@@ -333,7 +375,7 @@ export const BALANCE = {
     fullMs: 4 * 3600_000,
     fullCapMs: 12 * 3600_000,
     hungryMs: 12 * 3600_000,
-    feed: { baseCoins: 40, growth: 1.05, xp: 4 },
+    feed: { baseCoins: 90, growth: 1.0175, maxRaises: 500, xp: 4 },
     play: { cooldownMs: 10 * 60_000, xp: 1 },
     gift: { diamonds: 3, xp: 20 },
     present: { intervalMs: 6 * 3600_000, coinSecs: 300, diamondChance: 0.1, minCoins: 20 },
@@ -355,8 +397,9 @@ export const BALANCE = {
     },
   },
   /**
-   * 리듬게임: 싱글마다 곡 번호와 씨앗으로 채보가 자동 생성된다(4레인 탭 노트). 난이도별로 박 수·BPM·노트 밀도·보상 배율이 다르고
-   * 어둠 곡은 BPM이 darkBpm만큼 빠르다. 판정 폭은 전투력(power) 보너스만큼 넓어진다.
+   * 리듬게임: 음원이 있는 곡(`songcharts.ts`)으로만 플레이한다. 채보는 음원에 맞춘 고정 채보이고, 음원은 leadInMs에 시작해 끝난 뒤 trackTailMs에 끝난다.
+   * 난이도별 보상 배율(mult)과 판정 폭(power 보너스만큼 넓어진다)이 이 값들이다. 박 수·BPM·노트 밀도·darkBpm은 곡 번호와 씨앗으로 채보를 자동 생성하던
+   * 처음 설계의 값이라 지금 게임에서는 쓰이지 않고 `buildChart`의 음원 없는 경로(테스트)에서만 쓰인다.
    * 점수 = 1000 × (정확도 × (1 − comboWeight) + 최대 콤보 비율 × comboWeight), 정확도 = (Perfect 1 + Good goodValue) / 노트 수
    */
   rhythm: {
@@ -369,6 +412,8 @@ export const BALANCE = {
     darkBpm: 8,
     leadInMs: 2200,
     tailMs: 1200,
+    /** 음원 곡은 음원이 끝나고 이만큼 뒤에 끝난다 */
+    trackTailMs: 300,
     perfectMs: 55,
     goodMs: 115,
     goodValue: 0.6,
@@ -429,10 +474,13 @@ export const BALANCE = {
     starter: { 'l-a1': 2, 'l-eo1': 2, 'l-o1': 2, 'l-u1': 2, 'l-i1': 2, 'l-wild': 1, 'l-breath': 1 } as Record<string, number>,
   },
   /**
-   * 무한의 계단: 한 층 = 적 전투력 하나. 적 전투력 = baseEnemy × growth^(층−1), bossEvery층마다 보스(× bossMult).
-   * 내 전투력 = (basePower + perLevel × (레벨−1)) × (1 + perGear × 그 자아의 장비 레벨 합 + perClick × 클릭 업그레이드) × (1 + 수집 power 보너스).
-   * 약점 자아(층마다 정해짐)로 도전하면 weakMult배. 결과는 ±variance 무작위(씨앗·층·시도 횟수로 정해진다).
-   * 실패하면 failCooldownMs 쉬고, 성공하면 다음 층으로. 주(월요일)마다 층이 1로 돌아가고 최고 기록은 남는다.
+   * 무한의 계단: 한 층 = 보스 한 명. 직접 움직여 탄을 피하면서 보스를 쓰러뜨린다(마이크는 보스를 자동으로 조준해 쏜다).
+   * 적 전투력 = baseEnemy × growth^(층−1), bossEvery층마다 보스층(× bossMult). 내 전투력 =
+   *   (basePower + perLevel × (레벨−1)) × (1 + perGear × 그 자아의 장비 레벨 합 + perClick × 클릭 업그레이드) × (1 + 수집 power 보너스),
+   * 층마다 정해진 약점 자아로 도전하면 weakMult배. 두 전투력의 비율(ratio = 내 / 적)이 내 탄의 위력을 정한다: 한 발 = shotDmg × ratio,
+   * 보스 체력은 항상 bossHp. 그래서 전투력이 모자라면 시간 안에 못 쓰러뜨리고, 넉넉하면 빨리 끝난다.
+   * 보스의 탄은 층이 오를수록 빠르고 잦고 아프다(fireMs·dmg·shotSpeed). 체력이 0이 되거나 시간이 다 되면 진 것이다.
+   * 시작하면 failCooldownMs가 확정되고(포기·패배는 그대로), 이기면 winCooldownMs로 바로 풀린다. 주(월요일)마다 층이 1로 돌아가고 최고 기록은 남는다.
    * 보상: 층마다 인세 coinSecs초 분량 코인(처음 깰 때만), 보스층 다이아, milestoneEvery층마다 다이아 (이번 주 한 번씩).
    */
   tower: {
@@ -441,9 +489,8 @@ export const BALANCE = {
     bossEvery: 5,
     bossMult: 1.6,
     weakMult: 1.4,
-    variance: 0.15,
-    failCooldownMs: 60_000,
-    winCooldownMs: 8_000,
+    failCooldownMs: 30_000,
+    winCooldownMs: 0,
     basePower: 30,
     perLevel: 6,
     perGear: 0.04,
@@ -454,6 +501,58 @@ export const BALANCE = {
     bossDiamonds: 1,
     milestoneEvery: 10,
     milestoneDiamonds: 3,
+    battle: {
+      stepMs: 1000 / 60,
+      countdownMs: 2000,
+      timeLimitMs: 45_000,
+      half: 34,
+      playerR: 0.7,
+      playerSpeed: 8,
+      hp: 100,
+      invincibleMs: 400,
+      bossHp: 100,
+      bossR: 2,
+      bossSpeed: 4,
+      playerFireMs: 500,
+      shotDmg: 2,
+      shotSpeed: 24,
+      shotLife: 2.2,
+      shotR: 0.4,
+      ratioMin: 0.2,
+      ratioMax: 8,
+      /** 보스 탄: 발사 간격(ms) = max(fireMin, fireBase − fireStep × 층), 피해 = min(dmgMax, dmgBase + dmgStep × 층), 속도 = min(speedMax, speedBase + speedStep × 층) */
+      fireBase: 1300,
+      fireMin: 320,
+      fireStep: 9,
+      dmgBase: 10,
+      dmgMax: 35,
+      dmgStep: 0.15,
+      speedBase: 9,
+      speedMax: 22,
+      speedStep: 0.09,
+      enemyShotR: 0.5,
+      /**
+       * 한 번에 쏘는 탄 수 = min(fanMax, 1 + 층 ÷ fanEvery)(체력이 절반 아래이거나 보스층이면 +1), 탄 사이 각도 spread.
+       * 플레이어가 움직이는 쪽을 leadFactor만큼 앞서 겨눈다. 보스층은 ringEvery번째 발사마다,
+       * ringFromFloor층부터는 ringEveryNormal번째 발사마다 사방(ringCount발)으로 퍼진다.
+       */
+      leadFactor: 0.7,
+      fanEvery: 10,
+      fanMax: 6,
+      spread: 0.2,
+      ringEvery: 4,
+      ringEveryNormal: 5,
+      ringFromFloor: 15,
+      ringCount: 10,
+      ringCountPerFloor: 0.2,
+      ringCountMax: 40,
+      /** spiralFromFloor층부터는 발사마다 돌아가는 방향으로 탄이 하나 더 나간다 */
+      spiralFromFloor: 30,
+      /** 승산 표시 기준: 전투력 비율이 이 값 이상이면 해당 난이도 */
+      easyRatio: 1.6,
+      normalRatio: 1.1,
+      hardRatio: 0.75,
+    },
   },
   /**
    * 피켓팅: 오픈 시각(무작위 대기)에 누르는 반응속도(최대 reactionMax점) + 보안문자 입력(맞히면 captchaBase + 빠를수록 최대 captchaSpeed점).
@@ -535,6 +634,15 @@ export const STREAM_PLATFORMS: readonly StreamPlatform[] = ['spotify', 'ytmusic'
 export const SNACK_IDS = Object.keys(BALANCE.shop.snacks) as SnackId[];
 export const CAMPAIGN_IDS = Object.keys(BALANCE.shop.campaigns) as CampaignId[];
 export const THEME_IDS = Object.keys(BALANCE.shop.themes) as ThemeId[];
+export const COSTUME_IDS = Object.keys(BALANCE.shop.costumes) as CostumeId[];
+const DARK_COSTUMES: readonly DarkCostumeId[] = ['dbunny', 'band', 'king', 'milk', 'dbear', 'postman', 'cultist', 'clown', 'dnurse', 'dbride'];
+/** 코스튬이 어느 자아의 것인지 */
+export const costumePersona = (id: CostumeId): Persona => ((DARK_COSTUMES as readonly CostumeId[]).includes(id) ? 'dark' : 'normal');
+/** 자아별 코스튬(상점 표시 순서) */
+export const COSTUME_IDS_OF: Record<Persona, CostumeId[]> = {
+  normal: COSTUME_IDS.filter((id) => costumePersona(id) === 'normal'),
+  dark: COSTUME_IDS.filter((id) => costumePersona(id) === 'dark'),
+};
 export const POST_KINDS = Object.keys(BALANCE.monogram.kinds) as PostKind[];
 
 /* ---------- 콘텐츠 팩 2: 카드·NPC·가사 카드 표 ---------- */
@@ -551,24 +659,48 @@ export const PHOTO_CARD_IDS: readonly string[] = Array.from({ length: PHOTO_SETS
 
 export interface FeatDef {
   id: string;
-  rarity: Exclude<CardRarity, 'N'>;
+  rarity: CardRarity;
   vibe: Vibe;
 }
-/** 피처링 NPC 래퍼. 이름·소개는 content.ts */
+/** 피처링 래퍼. 이름·소개는 content.ts */
 export const FEAT_NPCS: readonly FeatDef[] = [
-  { id: 'f-han', rarity: 'R', vibe: 'rhyme' },
-  { id: 'f-conv', rarity: 'R', vibe: 'coin' },
-  { id: 'f-bus', rarity: 'R', vibe: 'fan' },
-  { id: 'f-roof', rarity: 'R', vibe: 'power' },
-  { id: 'f-rain', rarity: 'R', vibe: 'rhyme' },
-  { id: 'f-pc', rarity: 'SR', vibe: 'coin' },
-  { id: 'f-study', rarity: 'SR', vibe: 'rhyme' },
-  { id: 'f-diary', rarity: 'SR', vibe: 'fan' },
-  { id: 'f-dawn', rarity: 'SR', vibe: 'power' },
-  { id: 'f-moon', rarity: 'SSR', vibe: 'rhyme' },
-  { id: 'f-heart', rarity: 'SSR', vibe: 'fan' },
-  { id: 'f-void', rarity: 'SSR', vibe: 'power' },
+  { id: 'f-alfrado', rarity: 'N', vibe: 'rhyme' },
+  { id: 'f-haname', rarity: 'N', vibe: 'coin' },
+  { id: 'f-seungcheon', rarity: 'N', vibe: 'fan' },
+  { id: 'f-0ik2', rarity: 'N', vibe: 'power' },
+  { id: 'f-saerim', rarity: 'N', vibe: 'rhyme' },
+  { id: 'f-gangyusi', rarity: 'R', vibe: 'coin' },
+  { id: 'f-upia', rarity: 'R', vibe: 'rhyme' },
+  { id: 'f-feiz', rarity: 'R', vibe: 'fan' },
+  { id: 'f-p4rki', rarity: 'R', vibe: 'power' },
+  { id: 'f-nunalgogi', rarity: 'R', vibe: 'coin' },
+  { id: 'f-sohee', rarity: 'SR', vibe: 'rhyme' },
+  { id: 'f-truman', rarity: 'SR', vibe: 'coin' },
+  { id: 'f-pshine', rarity: 'SR', vibe: 'fan' },
+  { id: 'f-ch1tkey', rarity: 'SR', vibe: 'power' },
+  { id: 'f-k4ton', rarity: 'SR', vibe: 'rhyme' },
+  { id: 'f-rtw', rarity: 'SR', vibe: 'fan' },
+  { id: 'f-scails', rarity: 'SSR', vibe: 'rhyme' },
+  { id: 'f-hamo', rarity: 'SSR', vibe: 'fan' },
+  { id: 'f-ghostclub', rarity: 'SSR', vibe: 'power' },
+  { id: 'f-choisung', rarity: 'SSR', vibe: 'coin' },
+  { id: 'f-ruru', rarity: 'SSR', vibe: 'rhyme' },
 ];
+/** 12명 시절의 ID → 지금 ID. 예전 저장을 읽을 때 같은 등급 자리로 옮긴다(별·장착 유지). */
+export const FEAT_LEGACY_IDS: Readonly<Record<string, string>> = {
+  'f-han': 'f-alfrado',
+  'f-conv': 'f-haname',
+  'f-bus': 'f-seungcheon',
+  'f-roof': 'f-0ik2',
+  'f-rain': 'f-saerim',
+  'f-pc': 'f-gangyusi',
+  'f-study': 'f-upia',
+  'f-diary': 'f-feiz',
+  'f-dawn': 'f-p4rki',
+  'f-moon': 'f-scails',
+  'f-heart': 'f-hamo',
+  'f-void': 'f-ghostclub',
+};
 export const FEAT_IDS: readonly string[] = FEAT_NPCS.map((n) => n.id);
 export const featDefById = (id: string): FeatDef | undefined => FEAT_NPCS.find((n) => n.id === id);
 
@@ -729,7 +861,8 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
   { id: 'photoset-1', metric: 'photoSets', goal: 1, diamonds: 6 },
   { id: 'photoset-6', metric: 'photoSets', goal: 6, diamonds: 30 },
   { id: 'feat-5', metric: 'featOwned', goal: 5, diamonds: 4 },
-  { id: 'feat-12', metric: 'featOwned', goal: 12, diamonds: 20 },
+  // id는 12명 시절 그대로 둔다(저장된 달성 기록과 칭호가 id로 이어진다). 목표는 지금 래퍼 전원.
+  { id: 'feat-12', metric: 'featOwned', goal: FEAT_NPCS.length, diamonds: 20 },
   { id: 'card-ssr', metric: 'ssrCards', goal: 1, diamonds: 6 },
   { id: 'pet-adult', metric: 'mascotStage', goal: 3, diamonds: 5 },
   { id: 'pet-legend', metric: 'mascotStage', goal: 4, diamonds: 15 },

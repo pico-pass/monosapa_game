@@ -7,7 +7,7 @@ import { track } from './tracking';
 import type { CommandResult, Fail, FailReason, GameState } from './types';
 
 /*
- * 피처링 가챠: NPC 래퍼 카드를 다이아로 뽑는다. SSR은 이번 주 픽업이 50%, 빗나가면 다음 SSR은 픽업 확정, 50회 천장.
+ * 피처링 가챠: 래퍼 카드를 다이아로 뽑는다. 전설(SSR)은 이번 주 픽업이 50%, 빗나가면 다음 전설은 픽업 확정, 50회 천장.
  * 결과는 씨앗과 뽑기 번호로만 정해진다.
  */
 
@@ -29,7 +29,7 @@ export interface FeatPullResult {
 
 const byRarity = (r: FeatDef['rarity']): FeatDef[] => FEAT_NPCS.filter((n) => n.rarity === r);
 
-/** 뽑기 한 번의 결과(상태는 건드리지 않는다). tenLast: 10연의 마지막이면서 아직 SR 이상이 없었다. */
+/** 뽑기 한 번의 결과(상태는 건드리지 않는다). tenLast: 10연의 마지막이면서 아직 레어 이상이 없었다. */
 export function rollFeat(
   seed: number,
   seq: number,
@@ -50,8 +50,9 @@ export function rollFeat(
     const isPickup = guaranteed || r2 < F.pickupRate || others.length === 0;
     return { def: isPickup ? pickup : pick(others), pickup: isPickup };
   }
-  if (tenLast || r < F.rates.SSR + F.rates.SR) return { def: pick(byRarity('SR')), pickup: false };
-  return { def: pick(byRarity('R')), pickup: false };
+  if (r < F.rates.SSR + F.rates.SR) return { def: pick(byRarity('SR')), pickup: false };
+  if (tenLast || r < F.rates.SSR + F.rates.SR + F.rates.R) return { def: pick(byRarity('R')), pickup: false };
+  return { def: pick(byRarity('N')), pickup: false };
 }
 
 export function featPull(state: GameState, count: 1 | 10 = 1): CommandResult<{ results: FeatPullResult[]; cost: number; refund: number }> {
@@ -61,17 +62,17 @@ export function featPull(state: GameState, count: 1 | 10 = 1): CommandResult<{ r
   const owned = { ...state.feat.owned };
   let { pity, guaranteed, pulls } = state.feat;
   let refundTotal = 0;
-  let hasSr = false;
+  let hasRare = false;
   const results: FeatPullResult[] = [];
   for (let i = 0; i < count; i++) {
     pulls += 1;
-    const roll = rollFeat(state.feat.seed, pulls, pity, guaranteed, pickup, count === 10 && i === count - 1 && !hasSr);
+    const roll = rollFeat(state.feat.seed, pulls, pity, guaranteed, pickup, count === 10 && i === count - 1 && !hasRare);
     const def = roll.def;
     if (def.rarity === 'SSR') {
       pity = 0;
       guaranteed = !roll.pickup;
     } else pity += 1;
-    if (def.rarity !== 'R') hasSr = true;
+    if (def.rarity !== 'N') hasRare = true;
     const stars = owned[def.id] ?? 0;
     let refund = 0;
     if (stars >= F.maxStar) refund = F.dupRefund[def.rarity];

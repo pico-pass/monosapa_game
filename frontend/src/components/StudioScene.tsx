@@ -1,6 +1,6 @@
-import { ASSETS } from '../assets';
-import { PERSONA_TEXT } from '../game/content';
-import type { Persona } from '../game/types';
+import { ASSETS, petImage } from '../assets';
+import { MASCOT_TEXT, PERSONA_TEXT } from '../game/content';
+import type { CostumeId, Persona } from '../game/types';
 
 export type Mood = 'idle' | 'work' | 'hot' | 'seized';
 
@@ -11,13 +11,17 @@ interface Props {
   tier: number;
   /** 작업 입력이 들어올 때마다 바뀌는 값: 키가 바뀌면 애니메이션이 다시 재생된다. */
   pulse: number;
+  /** 이 자아가 입고 있는 코스튬. 없으면 기본 옷이다. */
+  costume?: CostumeId | null;
+  /** 이 자아 마스코트의 성장 단계. 없으면(null) 펫을 그리지 않는다. 알 단계는 이모지로 그린다. */
+  petStage?: number | null;
 }
 
 /** 임시 SVG 작업실 + 캐릭터. assets/index.ts에 이미지 경로를 넣으면 해당 부분이 교체된다. */
-export function StudioScene({ persona, mood, tier, pulse }: Props) {
+export function StudioScene({ persona, mood, tier, pulse, costume = null, petStage = null }: Props) {
   const dark = persona === 'dark';
   const roomImg = ASSETS.rooms[persona];
-  const charImg = ASSETS.characters[persona];
+  const charImg = costume ? ASSETS.costumes[costume] : ASSETS.characters[persona];
   const text = PERSONA_TEXT[persona];
 
   return (
@@ -70,6 +74,7 @@ export function StudioScene({ persona, mood, tier, pulse }: Props) {
       </g>
 
       <Desk dark={dark} tier={tier} />
+      {petStage !== null && <Pet persona={persona} stage={petStage} />}
       <rect width="360" height="300" fill={`url(#glow-${persona})`} pointerEvents="none" />
     </svg>
   );
@@ -243,6 +248,19 @@ function Desk({ dark, tier }: { dark: boolean; tier: number }) {
         </g>
       )}
     </g>
+  );
+}
+
+/* ---------- 마스코트 ---------- */
+
+/** 책상 오른쪽 끝에 앉은 마스코트. 화면이 위아래로 잘려도 책상 위(y 240)에는 보인다. */
+function Pet({ persona, stage }: { persona: Persona; stage: number }) {
+  const src = petImage(persona, stage);
+  if (src) return <image className="pet" href={src} x="262" y="160" width="90" height="80" preserveAspectRatio="xMidYMax meet" pointerEvents="none" />;
+  return (
+    <text className="pet pet-egg" x="306" y="238" textAnchor="middle" fontSize="40" pointerEvents="none">
+      {MASCOT_TEXT[persona].icons[stage]}
+    </text>
   );
 }
 

@@ -1,6 +1,7 @@
 import { BALANCE } from './balance';
 import { bonuses } from './packdata';
 import { clampResource, levelUpDiamonds, royaltyBreakdown } from './selectors';
+import { trackOfSingle, trackSingles } from './songcharts';
 import { mix } from './streaming';
 import { track } from './tracking';
 import type { ArcadeKind, CommandResult, Fail, FailReason, GameState, Persona } from './types';
@@ -59,8 +60,9 @@ const fail = (state: GameState, reason: FailReason): Fail => ({ ok: false, reaso
 export const arcadeCooldownLeft = (s: Pick<GameState, 'arcade' | 'lastSettledAt'>, kind: ArcadeKind): number =>
   Math.max(0, s.arcade[kind].cooldownUntil - s.lastSettledAt);
 
-/** 지금 시작할 수 있는가 (첫 싱글 필요 + 쿨다운) */
+/** 지금 시작할 수 있는가 (첫 싱글 필요 + 쿨다운, 리듬은 음원 곡 싱글이 있어야 한다) */
 export function arcadeBlocked(s: GameState, kind: ArcadeKind): FailReason | null {
+  if (kind === 'rhythm' && trackSingles(s.singles).length < 1) return 'need_track';
   if (s.singles.length < 1) return 'need_single';
   if (arcadeCooldownLeft(s, kind) > 0) return 'cooldown';
   return null;
@@ -76,9 +78,11 @@ export function beginArcade(
   if (blocked) return fail(state, blocked);
   let seed = mix(state.feat.seed ^ 0x61726364, state.arcade[kind].plays + 1 + state.counters.arcades * 7919);
   if (kind === 'rhythm') {
-    if (!opts.target || !state.singles.some((x) => x.id === opts.target)) return fail(state, 'not_found');
+    const single = state.singles.find((x) => x.id === opts.target);
+    if (!single) return fail(state, 'not_found');
+    if (!trackOfSingle(single)) return fail(state, 'need_track'); // 리듬 모드는 음원 곡만
     // 같은 곡은 항상 같은 채보: 곡 번호와 곡 카드 씨앗으로만 정한다.
-    seed = mix(state.cards.seed ^ 0x72687974, Number(opts.target.slice(7)) || 0);
+    seed = mix(state.cards.seed ^ 0x72687974, Number(single.id.slice(7)) || 0);
   }
   const record = state.arcade[kind];
   const next = track(

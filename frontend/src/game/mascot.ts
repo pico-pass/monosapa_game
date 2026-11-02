@@ -11,7 +11,8 @@ import type { CommandResult, Fail, FailReason, GameState, Mascot, Persona } from
 const M = BALANCE.mascot;
 const fail = (state: GameState, reason: FailReason): Fail => ({ ok: false, reason, state });
 
-export const feedCost = (level: number): number => Math.ceil(M.feed.baseCoins * M.feed.growth ** Math.max(0, level - 1));
+/** 간식 값(코인): 그 마스코트에게 간식을 준 횟수(fed)만큼 growth배가 쌓이고, maxRaises번째부터는 더 오르지 않는다. */
+export const feedCost = (fed: number): number => Math.ceil(M.feed.baseCoins * M.feed.growth ** Math.min(Math.max(0, fed), M.feed.maxRaises));
 
 export interface MascotView {
   persona: Persona;
@@ -49,14 +50,14 @@ export function mascotView(s: Pick<GameState, 'mascot' | 'lastSettledAt'>, perso
 
 const withMascot = (s: GameState, persona: Persona, patch: Partial<Mascot>): GameState => ({ ...s, mascot: { ...s.mascot, [persona]: { ...s.mascot[persona], ...patch } } });
 
-/** 간식 주기 (코인). 배부름 시간이 늘고 xp가 오른다. */
-export function feedMascot(state: GameState, persona: Persona, level: number): CommandResult<{ cost: number }> {
-  const cost = feedCost(level);
-  if (state.coins < cost) return fail(state, 'insufficient_coins');
+/** 간식 주기 (코인). 배부름 시간이 늘고 xp가 오르며, 다음 간식 값이 growth배로 오른다(상한까지). */
+export function feedMascot(state: GameState, persona: Persona): CommandResult<{ cost: number }> {
   const m = state.mascot[persona];
+  const cost = feedCost(m.fed);
+  if (state.coins < cost) return fail(state, 'insufficient_coins');
   const now = state.lastSettledAt;
   const fullUntil = Math.min(Math.max(m.fullUntil, now) + M.fullMs, now + M.fullCapMs);
-  const next = track(withMascot({ ...state, coins: state.coins - cost }, persona, { fullUntil, xp: m.xp + M.feed.xp }), 'pets');
+  const next = track(withMascot({ ...state, coins: state.coins - cost }, persona, { fullUntil, xp: m.xp + M.feed.xp, fed: m.fed + 1 }), 'pets');
   return { ok: true, state: next, cost };
 }
 

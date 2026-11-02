@@ -1,5 +1,5 @@
-import { ACHIEVEMENTS, BALANCE, CAMPAIGN_IDS, MISSION_METRICS, POST_KINDS, SCHEMA_VERSION, SNACK_IDS, STAGE_IDS, STREAM_PLATFORMS, THEME_IDS } from './balance';
-import { ALBUM_CATALOG, mailTemplateById } from './content';
+import { ACHIEVEMENTS, BALANCE, CAMPAIGN_IDS, COSTUME_IDS, MISSION_METRICS, POST_KINDS, SCHEMA_VERSION, SNACK_IDS, STAGE_IDS, STREAM_PLATFORMS, THEME_IDS, costumePersona } from './balance';
+import { albumDefById, albumSeries, mailTemplateById } from './content';
 import { emptyFanMail } from './fanmail';
 import { emptyMissions } from './missions';
 import { emptyMonogram } from './monogram';
@@ -9,10 +9,13 @@ import { retroactiveDiamonds } from './selectors';
 import { streamSeedFrom, zeroTotals } from './streaming';
 import { COUNTER_KEYS, zeroCounters } from './tracking';
 import type {
+  Album,
   Buffs,
   CampaignId,
   ConcertRecord,
   Cosmetics,
+  CostumeId,
+  DarkCostumeId,
   Counters,
   DialogueTone,
   FanMail,
@@ -20,6 +23,8 @@ import type {
   Mail,
   MissionState,
   Monogram,
+  NormalCostumeId,
+  Persona,
   Post,
   SnackId,
   StageId,
@@ -59,10 +64,11 @@ export function createInitialState(now: number, reducedMotion = false): GameStat
     darkEquipment: { mic: 0, studio: 0, promotion: 0 },
     musicPower: 0,
     dripPower: 0,
+    distributor: 0,
     diamonds: 0,
     diamondUpgrades: { production: 0, royalty: 0, offline: 0 },
     buffs: { snack: null, campaign: null },
-    cosmetics: { themes: ['default'], theme: 'default', title: null },
+    cosmetics: { themes: ['default'], theme: 'default', costumes: [], costume: null, darkCostume: null, title: null },
     counters: zeroCounters(),
     achievements: {},
     missions: emptyMissions(),
@@ -133,13 +139,18 @@ function parseBuffs(raw: unknown): Buffs {
 }
 
 function parseCosmetics(raw: unknown): Cosmetics {
-  if (raw === undefined) return { themes: ['default'], theme: 'default', title: null };
+  if (raw === undefined) return { themes: ['default'], theme: 'default', costumes: [], costume: null, darkCostume: null, title: null };
   if (!isObj(raw)) return bad('cosmetics가 올바르지 않습니다.');
   const owned = Array.isArray(raw.themes) ? raw.themes.filter((t): t is ThemeId => THEME_IDS.includes(t as ThemeId)) : [];
   const themes = [...new Set<ThemeId>(['default', ...owned])];
   const theme = themes.includes(raw.theme as ThemeId) ? (raw.theme as ThemeId) : 'default';
+  const costumes = [...new Set(Array.isArray(raw.costumes) ? raw.costumes.filter((c): c is CostumeId => COSTUME_IDS.includes(c as CostumeId)) : [])];
+  // 입은 옷은 가진 것이고 그 자아의 것일 때만 받아들인다
+  const worn = (id: unknown, who: Persona): CostumeId | null => (costumes.includes(id as CostumeId) && costumePersona(id as CostumeId) === who ? (id as CostumeId) : null);
+  const costume = worn(raw.costume, 'normal') as NormalCostumeId | null;
+  const darkCostume = worn(raw.darkCostume, 'dark') as DarkCostumeId | null;
   const title = typeof raw.title === 'string' && raw.title.length > 0 && raw.title.length <= 40 ? raw.title : null;
-  return { themes, theme, title };
+  return { themes, theme, costumes, costume, darkCostume, title };
 }
 
 function parseCounters(raw: unknown): Counters {
@@ -263,6 +274,8 @@ export function validateState(input: unknown): Validation {
     }
     const musicPower = o.musicPower === undefined ? 0 : int(o, 'musicPower', 0, 1000, 'musicPower');
     const dripPower = o.dripPower === undefined ? 0 : int(o, 'dripPower', 0, 1000, 'dripPower');
+    // 유통사 호감도는 나중에 추가돼서 없는 예전 저장은 0레벨이다.
+    const distributor = o.distributor === undefined ? 0 : int(o, 'distributor', 0, 1000, 'distributor');
 
     // 스트리밍도 나중에 추가된 필드다. 없는 예전 저장은 0에서 시작하고, 첫 정산은 바로 가능하다(복귀 정산분만 쌓여 있다).
     let streaming: Streaming = {
@@ -304,14 +317,20 @@ export function validateState(input: unknown): Validation {
       };
     });
 
-    // 앨범은 카탈로그 순서대로만 발매된다. 저장된 앨범은 발매 시각만 쓰고 제목·속성은 카탈로그에서 가져온다.
-    // (예전 저장의 「싱글 2개로 만든 앨범」도 앞에서부터 카탈로그 앨범으로 옮겨 읽는다.)
+    // 저장된 앨범은 id와 발매 시각만 쓰고 제목·속성은 카탈로그에서 가져온다. 속성마다 따로 발매하므로 id로 찾는다.
+    // (id가 없거나 모르는 것·겹친 것, 예전 저장의 「싱글 2개로 만든 앨범」은 아직 안 낸 일반 앨범을 앞에서부터 채워 옮겨 읽는다.)
     if (!Array.isArray(o.albums) || o.albums.length > BALANCE.maxSingles) return bad('albums 목록이 올바르지 않습니다.');
-    const albums = o.albums.slice(0, ALBUM_CATALOG.length).map((x, i) => {
+    const taken = new Set<string>();
+    const albums: Album[] = [];
+    for (const [i, x] of o.albums.entries()) {
       if (!isObj(x)) return bad(`albums[${i}]가 객체가 아닙니다.`);
-      const def = ALBUM_CATALOG[i];
-      return { id: def.id, title: def.title, type: def.type, releasedAt: num(x, 'releasedAt', 0, MAX_TIME, `albums[${i}].releasedAt`) };
-    });
+      const byId = typeof x.id === 'string' ? albumDefById(x.id) : undefined;
+      const def = byId && !taken.has(byId.id) ? byId : albumSeries('normal').find((d) => !taken.has(d.id));
+      const releasedAt = num(x, 'releasedAt', 0, MAX_TIME, `albums[${i}].releasedAt`);
+      if (!def) continue; // 카탈로그에 자리가 없는 앨범은 버린다
+      taken.add(def.id);
+      albums.push({ id: def.id, title: def.title, type: def.type, releasedAt });
+    }
 
     const concertsRaw = isObj(o.concerts) ? o.concerts : {};
     const concerts = {} as Record<StageId, ConcertRecord>;
@@ -378,6 +397,7 @@ export function validateState(input: unknown): Validation {
       darkEquipment,
       musicPower,
       dripPower,
+      distributor,
       diamonds: o.diamonds === undefined ? 0 : num(o, 'diamonds', 0, R),
       diamondUpgrades,
       buffs,

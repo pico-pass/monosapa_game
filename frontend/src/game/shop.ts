@@ -1,11 +1,11 @@
-import { BALANCE } from './balance';
+import { BALANCE, costumePersona } from './balance';
 import { shopPrice } from './selectors';
 import { track } from './tracking';
-import type { CampaignId, CommandResult, Fail, FailReason, GameState, SnackId, ThemeId } from './types';
+import type { CampaignId, CommandResult, Cosmetics, CostumeId, Fail, FailReason, GameState, Persona, SnackId, ThemeId } from './types';
 
 /*
  * 상점 명령. 다른 명령과 같이 이미 now까지 정산된 상태(state.lastSettledAt이 now)를 받는다.
- * 간식·홍보 캠페인은 코인, 테마는 다이아로 산다.
+ * 간식·홍보 캠페인은 코인, 테마·코스튬은 다이아로 산다.
  */
 
 const fail = (state: GameState, reason: FailReason): Fail => ({ ok: false, reason, state });
@@ -62,4 +62,28 @@ export function buyTheme(state: GameState, id: ThemeId): CommandResult<{ cost: n
 export function setTheme(state: GameState, id: ThemeId): CommandResult {
   if (!state.cosmetics.themes.includes(id)) return fail(state, 'not_owned');
   return { ok: true, state: { ...state, cosmetics: { ...state.cosmetics, theme: id } } };
+}
+
+/** 그 자아의 입은 옷 칸을 바꾼다. 자아가 맞는 코스튬만 들어온다고 가정한다. */
+function wear(c: Cosmetics, persona: Persona, id: CostumeId | null): Cosmetics {
+  return persona === 'normal' ? { ...c, costume: id as Cosmetics['costume'] } : { ...c, darkCostume: id as Cosmetics['darkCostume'] };
+}
+
+/** 코스튬(일반 50·어둠 66다이아)을 사고 바로 그 자아가 입는다. */
+export function buyCostume(state: GameState, id: CostumeId): CommandResult<{ cost: number }> {
+  const cost = BALANCE.shop.costumes[id];
+  if (cost === undefined) return fail(state, 'not_found');
+  if (state.cosmetics.costumes.includes(id)) return fail(state, 'owned');
+  if (state.diamonds < cost) return fail(state, 'insufficient_diamonds');
+  const cosmetics = wear({ ...state.cosmetics, costumes: [...state.cosmetics.costumes, id] }, costumePersona(id), id);
+  return { ok: true, state: { ...state, diamonds: state.diamonds - cost, cosmetics }, cost };
+}
+
+/** 그 자아에게 코스튬을 입힌다. null이면 기본 옷으로 돌아간다. 다른 자아의 옷은 입힐 수 없다. */
+export function setCostume(state: GameState, persona: Persona, id: CostumeId | null): CommandResult {
+  if (id !== null) {
+    if (!state.cosmetics.costumes.includes(id)) return fail(state, 'not_owned');
+    if (costumePersona(id) !== persona) return fail(state, 'not_found');
+  }
+  return { ok: true, state: { ...state, cosmetics: wear(state.cosmetics, persona, id) } };
 }

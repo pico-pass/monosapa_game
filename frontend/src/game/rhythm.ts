@@ -2,10 +2,12 @@ import { BALANCE } from './balance';
 import type { RhythmLevel } from './arcade';
 import type { Judgement } from './minigame';
 import { mulberry32 } from './runner';
+import { slotMs, type TrackDef } from './songcharts';
 import type { Persona } from './types';
 
 /*
- * 리듬게임: 싱글마다 곡 번호와 씨앗으로 채보(4레인 탭 노트)가 자동 생성된다. 판정은 마이크 타이밍과 같은 시계(ms)다.
+ * 리듬게임: 싱글마다 곡 번호와 씨앗으로 채보(4레인 탭 노트)가 자동 생성된다. 음원이 있는 곡(`songcharts.ts`)은 음원에 맞춘 고정 채보를 쓴다.
+ * 판정은 마이크 타이밍과 같은 시계(ms)다.
  * 점수 = 1000 × (정확도 × (1 − comboWeight) + 최대 콤보 비율 × comboWeight).
  */
 
@@ -16,16 +18,41 @@ export interface Note {
   lane: number;
 }
 
+/** 음원 곡: 게임 시각 startMs에 음원 0초가 시작하고 playMs 동안 재생된다. */
+export interface ChartAudio {
+  trackId: string;
+  startMs: number;
+  playMs: number;
+  fadeMs: number;
+}
+
 export interface Chart {
   persona: Persona;
   level: RhythmLevel;
   bpm: number;
   notes: Note[];
   durationMs: number;
+  audio?: ChartAudio;
 }
 
-/** 같은 씨앗·난이도·자아면 항상 같은 채보가 나온다. 레인이 같은 노트가 너무 가까이 붙지 않게 한다. */
-export function buildChart(seed: number, persona: Persona, level: RhythmLevel): Chart {
+/** 음원 곡의 고정 채보. 노트 시각 = 리드인 + 첫 박 + 슬롯 × 16분음표 한 칸, 음원은 리드인 시각에 시작한다. */
+export function buildTrackChart(track: TrackDef, persona: Persona, level: RhythmLevel): Chart {
+  const step = slotMs(track);
+  const notes: Note[] = track.notes[level].map((v) => ({ t: Math.round(R.leadInMs + track.firstBeatMs + Math.floor(v / R.lanes) * step), lane: v % R.lanes }));
+  notes.sort((a, c) => a.t - c.t || a.lane - c.lane);
+  return {
+    persona,
+    level,
+    bpm: track.bpm,
+    notes,
+    durationMs: R.leadInMs + track.playMs + R.trackTailMs,
+    audio: { trackId: track.id, startMs: R.leadInMs, playMs: track.playMs, fadeMs: track.fadeMs },
+  };
+}
+
+/** 같은 씨앗·난이도·자아면 항상 같은 채보가 나온다. 레인이 같은 노트가 너무 가까이 붙지 않게 한다. 음원 곡(track)이면 고정 채보다. */
+export function buildChart(seed: number, persona: Persona, level: RhythmLevel, track: TrackDef | null = null): Chart {
+  if (track) return buildTrackChart(track, persona, level);
   const cfg = R.levels[level];
   const rng = mulberry32(seed);
   rng();

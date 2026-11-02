@@ -127,6 +127,22 @@ describe('기획서 14장 검증 1~3: 자동 생산·과열 구간', () => {
     // 일반 홍보(×2)는 어둠 인세에 곱해지지 않는다. 어둠 인세에는 어둠 홍보만 곱해진다.
     expect(royaltyRate(alb(2), 'dark')).toBeCloseTo(100 * 0.02 * 1.18, 9);
     expect(royaltyRate(alb(3), 'dark')).toBeCloseTo(100 * 0.02 * 1.3, 9);
+    // 4~6번째 앨범은 +14% → +16% → +18% (6장이면 ×1.78)
+    expect(royaltyRate(alb(4), 'dark')).toBeCloseTo(100 * 0.02 * 1.44, 9);
+    expect(royaltyRate(alb(6), 'dark')).toBeCloseTo(100 * 0.02 * 1.78, 9);
+    // 어둠 앨범은 따로 세어 +12% → +24% → +40%가 일반 앨범 위에 더해지고, 두 자아의 인세에 모두 곱해진다
+    const mixed = (normal: number, dark: number) => ({
+      ...withPromo,
+      albums: [
+        ...Array.from({ length: normal }, (_, i) => ({ id: `n${i}`, title: 't', type: 'normal' as const, releasedAt: 0 })),
+        ...Array.from({ length: dark }, (_, i) => ({ id: `d${i}`, title: 't', type: 'dark' as const, releasedAt: 0 })),
+      ],
+    });
+    expect(royaltyRate(mixed(0, 1), 'dark')).toBeCloseTo(100 * 0.02 * 1.12, 9);
+    expect(royaltyRate(mixed(0, 3), 'dark')).toBeCloseTo(100 * 0.02 * 1.76, 9);
+    expect(royaltyRate(mixed(6, 3), 'dark')).toBeCloseTo(100 * 0.02 * 2.54, 9);
+    expect(royaltyRate(mixed(2, 1), 'dark')).toBeCloseTo(100 * 0.02 * (1 + 0.18 + 0.12), 9);
+    expect(royaltyRate(mixed(0, 1), 'normal')).toBeCloseTo(100 * 0.02 * 2 * 1.12 * 1.25, 9);
     expect(royaltyRate(withPromo, 'dark')).toBeCloseTo(100 * 0.02 * 1.08, 9);
     expect(royaltyRate(withPromo, 'normal')).toBeCloseTo(100 * 0.02 * 2 * 1.08 * 1.25, 9);
     const darkPromo = { ...withPromo, darkEquipment: { mic: 0, studio: 0, promotion: 10 } };

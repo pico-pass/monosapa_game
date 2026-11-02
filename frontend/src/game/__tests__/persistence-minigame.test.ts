@@ -201,7 +201,23 @@ describe('저장·검증', () => {
       albums: Array.from({ length: 5 }, (_, i) => ({ id: `album-${i + 1}`, title: 'al', singleIds: ['single-1', 'single-2'], type: 'dual', releasedAt: T0 + i })),
     };
     const migrated = validateState(legacy);
-    expect(migrated.ok && migrated.state.albums.map((a) => a.title)).toEqual(['SAPA', 'MONO', 'cybergirl.vst3']);
+    expect(migrated.ok && migrated.state.albums.map((a) => a.title)).toEqual(['SAPA', 'MONO', 'cybergirl.vst3', 'Voyage, Love & Blank', 'why my *GIRLS* not stereo']);
+    // 카탈로그에 자리가 없는 앨범(모르는 id가 일반 앨범을 다 채운 뒤에도 남는 경우)은 버린다
+    const extra = validateState({ ...good, albums: Array.from({ length: 9 }, (_, i) => ({ id: `album-${i + 1}`, releasedAt: T0 + i })) });
+    expect(extra.ok && extra.state.albums.map((a) => a.id)).toEqual(['album-1', 'album-2', 'album-3', 'album-4', 'album-5', 'album-6']);
+    // 어둠 앨범은 id로 찾아서 속성과 제목을 카탈로그에서 가져오고, 순서는 저장된 대로 둔다
+    const dark = validateState({
+      ...good,
+      albums: [{ id: 'album-dark-2', title: '아무거나', type: 'normal', releasedAt: T0 }, { id: 'album-1', releasedAt: T0 + 1 }, { id: 'album-dark-1', releasedAt: T0 + 2 }],
+    });
+    expect(dark.ok && dark.state.albums).toEqual([
+      { id: 'album-dark-2', title: '니엄마는...', type: 'dark', releasedAt: T0 },
+      { id: 'album-1', title: 'SAPA', type: 'normal', releasedAt: T0 + 1 },
+      { id: 'album-dark-1', title: '...정병러브...', type: 'dark', releasedAt: T0 + 2 },
+    ]);
+    // 같은 앨범이 두 번 있으면 겹친 것은 아직 안 낸 일반 앨범으로 옮겨 읽는다
+    const dup = validateState({ ...good, albums: [{ id: 'album-dark-1', releasedAt: T0 }, { id: 'album-dark-1', releasedAt: T0 + 1 }] });
+    expect(dup.ok && dup.state.albums.map((a) => a.id)).toEqual(['album-dark-1', 'album-1']);
     expect(validateState({ ...good, albums: [null] }).ok).toBe(false);
   });
 

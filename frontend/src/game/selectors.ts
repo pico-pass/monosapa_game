@@ -1,7 +1,7 @@
 import { BALANCE, SECRET_STAGE_IDS, STAGES, STREAM_PLATFORMS, TOUR_STAGE, WORLD_STAGE, type AchievementMetric, type MissionMetric } from './balance';
-import { ALBUM_CATALOG, singleTitle, type AlbumDef } from './content';
+import { albumSeries, singleTitle, type AlbumDef } from './content';
 import { bonuses, completedSets, mascotStage, photoDistinct, songCardOf, type BonusState } from './packdata';
-import type { CounterKey, DiamondUpgradeKind, Equipment, EquipmentKind, GameState, Persona, StageId, Streaming } from './types';
+import type { Album, AlbumType, CostumeId, CounterKey, DiamondUpgradeKind, Equipment, EquipmentKind, GameState, Persona, StageId, Streaming } from './types';
 
 const P = BALANCE.persona;
 
@@ -84,6 +84,11 @@ export function clickValue(s: ClickState, persona: Persona = s.activePersona): n
 export const clickGain = (s: ClickState, persona: Persona = s.activePersona): number =>
   clickValue(s, persona) * productionMultiplier(s, persona) * diamondProductionMult(s) * snackMult(s) * collectionProductionMult(s, persona);
 
+/** 그 자아가 지금 입고 있는 코스튬. 기본 옷이면 null. */
+export function wornCostume(s: Pick<GameState, 'cosmetics'>, persona: Persona): CostumeId | null {
+  return persona === 'normal' ? s.cosmetics.costume : s.cosmetics.darkCostume;
+}
+
 export function playerLevel(fans: number): number {
   return 1 + Math.floor(Math.sqrt(fans / BALANCE.level.fansPerStep));
 }
@@ -118,7 +123,7 @@ export interface RoyaltyBreakdown {
 
 export function royaltyBreakdown(s: GameState, persona: Persona = s.activePersona): RoyaltyBreakdown {
   const promotionMult = 1 + BALANCE.royalty.promotionPerLevel * equipmentOf(s, persona).promotion;
-  const albumMult = 1 + albumRoyaltyBonus(s.albums.length);
+  const albumMult = 1 + albumRoyaltyBonus(s.albums);
   const personaMult = persona === 'normal' ? P.normalRoyaltyMult : P.darkRoyaltyMult;
   const diamondMult = diamondRoyaltyMult(s);
   const collectionMult = 1 + bonuses(s).coin;
@@ -142,6 +147,32 @@ export const streamRate = (s: Pick<GameState, 'fans'>): number => s.fans * BALAN
 
 export const streamTotal = (st: Streaming): number => STREAM_PLATFORMS.reduce((sum, p) => sum + st.totals[p], 0);
 
+/** 유통사 호감도에 따른 스트리밍 수익 배율 = 1 + perLevel × 레벨. 아무것도 안 올렸으면 ×1이다. */
+export const streamRevenueMult = (s: Pick<GameState, 'distributor'>): number => 1 + BALANCE.distributor.perLevel * s.distributor;
+
+/** level: 지금 레벨. 다음 레벨로 올리는 비용(코인). */
+export const distributorCost = (level: number): number => Math.ceil(BALANCE.distributor.base * BALANCE.distributor.growth ** level);
+
+export interface DistributorPreview {
+  level: number;
+  cost: number;
+  affordable: boolean;
+  /** 올리기 전/후의 스트리밍 수익 배율 */
+  multBefore: number;
+  multAfter: number;
+}
+
+export function previewDistributor(s: Pick<GameState, 'distributor' | 'coins'>): DistributorPreview {
+  const cost = distributorCost(s.distributor);
+  return {
+    level: s.distributor,
+    cost,
+    affordable: Number.isFinite(cost) && s.coins >= cost,
+    multBefore: streamRevenueMult(s),
+    multAfter: streamRevenueMult({ distributor: s.distributor + 1 }),
+  };
+}
+
 /** 아직 코인으로 정산하지 않은 스트리밍 */
 export const streamsPending = (st: Streaming): number => Math.max(0, streamTotal(st) - st.settled);
 
@@ -159,7 +190,7 @@ export interface StreamClaimStatus {
 /** 정산 상태. 시계는 정산이 끝난 state.lastSettledAt을 쓴다. */
 export function streamClaimStatus(s: GameState): StreamClaimStatus {
   const pending = streamsPending(s.streaming);
-  const coins = Math.floor(pending / BALANCE.streaming.streamsPerCoin + 1e-9);
+  const coins = Math.floor((pending * streamRevenueMult(s)) / BALANCE.streaming.streamsPerCoin + 1e-9);
   const waitMs = Math.max(0, s.streaming.lastClaimAt + BALANCE.streaming.claimIntervalMs - s.lastSettledAt);
   return { pending, coins, waitMs, ready: waitMs === 0 && coins > 0 };
 }
@@ -222,15 +253,20 @@ export function previewSingle(s: GameState, persona: Persona = s.activePersona):
 
 /* ---------- 앨범 ---------- */
 
-/** 앨범 count장을 냈을 때 인세 배율에 더해지는 누적 값 (8% → +10% → +12% … 합산) */
-export const albumRoyaltyBonus = (count: number): number => BALANCE.royalty.perAlbum.slice(0, count).reduce((a, b) => a + b, 0);
-/** i번째(0부터) 앨범 하나가 더하는 값 */
-export const albumRoyaltyOf = (i: number): number => BALANCE.royalty.perAlbum[i] ?? 0;
-export const albumCost = (a: number): number => BALANCE.album.costs[a];
-export const albumFans = (a: number): number => BALANCE.album.fans[a];
+const ALBUM_TYPES = ['normal', 'dark'] as const;
+
+/** 앨범을 냈을 때 인세 배율에 더해지는 누적 값. 속성마다 낸 장수만큼 앞에서부터 합산한다 (일반 8% → +10% → +12% …) */
+export const albumRoyaltyBonus = (albums: readonly Pick<Album, 'type'>[]): number =>
+  ALBUM_TYPES.reduce((sum, t) => sum + BALANCE.royalty.perAlbum[t].slice(0, albums.filter((a) => a.type === t).length).reduce((a, b) => a + b, 0), 0);
+/** 그 속성의 i번째(0부터) 앨범 하나가 더하는 값 */
+export const albumRoyaltyOf = (type: AlbumType, i: number): number => BALANCE.royalty.perAlbum[type][i] ?? 0;
+export const albumCost = (type: AlbumType, a: number): number => BALANCE.album[type].costs[a];
+export const albumFans = (type: AlbumType, a: number): number => BALANCE.album[type].fans[a];
 
 export interface AlbumPreview {
-  /** 이번에 낼 앨범의 순번(0부터) */
+  /** 이번에 낼 앨범의 속성 */
+  type: AlbumType;
+  /** 그 속성 안에서 이번에 낼 앨범의 순번(0부터) */
   index: number;
   def: AlbumDef;
   cost: number;
@@ -238,13 +274,14 @@ export interface AlbumPreview {
   affordable: boolean;
 }
 
-/** 다음에 낼 앨범. 카탈로그를 모두 냈으면 null. */
-export function previewAlbum(s: GameState): AlbumPreview | null {
-  const index = s.albums.length;
-  const def = ALBUM_CATALOG[index];
-  if (!def) return null;
-  const cost = albumCost(index);
-  return { index, def, cost, fans: albumFans(index), affordable: s.coins >= cost };
+/** 그 속성에서 다음에 낼 앨범. 그 속성의 카탈로그를 모두 냈으면 null. */
+export function previewAlbum(s: GameState, type: AlbumType): AlbumPreview | null {
+  const owned = new Set(s.albums.map((a) => a.id));
+  const series = albumSeries(type);
+  const index = series.findIndex((d) => !owned.has(d.id));
+  if (index < 0) return null;
+  const cost = albumCost(type, index);
+  return { type, index, def: series[index], cost, fans: albumFans(type, index), affordable: s.coins >= cost };
 }
 
 /* ---------- 장비 ---------- */
@@ -393,7 +430,7 @@ export function previewDiamondUpgrade(s: GameState, kind: DiamondUpgradeKind): D
  */
 export function retroactiveDiamonds(s: Pick<GameState, 'concerts' | 'albums' | 'fans'>): number {
   const stages = STAGES.filter((d) => s.concerts[d.id]?.cleared).reduce((a, d) => a + d.firstClearDiamonds, 0);
-  const albums = BALANCE.diamond.album.slice(0, s.albums.length).reduce((a, b) => a + b, 0);
+  const albums = ALBUM_TYPES.reduce((sum, t) => sum + BALANCE.diamond.album[t].slice(0, s.albums.filter((a) => a.type === t).length).reduce((a, b) => a + b, 0), 0);
   return stages + albums + levelUpDiamonds(0, s.fans);
 }
 
@@ -604,7 +641,7 @@ export function currentHint(s: GameState): Hint | null {
     return { tab: 'studio', text: '어둠속성으로 바꿔보자. 라임이 더 빨리 쌓이지만 과열이 올라가.' };
   }
   if (!f.album) {
-    const album = previewAlbum(s);
+    const album = previewAlbum(s, 'normal');
     if (album) {
       return album.affordable
         ? { tab: 'release', text: `코인이 모였다! 발매 탭에서 첫 앨범 「${album.def.title}」을 내보자.` }

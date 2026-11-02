@@ -1,9 +1,11 @@
 import { fmt, fmtDuration } from '../components/format';
-import { BALANCE, CAMPAIGN_IDS, SNACK_IDS, THEME_IDS } from '../game/balance';
-import { CAMPAIGN_TEXT, SNACK_TEXT, THEME_TEXT } from '../game/content';
-import { campaignMult, snackMult } from '../game/selectors';
+import { ASSETS } from '../assets';
+import { BALANCE, CAMPAIGN_IDS, COSTUME_IDS_OF, SNACK_IDS, THEME_IDS } from '../game/balance';
+import { CAMPAIGN_TEXT, COSTUME_TEXT, PERSONA_TEXT, SNACK_TEXT, THEME_TEXT } from '../game/content';
+import { campaignMult, snackMult, wornCostume } from '../game/selectors';
 import { campaignPrice, snackPrice } from '../game/shop';
-import { doBuyCampaign, doBuySnack, doBuyTheme, doSetTheme, useUi } from '../store/gameStore';
+import type { GameState, Persona } from '../game/types';
+import { doBuyCampaign, doBuyCostume, doBuySnack, doBuyTheme, doSetCostume, doSetTheme, useUi } from '../store/gameStore';
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 
@@ -17,7 +19,7 @@ export function ShopScreen() {
   return (
     <section className="screen" aria-label="상점">
       <h2 className="section-title">상점</h2>
-      <p className="muted">가격은 플레이어 레벨이 오를수록 올라가요. 코인은 간식·홍보에, 다이아는 테마에 써요.</p>
+      <p className="muted">가격은 플레이어 레벨이 오를수록 올라가요. 코인은 간식·홍보에, 다이아는 테마·코스튬에 써요.</p>
 
       <h3 className="sub-title">🏪 편의점 간식 — 작업하기 라임 보너스</h3>
       {snack && (
@@ -105,6 +107,55 @@ export function ShopScreen() {
           );
         })}
       </div>
+
+      <h3 className="sub-title">👗 코스튬 — 모양만 바뀌어요</h3>
+      <p className="muted">일반속성과 어둠속성이 따로 입어요. 작업실에서 그 속성일 때 입은 옷이 보여요.</p>
+      <CostumeGrid g={g} persona="normal" />
+      <CostumeGrid g={g} persona="dark" />
     </section>
+  );
+}
+
+/** 한 자아의 코스튬 목록: 기본 옷 + 파는 옷 */
+function CostumeGrid({ g, persona }: { g: GameState; persona: Persona }) {
+  const worn = wornCostume(g, persona);
+  return (
+    <>
+      <h4 className="sub-title">{PERSONA_TEXT[persona].name}</h4>
+      <div className="theme-grid" role="group" aria-label={`${PERSONA_TEXT[persona].short}속성 코스튬`}>
+        <div className={`card theme-card${worn === null ? ' theme-on' : ''}`}>
+          <img className="costume-thumb" src={ASSETS.characters[persona] ?? undefined} alt="" loading="lazy" />
+          <strong>기본 옷</strong>
+          <small className="muted">처음 모습 그대로.</small>
+          <button type="button" className="btn btn-ghost" disabled={worn === null} onClick={() => doSetCostume(persona, null)}>
+            {worn === null ? '입는 중' : '입기'}
+          </button>
+        </div>
+        {COSTUME_IDS_OF[persona].map((id) => {
+          const t = COSTUME_TEXT[id];
+          const owned = g.cosmetics.costumes.includes(id);
+          const active = worn === id;
+          const price = BALANCE.shop.costumes[id];
+          return (
+            <div key={id} className={`card theme-card${active ? ' theme-on' : ''}`}>
+              <img className="costume-thumb" src={ASSETS.costumes[id]} alt="" loading="lazy" />
+              <strong>
+                <span aria-hidden>{t.icon}</span> {t.name}
+              </strong>
+              <small className="muted">{t.blurb}</small>
+              {owned ? (
+                <button type="button" className="btn btn-ghost" disabled={active} onClick={() => doSetCostume(persona, id)}>
+                  {active ? '입는 중' : '입기'}
+                </button>
+              ) : (
+                <button type="button" className="btn btn-accent" disabled={g.diamonds < price} onClick={() => doBuyCostume(id)}>
+                  💎 {price}
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </>
   );
 }

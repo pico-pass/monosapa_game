@@ -119,15 +119,18 @@ export function run(sc: Scenario): { m: Milestones; end: GameState } {
     for (;;) {
       type Option = { cost: number; buy: () => GameState | null };
       const options: Option[] = [];
-      const album = previewAlbum(s);
-      if (album) {
-        options.push({
-          cost: album.cost,
-          buy: () => {
-            const a = releaseAlbum(s);
-            return a.ok ? a.state : null;
-          },
-        });
+      // 일반 앨범은 항상, 어둠속성을 쓰는 전략이면 어둠 앨범도 후보에 넣는다.
+      for (const type of sc.strategy === 'normal' ? (['normal'] as const) : (['normal', 'dark'] as const)) {
+        const album = previewAlbum(s, type);
+        if (album) {
+          options.push({
+            cost: album.cost,
+            buy: () => {
+              const a = releaseAlbum(s, type);
+              return a.ok ? a.state : null;
+            },
+          });
+        }
       }
       // 일반 장비는 항상, 어둠속성을 쓰는 전략이면 어둠 장비도 후보에 넣는다. (가장 싼 것부터 산다)
       for (const persona of sc.strategy === 'normal' ? (['normal'] as const) : (['normal', 'dark'] as const)) {

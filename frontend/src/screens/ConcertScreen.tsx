@@ -2,15 +2,17 @@ import { fmt, fmtCountdown } from '../components/format';
 import { PersonaBadge } from '../components/parts';
 import { BALANCE, STAGES, manualGameOf } from '../game/balance';
 import { PERSONA_TEXT, STAGE_TEXT } from '../game/content';
+import { courseConfig } from '../game/runner';
 import { hiddenSecretStage, isTourComplete, stageStatus } from '../game/selectors';
+import type { StageId } from '../game/types';
 import { doAutoConcert, doSkipCooldown, setTourCardOpen, startManualConcert, useUi } from '../store/gameStore';
 
-/** 모노사파런 안내: 자아에 따라 목표 거리가 다르다 */
-function runNote(persona: 'normal' | 'dark'): string {
-  const r = BALANCE.run.persona;
+/** 모노사파런 안내: 공연장과 자아에 따라 목표 거리가 다르다 */
+function runNote(stage: StageId, persona: 'normal' | 'dark'): string {
+  const goal = courseConfig(stage, persona).goalM.toLocaleString();
   return persona === 'dark'
-    ? `달리면서 점점 빨라져요. ${r.dark.goalM.toLocaleString()}m를 완주하면 성공, 젤리를 많이 먹을수록 보상이 커져요. 어둠은 보상 ×${r.dark.rewardMult}.`
-    : `달리면서 점점 빨라져요. ${r.normal.goalM.toLocaleString()}m를 완주하면 성공, 젤리를 많이 먹을수록 보상이 커져요.`;
+    ? `달리면서 점점 빨라져요. ${goal}m를 완주하면 성공, 젤리를 많이 먹을수록 보상이 커져요. 어둠은 보상 ×${BALANCE.run.persona.dark.rewardMult}.`
+    : `달리면서 점점 빨라져요. ${goal}m를 완주하면 성공, 젤리를 많이 먹을수록 보상이 커져요.`;
 }
 
 export function ConcertScreen() {
@@ -92,7 +94,7 @@ export function ConcertScreen() {
             </div>
             {st.canRun && (
               <small className="muted">
-                직접 공연 자아는 시작할 때 현재 자아({PERSONA_TEXT[persona].short})로 고정돼요. {manualGameOf(def.id) === 'run' ? runNote(persona) : persona === 'dark' ? `어둠은 판정이 더 좁은 대신 보상 ×${BALANCE.concert.personaRewardMult.dark}.` : ''}
+                직접 공연 자아는 시작할 때 현재 자아({PERSONA_TEXT[persona].short})로 고정돼요. {manualGameOf(def.id) === 'run' ? runNote(def.id, persona) : persona === 'dark' ? `어둠은 판정이 더 좁은 대신 보상 ×${BALANCE.concert.personaRewardMult.dark}.` : ''}
               </small>
             )}
           </div>

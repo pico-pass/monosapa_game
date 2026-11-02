@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
+import { petImage } from '../assets';
 import { PersonaBadge, Progress } from '../components/parts';
 import { fmt, fmtCountdown, fmtDuration } from '../components/format';
 import { BALANCE, FEAT_NPCS, PHOTO_CARD_IDS, PHOTO_GRADES, PHOTO_SETS, photoCardId } from '../game/balance';
-import { FEAT_TEXT, MASCOT_TEXT, MOOD_TEXT, PERSONA_TEXT, PHOTO_GRADE_NAMES, PHOTO_SET_TEXT, VIBE_TEXT, photoCardName } from '../game/content';
+import { FEAT_RARITY_NAME, FEAT_TEXT, MASCOT_TEXT, MOOD_TEXT, PERSONA_TEXT, PHOTO_GRADE_NAMES, PHOTO_SET_TEXT, VIBE_TEXT, photoCardName } from '../game/content';
 import { feedCost, mascotView } from '../game/mascot';
 import { bonuses, featPassive, parsePhotoId, pickupOf, remasterCost, songCardOf } from '../game/packdata';
 import { pullsToPity } from '../game/photocards';
-import { playerLevel } from '../game/selectors';
 import { nextRemasterCost } from '../game/songcards';
 import type { Persona } from '../game/types';
 import { api, errorText } from '../platform/api';
@@ -369,7 +369,7 @@ export function FeatTab() {
         <div className="card-row">
           <strong>🎤 이번 주 픽업: {FEAT_TEXT[pickup.id].icon} {FEAT_TEXT[pickup.id].name}</strong>
           <small className="muted">
-            천장까지 {F.pityAt - f.pity}회{f.guaranteed ? ' · 다음 SSR은 픽업 확정' : ''}
+            천장까지 {F.pityAt - f.pity}회{f.guaranteed ? ' · 다음 전설은 픽업 확정' : ''}
           </small>
         </div>
         <div className="btn-row">
@@ -381,7 +381,7 @@ export function FeatTab() {
           </button>
         </div>
         <p className="fineprint">
-          SSR {F.rates.SSR * 100}% · SR {F.rates.SR * 100}% · SSR은 픽업이 {F.pickupRate * 100}%, 빗나가면 다음 SSR은 픽업 확정. 10회의 마지막은 SR 이상. 같은 래퍼가 또 나오면 별이 올라요(최대 {F.maxStar}).
+          전설 {F.rates.SSR * 100}% · 에픽 {F.rates.SR * 100}% · 레어 {F.rates.R * 100}% · 일반 {F.rates.N * 100}% · 전설은 픽업이 {F.pickupRate * 100}%, 빗나가면 다음 전설은 픽업 확정. 10회의 마지막은 레어 이상. 같은 래퍼가 또 나오면 별이 올라요(최대 {F.maxStar}).
         </p>
       </div>
       <p className="muted">장착한 래퍼 {f.slots.length}/{F.slots}명의 패시브가 붙어요.</p>
@@ -394,7 +394,7 @@ export function FeatTab() {
           <div key={def.id} className={`card feat-card rar-${def.rarity}${stars === 0 ? ' feat-locked' : ''}${on ? ' song-card-on' : ''}`}>
             <div className="card-row">
               <h3>
-                <span className={`rar rar-${def.rarity}`}>{def.rarity}</span> {stars > 0 ? `${t.icon} ${t.name}` : '？？？'}
+                <span className={`rar rar-${def.rarity}`}>{FEAT_RARITY_NAME[def.rarity]}</span> {stars > 0 ? `${t.icon} ${t.name}` : '？？？'}
               </h3>
               <small className="muted">{stars > 0 ? '★'.repeat(stars) + '☆'.repeat(F.maxStar - stars) : '미계약'}</small>
             </div>
@@ -421,7 +421,7 @@ export function FeatTab() {
 export function MascotTab() {
   return (
     <>
-      <p className="muted">간식을 주고 놀아 주면 자라요. 자라면 그 자아의 라임 생산이 늘어요. 배고픈 채로 오래 두면 삐져서 보너스가 사라져요.</p>
+      <p className="muted">간식을 주고 놀아 주면 자라요. 자라면 그 자아의 라임 생산이 늘어요. 배고픈 채로 오래 두면 삐져서 보너스가 사라져요. 간식 값은 줄 때마다 {parseFloat(((BALANCE.mascot.feed.growth - 1) * 100).toFixed(2))}%씩 올라요({BALANCE.mascot.feed.maxRaises}번째부터는 그대로, 자아마다 따로).</p>
       <MascotCard persona="normal" />
       <MascotCard persona="dark" />
     </>
@@ -433,16 +433,20 @@ function MascotCard({ persona }: { persona: Persona }) {
   const v = mascotView(g, persona);
   const t = MASCOT_TEXT[persona];
   const mood = MOOD_TEXT[v.mood];
-  const level = playerLevel(g.fans);
-  const cost = feedCost(level);
+  const cost = feedCost(v.mascot.fed);
+  const image = petImage(persona, v.stage);
   const base = BALANCE.mascot.stageXp[v.stage];
   return (
     <div className={`card mascot mascot-${v.mood}`}>
       <div className="card-row">
         <h3>
-          <span className="mascot-face" aria-hidden>
-            {t.icons[v.stage]}
-          </span>{' '}
+          {image ? (
+            <img className="mascot-img" src={image} alt="" loading="lazy" />
+          ) : (
+            <span className="mascot-face" aria-hidden>
+              {t.icons[v.stage]}
+            </span>
+          )}{' '}
           {t.stages[v.stage]}
         </h3>
         <PersonaBadge persona={persona} />

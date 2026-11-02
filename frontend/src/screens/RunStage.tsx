@@ -149,7 +149,7 @@ function draw(ctx: CanvasRenderingContext2D, g: RunGame, W: number, H: number, p
 /** 모노사파런 전체화면. 점프(탭·스페이스·↑), 공중에서 한 번 더 점프할 수 있다. */
 export function RunPlay({ run }: { run: ConcertRun }) {
   const gameRef = useRef<RunGame | null>(null);
-  if (!gameRef.current) gameRef.current = new RunGame(run.persona, (Date.now() ^ Math.floor(Math.random() * 0x7fffffff)) >>> 0);
+  if (!gameRef.current) gameRef.current = new RunGame(run.persona, (Date.now() ^ Math.floor(Math.random() * 0x7fffffff)) >>> 0, run.stageId);
   const game = gameRef.current;
 
   const wrapRef = useRef<HTMLDivElement>(null);

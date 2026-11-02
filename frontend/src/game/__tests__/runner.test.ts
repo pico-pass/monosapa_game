@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../balance';
 import { beginManualConcert, finishManualConcert, manualConcertReward } from '../commands';
 import { createInitialState } from '../persistence';
-import { RunGame, buildCourse, speedAt } from '../runner';
+import { RunGame, buildCourse, courseConfig, speedAt } from '../runner';
 import { createMinigame, taskDifficulty } from '../minigame';
 import { stageTaskGrowth } from '../selectors';
 import type { Persona } from '../types';
@@ -25,29 +25,47 @@ function autopilot(game: RunGame, leadSec = 0.3, maxMs = 600_000): void {
 
 describe('모노사파런 코스', () => {
   it('같은 시드면 같은 코스, 다른 시드면 다른 코스', () => {
-    expect(buildCourse('normal', 1)).toEqual(buildCourse('normal', 1));
-    expect(buildCourse('normal', 1).obstacles).not.toEqual(buildCourse('normal', 2).obstacles);
+    expect(buildCourse('normal', 1, 'club')).toEqual(buildCourse('normal', 1, 'club'));
+    expect(buildCourse('normal', 1, 'club').obstacles).not.toEqual(buildCourse('normal', 2, 'club').obstacles);
   });
 
-  it('목표 거리: 일반 2600m, 어둠 6900m', () => {
-    expect(buildCourse('normal', 1).goalM).toBe(2600);
-    expect(buildCourse('dark', 1).goalM).toBe(6900);
+  it('지하 클럽 목표 거리: 일반 400m, 어둠 697.4m', () => {
+    expect(buildCourse('normal', 1, 'club').goalM).toBe(400);
+    expect(buildCourse('dark', 1, 'club').goalM).toBe(697.4);
+  });
+
+  it('폐건물 지하는 원래 코스(일반 2600m, 어둠 6900m) 그대로다', () => {
+    expect(buildCourse('normal', 1, 'ruins').goalM).toBe(2600);
+    expect(buildCourse('dark', 1, 'ruins').goalM).toBe(6900);
+    expect(courseConfig('ruins', 'dark')).toBe(R.persona.dark);
+    expect(courseConfig('club', 'dark')).toBe(R.stageCourse.club?.dark);
   });
 
   it('속도는 달릴수록 빨라진다 (어둠이 더 빠르다)', () => {
     for (const p of ['normal', 'dark'] as Persona[]) {
-      const c = buildCourse(p, 3);
-      expect(speedAt(c, 0)).toBe(R.persona[p].startSpeed);
-      expect(speedAt(c, c.lengthU)).toBe(R.persona[p].endSpeed);
+      const cfg = courseConfig('club', p);
+      const c = buildCourse(p, 3, 'club');
+      expect(speedAt(c, 0)).toBe(cfg.startSpeed);
+      expect(speedAt(c, c.lengthU)).toBe(cfg.endSpeed);
       expect(speedAt(c, c.lengthU / 2)).toBeGreaterThan(speedAt(c, c.lengthU / 4));
     }
-    expect(R.persona.dark.startSpeed).toBeGreaterThan(R.persona.normal.startSpeed);
-    expect(R.persona.dark.endSpeed).toBeGreaterThan(R.persona.normal.endSpeed);
+    expect(courseConfig('club', 'dark').startSpeed).toBeGreaterThan(courseConfig('club', 'normal').startSpeed);
+    expect(courseConfig('club', 'dark').endSpeed).toBeGreaterThan(courseConfig('club', 'normal').endSpeed);
+  });
+
+  it('지하 클럽은 짧아진 대신 끝에서 시작 속도의 2.4배 넘게 빨라진다 (폐건물 지하는 2배)', () => {
+    for (const p of ['normal', 'dark'] as Persona[]) {
+      const club = courseConfig('club', p);
+      const old = courseConfig('ruins', p);
+      expect(club.endSpeed / club.startSpeed).toBeGreaterThan(2.4);
+      expect(old.endSpeed / old.startSpeed).toBe(2);
+      expect(club.lengthU).toBeLessThan(old.lengthU);
+    }
   });
 
   it('출발·결승 앞에는 장애물이 없고 장애물끼리 겹치지 않는다', () => {
     for (const p of ['normal', 'dark'] as Persona[]) {
-      const c = buildCourse(p, 7);
+      const c = buildCourse(p, 7, 'club');
       expect(c.obstacles.length).toBeGreaterThan(30);
       expect(c.obstacles[0].x).toBeGreaterThanOrEqual(R.leadInU);
       const last = c.obstacles[c.obstacles.length - 1];
@@ -63,16 +81,16 @@ describe('모노사파런 코스', () => {
 
 describe('모노사파런 진행', () => {
   it('입력이 없으면 장애물에 세 번 걸려 실패한다', () => {
-    const g = new RunGame('normal', 11);
+    const g = new RunGame('normal', 11, 'club');
     while (g.status === 'running' && g.elapsedMs < 300_000) g.advance(FRAME);
     expect(g.status).toBe('failed');
     expect(g.hearts).toBe(0);
     expect(g.hits).toBe(R.hearts);
-    expect(g.distanceM).toBeLessThan(2600);
+    expect(g.distanceM).toBeLessThan(400);
   });
 
   it('무적 시간에는 연속으로 하트를 잃지 않는다', () => {
-    const g = new RunGame('normal', 11);
+    const g = new RunGame('normal', 11, 'club');
     const first = g.course.obstacles[0];
     while (g.hits === 0 && g.elapsedMs < 60_000) g.advance(FRAME);
     expect(g.hearts).toBe(R.hearts - 1);
@@ -84,7 +102,7 @@ describe('모노사파런 진행', () => {
   });
 
   it('점프는 바닥에서 한 번, 공중에서 한 번 더 — 세 번째는 무시', () => {
-    const g = new RunGame('normal', 1);
+    const g = new RunGame('normal', 1, 'club');
     expect(g.jump()).toBe(true);
     g.advance(100);
     expect(g.y).toBeGreaterThan(0);
@@ -95,18 +113,41 @@ describe('모노사파런 진행', () => {
     expect(g.jump()).toBe(true);
   });
 
-  it('일반: 알맞게 점프하면 2600m를 완주하고 걸린 시간이 2분 안팎이다', () => {
-    const g = new RunGame('normal', 5);
+  it('일반: 알맞게 점프하면 400m를 완주하고 걸린 시간이 1분 남짓이다', () => {
+    const g = new RunGame('normal', 5, 'club');
     autopilot(g);
     expect(g.status).toBe('cleared');
-    expect(g.distanceM).toBe(2600);
+    expect(g.distanceM).toBe(400);
     expect(g.hits).toBe(0);
-    expect(g.elapsedMs / 1000).toBeGreaterThan(90);
-    expect(g.elapsedMs / 1000).toBeLessThan(180);
+    expect(g.elapsedMs / 1000).toBeGreaterThan(50);
+    expect(g.elapsedMs / 1000).toBeLessThan(90);
   });
 
-  it('어둠: 6900m를 완주하고 일반보다 오래·빠르게 달린다', () => {
-    const g = new RunGame('dark', 5);
+  it('어둠: 697.4m를 완주하고 일반보다 오래·빠르게 달린다', () => {
+    const g = new RunGame('dark', 5, 'club');
+    autopilot(g);
+    expect(g.status).toBe('cleared');
+    expect(g.distanceM).toBe(697.4);
+    expect(g.hits).toBe(0);
+    expect(g.elapsedMs / 1000).toBeGreaterThan(65);
+    expect(g.elapsedMs / 1000).toBeLessThan(110);
+  });
+
+  it('달리는 동안 거리는 정수로 올라가고 결승선에서만 목표 거리 그대로가 된다', () => {
+    const g = new RunGame('dark', 5, 'club');
+    let sawFraction = false;
+    while (g.status === 'running') {
+      if (!Number.isInteger(g.distanceM)) sawFraction = true;
+      const next = g.course.obstacles.find((o) => o.x + o.w > g.x);
+      if (next && g.y === 0 && next.x + next.w / 2 - (g.x + R.playerW / 2) <= g.speed * 0.3 && next.x + next.w / 2 > g.x) g.jump();
+      g.advance(FRAME);
+    }
+    expect(sawFraction).toBe(false);
+    expect(g.distanceM).toBe(697.4);
+  });
+
+  it('폐건물 지하 어둠: 6900m를 완주하는 원래 코스 (약 2분 반)', () => {
+    const g = new RunGame('dark', 5, 'ruins');
     autopilot(g);
     expect(g.status).toBe('cleared');
     expect(g.distanceM).toBe(6900);
@@ -116,21 +157,21 @@ describe('모노사파런 진행', () => {
   });
 
   it('점수는 먹은 젤리 비율: 점프를 알맞게 하면 높고, 제자리 걸음은 낮다', () => {
-    const good = new RunGame('normal', 9);
+    const good = new RunGame('normal', 9, 'club');
     autopilot(good);
     expect(good.score).toBeGreaterThan(300);
     expect(good.score).toBeLessThanOrEqual(1000);
     expect(good.jellyCount).toBe(good.collected.filter(Boolean).length);
 
     // 항상 점프만 하면 위쪽 젤리까지 쓸 수 있지만 장애물에는 걸린다
-    const none = new RunGame('normal', 9);
+    const none = new RunGame('normal', 9, 'club');
     while (none.status === 'running') none.advance(FRAME);
     expect(none.score).toBeLessThan(good.score);
   });
 
   it('프레임 간격이 달라도 결과가 같다 (고정 시간 간격)', () => {
     const run = (frameMs: number) => {
-      const g = new RunGame('normal', 21);
+      const g = new RunGame('normal', 21, 'club');
       for (let t = 0; t < 20_000 && g.status === 'running'; t += frameMs) {
         if (g.elapsedMs > 3000 && g.y === 0 && Math.floor(t / 700) !== Math.floor((t - frameMs) / 700)) g.jump();
         g.advance(frameMs);
@@ -144,7 +185,7 @@ describe('모노사파런 진행', () => {
   });
 
   it('한 번에 긴 시간이 들어와도 한 프레임 한도만 진행한다', () => {
-    const g = new RunGame('normal', 1);
+    const g = new RunGame('normal', 1, 'club');
     g.advance(60_000);
     expect(g.elapsedMs).toBeLessThanOrEqual(100);
   });

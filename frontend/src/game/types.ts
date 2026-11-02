@@ -66,6 +66,11 @@ export interface ConcertRecord {
 export type SnackId = 'kimbap' | 'coffee' | 'energy' | 'lunchbox';
 export type CampaignId = 'flyer' | 'insta' | 'billboard';
 export type ThemeId = 'default' | 'pastel' | 'mono' | 'neon';
+/** 일반속성 모노사파의 코스튬(다이아로 산다. 모양만 바뀐다). 지뢰·텐션업·화난·메이드·토끼·타락천사·곰도리·수녀·뱀파이어·냥집사·유령신부 */
+export type NormalCostumeId = 'jirai' | 'hype' | 'angry' | 'maid' | 'bunny' | 'fallen' | 'bear' | 'nun' | 'vampire' | 'butler' | 'bride';
+/** 어둠속성 모노사파의 코스튬. 검은토끼·지뢰밴드·어둠의왕·딸기우유·곰도리어둠·편지배달부·어둠의교주·삐에로·어둠의간호사·어둠의신부 */
+export type DarkCostumeId = 'dbunny' | 'band' | 'king' | 'milk' | 'dbear' | 'postman' | 'cultist' | 'clown' | 'dnurse' | 'dbride';
+export type CostumeId = NormalCostumeId | DarkCostumeId;
 
 export interface Buffs {
   /** 작업하기 라임 +N%. until(ms)까지. 하나만 켤 수 있다. */
@@ -79,6 +84,12 @@ export interface Cosmetics {
   /** 가진 테마(기본은 항상 있다) */
   themes: ThemeId[];
   theme: ThemeId;
+  /** 가진 코스튬(두 자아 것을 함께) */
+  costumes: CostumeId[];
+  /** 일반속성 모노사파가 입고 있는 코스튬. 없으면(null) 기본 옷이다. */
+  costume: NormalCostumeId | null;
+  /** 어둠속성 모노사파가 입고 있는 코스튬. 없으면(null) 기본 옷이다. */
+  darkCostume: DarkCostumeId | null;
   /** 달고 있는 칭호(업적 ID). 없으면 null. */
   title: string | null;
 }
@@ -164,6 +175,8 @@ export interface Mascot {
   fullUntil: number;
   playReadyAt: number;
   giftReadyAt: number;
+  /** 간식을 준 횟수. 간식 값이 줄 때마다 오르고(상한 있음) 횟수 자체는 계속 센다. */
+  fed: number;
 }
 export type Mascots = Record<Persona, Mascot>;
 
@@ -283,6 +296,8 @@ export interface GameState {
   musicPower: number;
   /** 음지 드립력 업그레이드 레벨(어둠속성). 효과는 같은 방식이다. */
   dripPower: number;
+  /** 유통사 호감도 레벨. 레벨당 스트리밍 정산 코인이 늘어난다(최대 레벨 없음). */
+  distributor: number;
   /** 다이아 재화. 공연장 첫 클리어·앨범 발매·플레이어 레벨업으로 얻는다. */
   diamonds: number;
   /** 다이아 전용 영구 업그레이드 레벨 */
@@ -354,6 +369,7 @@ export type FailReason =
   | 'owned'
   | 'not_owned'
   | 'need_single'
+  | 'need_track'
   | 'no_ticket'
   | 'need_duplicate'
   | 'full_slots'

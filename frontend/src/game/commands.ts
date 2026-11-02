@@ -12,6 +12,7 @@ import {
   equipmentDef,
   diamondUpgradeCost,
   diamondUpgradeMaxLevel,
+  distributorCost,
   equipmentOf,
   isPenaltyActive,
   levelUpDiamonds,
@@ -23,10 +24,12 @@ import {
   stageStatus,
   stageTaskGrowth,
   streamClaimStatus,
+  streamRevenueMult,
   switchStatus,
 } from './selectors';
 import type {
   Album,
+  AlbumType,
   CommandResult,
   EquipmentKind,
   DiamondUpgradeKind,
@@ -172,12 +175,22 @@ export function buyMusicPower(state: GameState, persona: Persona = 'normal'): Co
   return { ok: true, state: track({ ...state, coins: state.coins - cost, [key]: level + 1 }, 'buys'), cost, level: level + 1 };
 }
 
+/* ---------- 유통사 호감도 (스트리밍 수익 업그레이드) ---------- */
+
+/** 코인으로 유통사 호감도를 1레벨 올린다. 최대 레벨은 없다(코인이 모자라면 실패). */
+export function buyDistributor(state: GameState): CommandResult<{ cost: number; level: number }> {
+  const cost = distributorCost(state.distributor);
+  if (!Number.isFinite(cost) || state.coins < cost) return fail(state, 'insufficient_coins');
+  const level = state.distributor + 1;
+  return { ok: true, state: track({ ...state, coins: state.coins - cost, distributor: level }, 'buys'), cost, level };
+}
+
 /* ---------- 앨범 ---------- */
 
 export interface AlbumInfo {
   album: Album;
   def: AlbumDef;
-  /** 1부터 세는 앨범 순번 */
+  /** 그 속성 안에서 1부터 세는 앨범 순번 */
   ordinal: number;
   cost: number;
   fans: number;
@@ -185,16 +198,16 @@ export interface AlbumInfo {
   diamonds: number;
 }
 
-/** 카탈로그의 다음 앨범을 발매한다. 발매한 싱글과는 무관하다. */
-export function releaseAlbum(state: GameState): CommandResult<AlbumInfo> {
-  const preview = previewAlbum(state);
+/** 그 속성에서 다음 앨범을 발매한다. 발매한 싱글과는 무관하다. */
+export function releaseAlbum(state: GameState, type: AlbumType): CommandResult<AlbumInfo> {
+  const preview = previewAlbum(state, type);
   if (!preview) return fail(state, 'no_more_albums');
   if (!preview.affordable) return fail(state, 'insufficient_coins');
   const { def, index, cost, fans } = preview;
   const album: Album = { id: def.id, title: def.title, type: def.type, releasedAt: state.lastSettledAt };
   const gainedFans = Math.ceil(fans * fanGainMult(state));
   const newFans = clampResource(state.fans + gainedFans);
-  const diamonds = (BALANCE.diamond.album[index] ?? 0) + levelUpDiamonds(state.fans, newFans);
+  const diamonds = (BALANCE.diamond.album[type][index] ?? 0) + levelUpDiamonds(state.fans, newFans);
   const next = addTickets(
     withFlag(
       {
@@ -397,14 +410,14 @@ export interface StreamClaimInfo {
 }
 
 /**
- * 쌓인 스트리밍을 코인으로 정산한다. 정산 간격이 지나야 하고, streamsPerCoin 스트리밍마다 1코인이라
+ * 쌓인 스트리밍을 코인으로 정산한다. 정산 간격이 지나야 하고, streamsPerCoin ÷ 유통사 배율 스트리밍마다 1코인이라
  * 나머지는 정산 대기분에 남는다. 정산할 코인이 없으면 실패하고 간격은 그대로다.
  */
 export function claimStreaming(state: GameState): CommandResult<StreamClaimInfo> {
   const st = streamClaimStatus(state);
   if (st.waitMs > 0) return fail(state, 'streaming_wait');
   if (st.coins <= 0) return fail(state, 'nothing_to_claim');
-  const streams = st.coins * BALANCE.streaming.streamsPerCoin;
+  const streams = (st.coins * BALANCE.streaming.streamsPerCoin) / streamRevenueMult(state);
   const next: GameState = track(
     {
       ...state,

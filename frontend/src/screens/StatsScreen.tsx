@@ -1,8 +1,11 @@
 import { fmt, fmtCountdown, fmtStreamRate, fmtStreams } from '../components/format';
 import { BALANCE, STREAM_PLATFORMS } from '../game/balance';
-import { STREAM_PLATFORM_TEXT } from '../game/content';
-import { streamClaimStatus, streamRate, streamTotal } from '../game/selectors';
-import { doClaimStreaming, useUi } from '../store/gameStore';
+import { DISTRIBUTOR_TEXT, STREAM_PLATFORM_TEXT } from '../game/content';
+import { previewDistributor, streamClaimStatus, streamRate, streamRevenueMult, streamTotal } from '../game/selectors';
+import { doBuyDistributor, doClaimStreaming, useUi } from '../store/gameStore';
+
+/** 배율 표시: 1.05처럼 필요한 만큼만 소수점을 보인다. */
+const fmtMult = (m: number) => String(Math.round(m * 100) / 100);
 
 /** 통계. 지금은 음원 플랫폼별 스트리밍 기록과 코인 정산이 들어 있다. */
 export function StatsScreen() {
@@ -12,6 +15,8 @@ export function StatsScreen() {
   const claim = streamClaimStatus(g);
   const rate = streamRate(g);
   const perCoin = BALANCE.streaming.streamsPerCoin;
+  const revenue = streamRevenueMult(g);
+  const dist = previewDistributor(g);
   const intervalMin = BALANCE.streaming.claimIntervalMs / 60000;
 
   return (
@@ -67,7 +72,7 @@ export function StatsScreen() {
         <div className="card-row">
           <h3>🎧 스트리밍 정산</h3>
           <small className="muted">
-            {perCoin}스트리밍 = 🪙 1 · {intervalMin >= 60 ? `${intervalMin / 60}시간` : `${intervalMin}분`}마다
+            {perCoin}스트리밍 = 🪙 {fmtMult(revenue)} · {intervalMin >= 60 ? `${intervalMin / 60}시간` : `${intervalMin}분`}마다
           </small>
         </div>
         <dl className="before-after">
@@ -85,7 +90,28 @@ export function StatsScreen() {
               ? `정산하기 🪙 ${fmt(claim.coins)}`
               : '정산할 스트리밍이 없어요'}
         </button>
-        <p className="fineprint">정산하지 않은 스트리밍은 사라지지 않고 계속 쌓여요. {perCoin}으로 나누고 남은 스트리밍은 다음 정산으로 넘어가요.</p>
+        <p className="fineprint">정산하지 않은 스트리밍은 사라지지 않고 계속 쌓여요. 코인으로 바꾸고 남은 스트리밍은 다음 정산으로 넘어가요.</p>
+      </div>
+
+      <div className="card equip-card">
+        <div className="card-row">
+          <h3>
+            <span aria-hidden>{DISTRIBUTOR_TEXT.icon}</span> {DISTRIBUTOR_TEXT.name} <small>Lv.{dist.level}</small>
+          </h3>
+          <small className="muted">최대 레벨 없음</small>
+        </div>
+        <p className="muted">{DISTRIBUTOR_TEXT.effect}</p>
+        <dl className="before-after">
+          <div>
+            <dt>스트리밍 수익</dt>
+            <dd>
+              ×{fmtMult(dist.multBefore)} → <b>×{fmtMult(dist.multAfter)}</b>
+            </dd>
+          </div>
+        </dl>
+        <button type="button" className="btn btn-primary btn-wide" disabled={!dist.affordable} onClick={doBuyDistributor}>
+          {dist.affordable ? `올리기 🪙 ${fmt(dist.cost)}` : `🪙 ${fmt(dist.cost)} 필요 (보유 ${fmt(Math.floor(g.coins))})`}
+        </button>
       </div>
     </section>
   );

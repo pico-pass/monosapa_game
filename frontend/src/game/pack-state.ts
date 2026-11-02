@@ -1,4 +1,4 @@
-import { BALANCE, FEAT_IDS, LYRIC_CARD_IDS, PHOTO_SETS, lyricCardById } from './balance';
+import { BALANCE, FEAT_IDS, FEAT_LEGACY_IDS, LYRIC_CARD_IDS, PHOTO_SETS, lyricCardById } from './balance';
 import { bool, countMap, int, isObj, num, MAX_TIME, bad, type Obj } from './parse';
 import { isPhotoCard } from './packdata';
 import { streamSeedFrom } from './streaming';
@@ -9,7 +9,7 @@ import type { Arcade, ArcadeRecord, Featuring, Mascot, Mascots, PhotoBook, SongC
 export const emptyCards = (seed: number): SongCards => ({ seed, deck: [], remaster: {} });
 export const emptyPhoto = (seed: number): PhotoBook => ({ seed, pulls: 0, pity: 0, tickets: 0, owned: {}, shards: 0, claimedSets: [] });
 export const emptyFeat = (seed: number): Featuring => ({ seed, pulls: 0, pity: 0, guaranteed: false, owned: {}, slots: [] });
-export const emptyMascot = (): Mascot => ({ xp: 0, fullUntil: 0, playReadyAt: 0, giftReadyAt: 0 });
+export const emptyMascot = (): Mascot => ({ xp: 0, fullUntil: 0, playReadyAt: 0, giftReadyAt: 0, fed: 0 });
 export const emptyMascots = (): Mascots => ({ normal: emptyMascot(), dark: emptyMascot() });
 const emptyRecord = (): ArcadeRecord => ({ cooldownUntil: 0, best: 0, plays: 0 });
 export const emptyArcade = (): Arcade => ({
@@ -58,14 +58,17 @@ export function parsePhoto(raw: unknown, seed: number): PhotoBook {
 export function parseFeat(raw: unknown, seed: number): Featuring {
   if (raw === undefined) return emptyFeat(seed);
   if (!isObj(raw)) return bad('feat가 올바르지 않습니다.');
-  const owned = countMap(raw.owned, (id) => FEAT_IDS.includes(id), BALANCE.feat.maxStar, 'feat.owned');
+  // 12명 시절 ID는 같은 등급 자리의 새 ID로 옮긴다(별·장착 유지)
+  const upgraded = isObj(raw.owned) ? Object.fromEntries(Object.entries(raw.owned).map(([id, v]) => [FEAT_LEGACY_IDS[id] ?? id, v])) : raw.owned;
+  const owned = countMap(upgraded, (id) => FEAT_IDS.includes(id), BALANCE.feat.maxStar, 'feat.owned');
+  const slotIds = Array.isArray(raw.slots) ? raw.slots.map((id) => (typeof id === 'string' ? (FEAT_LEGACY_IDS[id] ?? id) : id)) : raw.slots;
   return {
     seed: int(raw, 'seed', 0, 0xffffffff, 'feat.seed'),
     pulls: int(raw, 'pulls', 0, BIG, 'feat.pulls'),
     pity: int(raw, 'pity', 0, BALANCE.feat.pityAt, 'feat.pity'),
     guaranteed: bool(raw, 'guaranteed', 'feat.guaranteed'),
     owned,
-    slots: idList(raw.slots, (id) => (owned[id] ?? 0) > 0, BALANCE.feat.slots),
+    slots: idList(slotIds, (id) => (owned[id] ?? 0) > 0, BALANCE.feat.slots),
   };
 }
 
@@ -77,6 +80,8 @@ function parseMascot(raw: unknown, label: string): Mascot {
     fullUntil: num(raw, 'fullUntil', 0, MAX_TIME, `${label}.fullUntil`),
     playReadyAt: num(raw, 'playReadyAt', 0, MAX_TIME, `${label}.playReadyAt`),
     giftReadyAt: num(raw, 'giftReadyAt', 0, MAX_TIME, `${label}.giftReadyAt`),
+    // 간식 횟수는 나중에 생긴 필드라 없는 예전 저장은 0부터 센다
+    fed: raw.fed === undefined ? 0 : int(raw, 'fed', 0, BIG, `${label}.fed`),
   };
 }
 

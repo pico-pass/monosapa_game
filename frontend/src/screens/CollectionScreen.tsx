@@ -1,6 +1,6 @@
 import { PersonaBadge } from '../components/parts';
 import { STAGES } from '../game/balance';
-import { ALBUM_CATALOG, STAGE_TEXT } from '../game/content';
+import { ALBUM_CATALOG, PERSONA_TEXT, STAGE_TEXT, albumSeries } from '../game/content';
 import { isTourComplete, stageStatus } from '../game/selectors';
 import type { Persona, Single } from '../game/types';
 import { useUi } from '../store/gameStore';
@@ -98,48 +98,56 @@ function SingleList({ title, persona, singles }: { title: string; persona: Perso
   );
 }
 
+/** 앨범은 속성마다 따로 낸다: 일반·어둠 순서로 각자 위에서부터 채워진다. */
 function AlbumList() {
   const { game: g } = useUi();
   return (
     <>
-      <h3 className="sub-title">
-        앨범 ({g.albums.length}/{ALBUM_CATALOG.length})
-      </h3>
-      <ol className="collection">
-        {ALBUM_CATALOG.map((def, i) => {
-          const released = g.albums[i];
-          if (!released) {
-            return (
-              <li key={def.id} className="collect collect-locked">
-                <div>
-                  <strong>💿 ？？？</strong>
-                  <small>{i === g.albums.length ? '다음에 발매할 앨범이에요.' : '앞 앨범을 먼저 발매해요.'}</small>
-                </div>
-                <span className="muted">{i + 1}번째</span>
-              </li>
-            );
-          }
-          return (
-            <li key={def.id} className={`collect collect-${def.type}`}>
-              <div>
-                <strong>
-                  💿 [{def.title}] · {def.kind}
-                </strong>
-                <ol className="tracklist tracklist-small">
-                  {def.tracks.map((t, n) => (
-                    <li key={t.title}>
-                      <span className="track-no">{n + 1}</span>
-                      <span className="track-title">{t.title}</span>
-                      {t.isTitle && <span className="track-tag">Title</span>}
+      {(['normal', 'dark'] as const).map((type) => {
+        const series = albumSeries(type);
+        const next = series.find((d) => !g.albums.some((a) => a.id === d.id));
+        return (
+          <section key={type} aria-label={`${PERSONA_TEXT[type].short}속성 앨범`}>
+            <h3 className="sub-title">
+              {PERSONA_TEXT[type].short}속성 앨범 ({g.albums.filter((a) => a.type === type).length}/{series.length})
+            </h3>
+            <ol className="collection">
+              {series.map((def, i) => {
+                if (!g.albums.some((a) => a.id === def.id)) {
+                  return (
+                    <li key={def.id} className="collect collect-locked">
+                      <div>
+                        <strong>💿 ？？？</strong>
+                        <small>{def === next ? '다음에 발매할 앨범이에요.' : '앞 앨범을 먼저 발매해요.'}</small>
+                      </div>
+                      <span className="muted">{i + 1}번째</span>
                     </li>
-                  ))}
-                </ol>
-              </div>
-              <span className="muted">{i + 1}번째</span>
-            </li>
-          );
-        })}
-      </ol>
+                  );
+                }
+                return (
+                  <li key={def.id} className={`collect collect-${def.type}`}>
+                    <div>
+                      <strong>
+                        💿 [{def.title}] · {def.kind}
+                      </strong>
+                      <ol className="tracklist tracklist-small">
+                        {def.tracks.map((t, n) => (
+                          <li key={t.title}>
+                            <span className="track-no">{n + 1}</span>
+                            <span className="track-title">{t.title}</span>
+                            {t.isTitle && <span className="track-tag">Title</span>}
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                    <span className="muted">{i + 1}번째</span>
+                  </li>
+                );
+              })}
+            </ol>
+          </section>
+        );
+      })}
     </>
   );
 }

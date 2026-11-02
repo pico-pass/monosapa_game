@@ -1,6 +1,6 @@
 import { Modal } from '../components/Modal';
 import { fmt } from '../components/format';
-import { FEAT_TEXT, PERSONA_TEXT, PHOTO_GRADE_NAMES, PHOTO_SET_TEXT, photoCardName } from '../game/content';
+import { FEAT_RARITY_NAME, FEAT_TEXT, PERSONA_TEXT, PHOTO_GRADE_NAMES, PHOTO_SET_TEXT, photoCardName } from '../game/content';
 import { closeGacha, closeTowerResult, useUi } from '../store/gameStore';
 
 /** 가챠 결과 창 (포토카드·피처링) */
@@ -33,7 +33,7 @@ export function GachaModal() {
       <ul className="gacha-list">
         {r.results.map((x, i) => (
           <li key={i} className={`gacha-item rar-${x.rarity}`}>
-            <span className={`rar rar-${x.rarity}`}>{x.rarity}</span>
+            <span className={`rar rar-${x.rarity}`}>{FEAT_RARITY_NAME[x.rarity]}</span>
             <span>
               {FEAT_TEXT[x.id].icon} {FEAT_TEXT[x.id].name}
             </span>
@@ -53,7 +53,7 @@ export function TowerModal() {
   return (
     <Modal title={r.win ? `${r.floor}층 돌파!` : `${r.floor}층에서 쓰러졌어요`} onClose={closeTowerResult} tone={r.win ? 'gold' : 'normal'}>
       <p>
-        {r.enemy.boss ? '보스 ' : ''}적 전투력 <b>{fmt(Math.round(r.enemy.power))}</b> vs 내 전투력 <b>{fmt(Math.round(r.power))}</b> (운 ×{r.roll.toFixed(2)})
+        {r.enemy.boss ? '보스 ' : ''}적 전투력 <b>{fmt(Math.round(r.enemy.power))}</b> vs 내 전투력 <b>{fmt(Math.round(r.power))}</b> (×{r.ratio.toFixed(2)})
       </p>
       <small className="muted">이 층의 약점은 {PERSONA_TEXT[r.enemy.weak].short}이었어요.</small>
       {r.win ? (
@@ -75,7 +75,7 @@ export function TowerModal() {
           {r.newBest && <li>🎉 새 최고 기록이에요!</li>}
         </ul>
       ) : (
-        <p className="muted">잠시 쉬었다가 다시 도전해요. 약점 자아로 도전하면 유리해요.</p>
+        <p className="muted">쿨다운이 끝나면 다시 도전할 수 있어요. 전투력을 올리거나 약점 자아로 도전하면 내 탄이 더 세져요.</p>
       )}
     </Modal>
   );

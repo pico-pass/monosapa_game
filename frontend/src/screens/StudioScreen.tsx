@@ -5,6 +5,7 @@ import { fmtDuration, fmtHave, fmtRate } from '../components/format';
 import { BALANCE } from '../game/balance';
 import { titleText } from '../game/achievements';
 import { CAMPAIGN_TEXT, CLICK_POWER_TEXT, PERSONA_TEXT, SNACK_TEXT } from '../game/content';
+import { mascotView } from '../game/mascot';
 import {
   clickGain,
   clickPowerOf,
@@ -15,6 +16,7 @@ import {
   roomTier,
   royaltyRate,
   switchStatus,
+  wornCostume,
 } from '../game/selectors';
 import { doClearSeizure, doSwitch, setTab, useUi } from '../store/gameStore';
 
@@ -44,7 +46,7 @@ export function StudioScreen() {
   return (
     <section className="screen studio" aria-label="작업실">
       <div className={`scene-frame ${hot ? 'scene-hot' : ''} ${penalized ? 'scene-seized' : ''}`}>
-        <StudioScene persona={persona} mood={mood} tier={roomTier(g)} pulse={ui.workPulse} />
+        <StudioScene persona={persona} mood={mood} tier={roomTier(g)} pulse={ui.workPulse} costume={wornCostume(g, persona)} petStage={mascotView(g, persona).stage} />
         {ui.bubble && (
           <div key={ui.bubble.id} className={`bubble bubble-${ui.bubble.persona}`} role="status">
             {ui.bubble.text}

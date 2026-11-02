@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { evaluateAchievements, setTitle, titleText } from '../achievements';
 import { moreAlerts } from '../alerts';
-import { ACHIEVEMENTS, BALANCE, MISSIONS, STAGES, manualGameOf } from '../balance';
+import { ACHIEVEMENTS, BALANCE, COSTUME_IDS, COSTUME_IDS_OF, MISSIONS, STAGES, manualGameOf } from '../balance';
 import {
   beginManualConcert,
   buyDiamondUpgrade,
@@ -33,9 +33,10 @@ import {
   previewDiamondUpgrade,
   snackMult,
   stageStatus,
+  wornCostume,
 } from '../selectors';
 import { advance, settleOffline } from '../simulation';
-import { buyCampaign, buySnack, buyTheme, campaignPrice, setTheme, snackPrice } from '../shop';
+import { buyCampaign, buyCostume, buySnack, buyTheme, campaignPrice, setCostume, setTheme, snackPrice } from '../shop';
 import { zeroCounters } from '../tracking';
 import type { GameState, Mail, Single } from '../types';
 
@@ -138,6 +139,65 @@ describe('상점: 테마', () => {
     expect(!not.ok && not.reason).toBe('not_owned');
     const back = setTheme(r.state, 'default');
     expect(back.ok && back.state.cosmetics.theme).toBe('default');
+  });
+});
+
+describe('상점: 코스튬', () => {
+  const NORMAL = ['jirai', 'hype', 'angry', 'maid', 'bunny', 'fallen', 'bear', 'nun', 'vampire', 'butler', 'bride'];
+  const DARK = ['dbunny', 'band', 'king', 'milk', 'dbear', 'postman', 'cultist', 'clown', 'dnurse', 'dbride'];
+
+  it('일반속성 11종은 각 50다이아, 어둠속성 10종은 각 66다이아다', () => {
+    expect(COSTUME_IDS_OF.normal).toEqual(NORMAL);
+    expect(COSTUME_IDS_OF.dark).toEqual(DARK);
+    expect(COSTUME_IDS).toEqual([...NORMAL, ...DARK]);
+    for (const id of COSTUME_IDS_OF.normal) expect(BALANCE.shop.costumes[id]).toBe(50);
+    for (const id of COSTUME_IDS_OF.dark) expect(BALANCE.shop.costumes[id]).toBe(66);
+  });
+
+  it('다이아로 사면 바로 입고, 가진 것만 입을 수 있고, 기본 옷으로 돌아갈 수 있다', () => {
+    const poor = buyCostume(base({ diamonds: 49 }), 'maid');
+    expect(!poor.ok && poor.reason).toBe('insufficient_diamonds');
+    const r = buyCostume(base({ diamonds: 120 }), 'maid');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.state.diamonds).toBe(70);
+    expect(r.state.cosmetics).toMatchObject({ costumes: ['maid'], costume: 'maid', darkCostume: null, theme: 'default' });
+    const again = buyCostume(r.state, 'maid');
+    expect(!again.ok && again.reason).toBe('owned');
+    const second = buyCostume(r.state, 'nun');
+    expect(second.ok && second.state.cosmetics).toMatchObject({ costumes: ['maid', 'nun'], costume: 'nun' });
+    const not = setCostume(r.state, 'normal', 'vampire');
+    expect(!not.ok && not.reason).toBe('not_owned');
+    const plain = setCostume(r.state, 'normal', null);
+    expect(plain.ok && plain.state.cosmetics).toMatchObject({ costumes: ['maid'], costume: null });
+    const back = plain.ok ? setCostume(plain.state, 'normal', 'maid') : plain;
+    expect(back.ok && back.state.cosmetics.costume).toBe('maid');
+  });
+
+  it('어둠 코스튬은 66다이아이고 어둠속성 칸에만 입는다', () => {
+    expect(BALANCE.shop.costumes.king).toBe(66);
+    const poor = buyCostume(base({ diamonds: 65 }), 'king');
+    expect(!poor.ok && poor.reason).toBe('insufficient_diamonds');
+    const r = buyCostume(base({ diamonds: 100, cosmetics: { ...createInitialState(T0).cosmetics, costumes: ['maid'], costume: 'maid' } }), 'king');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.state.diamonds).toBe(34);
+    // 일반속성이 입은 옷은 그대로다
+    expect(r.state.cosmetics).toMatchObject({ costumes: ['maid', 'king'], costume: 'maid', darkCostume: 'king' });
+    expect(wornCostume(r.state, 'normal')).toBe('maid');
+    expect(wornCostume(r.state, 'dark')).toBe('king');
+    // 자아가 다른 옷은 입힐 수 없다
+    const wrongDark = setCostume(r.state, 'dark', 'maid');
+    expect(!wrongDark.ok && wrongDark.reason).toBe('not_found');
+    const wrongNormal = setCostume(r.state, 'normal', 'king');
+    expect(!wrongNormal.ok && wrongNormal.reason).toBe('not_found');
+    const plain = setCostume(r.state, 'dark', null);
+    expect(plain.ok && plain.state.cosmetics).toMatchObject({ costume: 'maid', darkCostume: null });
+  });
+
+  it('테마와 따로 산다(테마 수집 업적에 섞이지 않는다)', () => {
+    const r = buyCostume(base({ diamonds: 100 }), 'bear');
+    expect(r.ok && achievementValue(r.state, 'themes')).toBe(0);
   });
 });
 
@@ -711,13 +771,14 @@ describe('저장 검증(나중에 추가된 필드)', () => {
   });
 
   it('예전 저장(새 필드 없음)은 기본값으로 읽힌다', () => {
-    const { buffs: _b, cosmetics: _c, counters: _n, achievements: _a, missions: _m, fanMail: _f, monogram: _g, ...legacy } = base({ fans: 150 });
+    const { distributor: _d, buffs: _b, cosmetics: _c, counters: _n, achievements: _a, missions: _m, fanMail: _f, monogram: _g, ...legacy } = base({ fans: 150 });
     const v = validateState({ ...legacy, diamondUpgrades: { production: 2, royalty: 1 } });
     expect(v.ok).toBe(true);
     if (!v.ok) return;
     expect(v.state.diamondUpgrades).toEqual({ production: 2, royalty: 1, offline: 0 });
+    expect(v.state.distributor).toBe(0); // 유통사 호감도가 없던 저장은 0레벨
     expect(v.state.buffs).toEqual({ snack: null, campaign: null });
-    expect(v.state.cosmetics).toEqual({ themes: ['default'], theme: 'default', title: null });
+    expect(v.state.cosmetics).toEqual({ themes: ['default'], theme: 'default', costumes: [], costume: null, darkCostume: null, title: null });
     expect(v.state.counters).toEqual(zeroCounters());
     expect(v.state.achievements).toEqual({});
     expect(v.state.monogram).toMatchObject({ slots: 1, posts: [], seq: 0 });
@@ -738,14 +799,20 @@ describe('저장 검증(나중에 추가된 필드)', () => {
     const lenient = validateState({
       ...s,
       buffs: { snack: { id: '없는간식', until: 5 }, campaign: { id: 'flyer', until: 7 } },
-      cosmetics: { themes: ['pastel', '없는테마'], theme: '없는테마', title: 'grind' },
+      cosmetics: { themes: ['pastel', '없는테마'], theme: '없는테마', costumes: ['bunny', '없는옷', 'bunny', 'king'], costume: '없는옷', darkCostume: 'bunny', title: 'grind' },
       achievements: { grind: 5, '없는업적': 9 },
       fanMail: { ...s.fanMail, inbox: [{ id: 'mail-1', tpl: '사라진템플릿', nick: 'x', at: 1 }, { id: 'mail-2', tpl: 'sup-1', nick: 'y', at: 2 }] },
     });
     expect(lenient.ok).toBe(true);
     if (!lenient.ok) return;
     expect(lenient.state.buffs).toEqual({ snack: null, campaign: { id: 'flyer', until: 7 } });
-    expect(lenient.state.cosmetics).toEqual({ themes: ['default', 'pastel'], theme: 'default', title: 'grind' });
+    expect(lenient.state.cosmetics).toEqual({ themes: ['default', 'pastel'], theme: 'default', costumes: ['bunny', 'king'], costume: null, darkCostume: null, title: 'grind' }); // 어둠 칸에 일반 옷은 못 입는다
+    const worn = validateState({ ...s, cosmetics: { ...s.cosmetics, costumes: ['bunny', 'king'], costume: 'bunny', darkCostume: 'king' } });
+    expect(worn.ok && worn.state.cosmetics).toMatchObject({ costumes: ['bunny', 'king'], costume: 'bunny', darkCostume: 'king' });
+    const swapped = validateState({ ...s, cosmetics: { ...s.cosmetics, costumes: ['bunny', 'king'], costume: 'king', darkCostume: 'bunny' } }); // 자아가 바뀐 옷은 입을 수 없다
+    expect(swapped.ok && swapped.state.cosmetics).toMatchObject({ costume: null, darkCostume: null });
+    const unowned = validateState({ ...s, cosmetics: { ...s.cosmetics, costumes: [], costume: 'bunny' } }); // 안 가진 옷은 입을 수 없다
+    expect(unowned.ok && unowned.state.cosmetics.costume).toBeNull();
     expect(lenient.state.achievements).toEqual({ grind: 5 });
     expect(lenient.state.fanMail.inbox.map((m) => m.id)).toEqual(['mail-2']);
   });

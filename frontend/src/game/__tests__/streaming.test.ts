@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, STREAM_PLATFORMS } from '../balance';
-import { claimStreaming } from '../commands';
+import { buyDistributor, claimStreaming } from '../commands';
 import { createInitialState } from '../persistence';
-import { streamClaimStatus, streamRate, streamTotal, streamsPending } from '../selectors';
+import { distributorCost, previewDistributor, streamClaimStatus, streamRate, streamRevenueMult, streamTotal, streamsPending } from '../selectors';
 import { advance, makeReport, OFFLINE, ONLINE, settleOffline, settleOnline } from '../simulation';
 import { accrueStreams, platformShares, streamSeedFrom, zeroTotals } from '../streaming';
 import type { GameState } from '../types';
@@ -201,5 +201,68 @@ describe('스트리밍: 정산', () => {
     expect(r.state.fans).toBe(40);
     expect(r.state.diamonds).toBe(s.diamonds);
     expect(r.state.normalRhymes).toBe(s.normalRhymes);
+  });
+});
+
+describe('스트리밍: 유통사 호감도', () => {
+  const D = BALANCE.distributor;
+
+  it('첫 비용 5,000코인, 이후 1.4배씩 올라간다', () => {
+    expect(D).toMatchObject({ base: 5000, growth: 1.4, perLevel: 0.05 });
+    expect([0, 1, 2, 3].map(distributorCost)).toEqual([5000, 7000, 9800, 13720]);
+    expect(distributorCost(10)).toBe(Math.ceil(5000 * 1.4 ** 10));
+  });
+
+  it('레벨당 스트리밍 수익이 +5%씩 더해진다(×1, ×1.05, ×1.1 …)', () => {
+    expect(streamRevenueMult({ distributor: 0 })).toBe(1);
+    expect(streamRevenueMult({ distributor: 1 })).toBeCloseTo(1.05, 10);
+    expect(streamRevenueMult({ distributor: 10 })).toBeCloseTo(1.5, 10);
+    const pv = previewDistributor(base({ coins: 5000, distributor: 2 }));
+    expect(pv).toMatchObject({ level: 2, cost: 9800, affordable: false });
+    expect(pv.multBefore).toBeCloseTo(1.1, 10);
+    expect(pv.multAfter).toBeCloseTo(1.15, 10);
+  });
+
+  it('코인으로만 올리고 모자라면 실패한다', () => {
+    const poor = buyDistributor(base({ coins: 4999 }));
+    expect(poor).toMatchObject({ ok: false, reason: 'insufficient_coins' });
+    const r = buyDistributor(base({ coins: 6000 }));
+    expect(r.ok && r.state.distributor).toBe(1);
+    expect(r.ok && r.state.coins).toBe(1000);
+    expect(r.ok && r.cost).toBe(5000);
+    const r2 = r.ok ? buyDistributor({ ...r.state, coins: 7000 }) : r;
+    expect(r2.ok && r2.state.distributor).toBe(2);
+    expect(r2.ok && r2.cost).toBe(7000);
+  });
+
+  it('정산으로 받는 코인만 늘고, 쌓인 스트리밍 수와 기록은 그대로다', () => {
+    const plain = advance(base({ fans: 100 }), HOUR).state;
+    const loved = advance(base({ fans: 100, distributor: 10 }), HOUR).state; // +50%
+    expect(streamTotal(loved.streaming)).toBeCloseTo(streamTotal(plain.streaming), 6);
+    const a = claimStreaming(plain);
+    const b = claimStreaming(loved);
+    expect(a.ok && b.ok).toBe(true);
+    if (!a.ok || !b.ok) return;
+    expect(a.coins).toBe(Math.floor((100 * S.perFanPerSec * 3600) / S.streamsPerCoin));
+    expect(b.coins).toBe(Math.floor((100 * S.perFanPerSec * 3600 * 1.5) / S.streamsPerCoin));
+    expect(b.coins).toBeGreaterThan(a.coins);
+    expect(b.state.streaming.totals).toEqual(loved.streaming.totals);
+  });
+
+  it('코인으로 바꾸고 남은 스트리밍은 다음 정산으로 넘어간다(비율이 달라도 손해가 없다)', () => {
+    const per = S.streamsPerCoin;
+    // 1.05배: 코인 1개 = per/1.05 스트리밍. per × 2.5 스트리밍이면 floor(2.625) = 2코인을 받고 나머지는 남는다.
+    const s = base({
+      distributor: 1,
+      streaming: { totals: { spotify: per * 2.5, ytmusic: 0, melon: 0, applemusic: 0 }, settled: 0, lastClaimAt: T0 - HOUR, seed: 1 },
+    });
+    const r = claimStreaming(s);
+    expect(r.ok && r.coins).toBe(2);
+    if (!r.ok) return;
+    const used = (2 * per) / 1.05;
+    expect(r.streams).toBeCloseTo(used, 9);
+    expect(streamsPending(r.state.streaming)).toBeCloseTo(per * 2.5 - used, 9);
+    // 남은 양은 코인 1개(per/1.05)에 못 미친다
+    expect(streamsPending(r.state.streaming)).toBeLessThan(per / 1.05);
   });
 });

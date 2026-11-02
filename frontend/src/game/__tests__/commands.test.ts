@@ -41,7 +41,7 @@ import {
   stageStatus,
   isTourComplete,
 } from '../selectors';
-import { ALBUM_CATALOG, dialogueCount, DIALOGUE, SITUATIONS, pickLine } from '../content';
+import { ALBUM_CATALOG, albumDefById, albumSeries, dialogueCount, DIALOGUE, SITUATIONS, pickLine } from '../content';
 import type { GameState } from '../types';
 
 const T0 = 1_700_000_000_000;
@@ -324,7 +324,7 @@ describe('다이아', () => {
     let s = base({ coins: 1e9 });
     const got: number[] = [];
     for (let i = 0; i < 3; i++) {
-      const r = releaseAlbum(s);
+      const r = releaseAlbum(s, 'normal');
       if (!r.ok) throw new Error('album');
       s = r.state;
       got.push(r.diamonds);
@@ -424,27 +424,40 @@ describe('다이아', () => {
       albums: [
         { id: 'a1', title: 't', type: 'normal', releasedAt: 0 },
         { id: 'a2', title: 't', type: 'normal', releasedAt: 0 },
-      ], // 30 + 60
+        { id: 'a3', title: 't', type: 'dark', releasedAt: 0 },
+      ], // 일반 30 + 60, 어둠 100
       concerts: {
         ...createInitialState(T0).concerts,
         room: { cleared: true, bestScore: 0, cooldownUntil: 0 }, // 5
         club: { cleared: true, bestScore: 0, cooldownUntil: 0 }, // 10
       },
     });
-    expect(retroactiveDiamonds(s)).toBe(5 + 10 + 30 + 60 + 4);
+    expect(retroactiveDiamonds(s)).toBe(5 + 10 + 30 + 60 + 100 + 4);
     expect(retroactiveDiamonds(base())).toBe(0);
   });
 });
 
 describe('앨범', () => {
   const ready = (coins = 1e9) => base({ coins });
+  const owned = (ids: string[]) => ids.map((id) => ({ id, title: albumDefById(id)!.title, type: albumDefById(id)!.type, releasedAt: 0 }));
+  const normalIds = (n: number) => albumSeries('normal').slice(0, n).map((d) => d.id);
 
-  it('카탈로그: 지정한 3장의 수록곡·속성', () => {
+  it('카탈로그: 지정한 일반 6장·어둠 3장의 수록곡·속성', () => {
     expect(ALBUM_CATALOG.map((d) => [d.title, d.kind, d.type, d.tracks.length])).toEqual([
       ['SAPA', 'EP', 'normal', 5],
       ['MONO', 'EP', 'normal', 5],
       ['cybergirl.vst3', '싱글', 'normal', 3],
+      ['Voyage, Love & Blank', '정규', 'normal', 11],
+      ['why my *GIRLS* not stereo', 'EP', 'normal', 7],
+      ['why my *GIRL* not mono', '싱글', 'normal', 2],
+      ['...정병러브...', 'EP', 'dark', 3],
+      ['니엄마는...', 'EP', 'dark', 3],
+      ['트롯사파 팩', 'EP', 'dark', 2],
     ]);
+    expect(ALBUM_CATALOG.map((d) => d.id)).toEqual(['album-1', 'album-2', 'album-3', 'album-4', 'album-5', 'album-6', 'album-dark-1', 'album-dark-2', 'album-dark-3']);
+    expect(new Set(ALBUM_CATALOG.map((d) => d.id)).size).toBe(ALBUM_CATALOG.length);
+    expect(albumSeries('normal').map((d) => d.title)).toEqual(['SAPA', 'MONO', 'cybergirl.vst3', 'Voyage, Love & Blank', 'why my *GIRLS* not stereo', 'why my *GIRL* not mono']);
+    expect(albumSeries('dark').map((d) => d.title)).toEqual(['...정병러브...', '니엄마는...', '트롯사파 팩']);
     expect(ALBUM_CATALOG[0].tracks.map((x) => x.title)).toEqual([
       'outro (항해사랑빈칸)',
       'draco !',
@@ -454,62 +467,165 @@ describe('앨범', () => {
     ]);
     expect(ALBUM_CATALOG[1].tracks.filter((x) => x.isTitle).map((x) => x.title)).toEqual(['이리 와']);
     expect(ALBUM_CATALOG[2].tracks.filter((x) => x.isTitle).map((x) => x.title)).toEqual(['cybergirl.vst3']);
+    expect(ALBUM_CATALOG[3].tracks.map((x) => x.title)).toEqual([
+      'Voyage Theme',
+      'Voyage unspecial',
+      'Voyage:Digital Star',
+      'LoveTheme',
+      'Love:憎惡⟹愛着',
+      'Love:17.2% ABV',
+      'Blank:Interlude',
+      'Blank Theme',
+      'Blank:론리청춘',
+      'Love:no faith in my romance',
+      'Love:Rockstar',
+    ]);
+    expect(ALBUM_CATALOG[4].tracks.map((x) => x.title)).toEqual([
+      'ki-eok III',
+      '@mensa_kr',
+      'KISS HEELS',
+      'ICED OUT',
+      'not 4 sale',
+      'what means "jerk" in korean?',
+      'why my rizz is only available on snapchat',
+    ]);
+    expect(ALBUM_CATALOG[5].tracks.map((x) => x.title)).toEqual(['싸가지', '우리의 사랑은 왜 베일에 쌓였을까']);
+  });
+
+  it('어둠 앨범 3장의 수록곡', () => {
+    const [d1, d2, d3] = albumSeries('dark');
+    expect(d1.tracks).toEqual([
+      { title: '정신병자러브', isTitle: true },
+      { title: '이상형이정신병자면 어떡해요' },
+      { title: '외모정병내가고쳐준다니까(feat.ruletheworldboi)' },
+    ]);
+    expect(d2.tracks.map((x) => x.title)).toEqual(['니엄마대가리에서눈이와', '니엄마의배꼽에다나는송곳을박아', '니네엄마한테위고비를맞혀']);
+    expect(d3.tracks.map((x) => x.title)).toEqual(['트롯사파', '트롯사파2(feat.한결행복가든)']);
+  });
+
+  it('속성마다 비용·팬·인세 배율·다이아가 카탈로그 장수만큼 있다', () => {
+    for (const type of ['normal', 'dark'] as const) {
+      const n = albumSeries(type).length;
+      expect(BALANCE.album[type].costs).toHaveLength(n);
+      expect(BALANCE.album[type].fans).toHaveLength(n);
+      expect(BALANCE.royalty.perAlbum[type]).toHaveLength(n);
+      expect(BALANCE.diamond.album[type]).toHaveLength(n);
+      for (let i = 0; i < n; i++) {
+        expect(albumCost(type, i)).toBeGreaterThan(0);
+        expect(albumFans(type, i)).toBeGreaterThan(0);
+      }
+    }
   });
 
   it('비용·팬 공식', () => {
-    expect([0, 1, 2].map(albumCost)).toEqual([10_000, 350_000, 20_000_000]);
-    expect([0, 1, 2].map(albumFans)).toEqual([100, 200, 300]);
-    const first = releaseAlbum(ready());
-    expect(first.ok && first.fans).toBe(albumFans(0));
+    expect([0, 1, 2, 3, 4, 5].map((i) => albumCost('normal', i))).toEqual([10_000, 350_000, 20_000_000, 1_000_000_000, 50_000_000_000, 2_500_000_000_000]);
+    expect([0, 1, 2, 3, 4, 5].map((i) => albumFans('normal', i))).toEqual([100, 200, 300, 400, 500, 600]);
+    expect([0, 1, 2].map((i) => albumCost('dark', i))).toEqual([100_000, 6_900_000, 740_000_000]);
+    expect([0, 1, 2].map((i) => albumFans('dark', i))).toEqual([124, 300, 740]);
+    expect(BALANCE.royalty.perAlbum.dark).toEqual([0.12, 0.24, 0.4]);
+    expect(BALANCE.diamond.album.dark).toEqual([100, 200, 400]);
+    const first = releaseAlbum(ready(), 'normal');
+    expect(first.ok && first.fans).toBe(albumFans('normal', 0));
     expect(first.ok && first.state.coins).toBe(1e9 - 10_000);
     expect(first.ok && first.album).toMatchObject({ id: 'album-1', title: 'SAPA', type: 'normal' });
     // 세 번째 앨범
-    const third = releaseAlbum(base({ coins: 1e8, albums: ALBUM_CATALOG.slice(0, 2).map((d) => ({ id: d.id, title: d.title, type: d.type, releasedAt: 0 })) }));
-    expect(third.ok && third.fans).toBe(albumFans(2));
-    expect(third.ok && third.cost).toBe(albumCost(2));
+    const third = releaseAlbum(base({ coins: 1e8, albums: owned(normalIds(2)) }), 'normal');
+    expect(third.ok && third.fans).toBe(albumFans('normal', 2));
+    expect(third.ok && third.cost).toBe(albumCost('normal', 2));
+    // 네 번째 앨범은 코인이 모자라면 못 내고, 충분하면 새 앨범이 나온다
+    const have3 = owned(normalIds(3));
+    expect(releaseAlbum(base({ coins: 999_999_999, albums: have3 }), 'normal')).toMatchObject({ ok: false, reason: 'insufficient_coins' });
+    const fourth = releaseAlbum(base({ coins: 1_000_000_000, albums: have3 }), 'normal');
+    expect(fourth.ok && fourth.album).toMatchObject({ id: 'album-4', title: 'Voyage, Love & Blank', type: 'normal' });
+    expect(fourth.ok && fourth.ordinal).toBe(4);
+    expect(fourth.ok && fourth.state.coins).toBe(0);
+    expect(fourth.ok && fourth.diamonds).toBeGreaterThanOrEqual(BALANCE.diamond.album.normal[3]);
   });
 
-  it('발매한 싱글과 무관하게 지정 순서대로 낸다', () => {
+  it('어둠 앨범은 일반 앨범을 하나도 안 냈어도 따로 첫 번째부터 낸다', () => {
     const s = ready();
+    expect(previewAlbum(s, 'dark')).toMatchObject({ type: 'dark', index: 0, cost: 100_000, fans: 124 });
+    expect(previewAlbum(s, 'dark')?.def.title).toBe('...정병러브...');
+    const d1 = releaseAlbum(s, 'dark');
+    expect(d1.ok && d1.album).toMatchObject({ id: 'album-dark-1', title: '...정병러브...', type: 'dark' });
+    expect(d1.ok && d1.ordinal).toBe(1);
+    expect(d1.ok && d1.fans).toBe(124);
+    expect(d1.ok && d1.state.coins).toBe(1e9 - 100_000);
+    expect(d1.ok && d1.diamonds).toBeGreaterThanOrEqual(BALANCE.diamond.album.dark[0]);
+    expect(d1.ok && d1.state.tutorialFlags.album).toBe(true);
+    if (!d1.ok) return;
+    // 어둠 앨범을 냈다고 일반 앨범의 순번이 밀리지 않는다
+    expect(previewAlbum(d1.state, 'normal')).toMatchObject({ index: 0 });
+    expect(previewAlbum(d1.state, 'normal')?.def.id).toBe('album-1');
+    const d2 = releaseAlbum(d1.state, 'dark');
+    expect(d2.ok && d2.album).toMatchObject({ id: 'album-dark-2', title: '니엄마는...' });
+    expect(d2.ok && d2.cost).toBe(albumCost('dark', 1));
+    // 반대로 일반 앨범을 냈다고 어둠 앨범이 앞당겨지지도 않는다
+    const n1 = releaseAlbum(d1.state, 'normal');
+    expect(n1.ok && n1.album.id).toBe('album-1');
+    expect(n1.ok && n1.state.albums.map((a) => a.id)).toEqual(['album-dark-1', 'album-1']);
+    expect(n1.ok && previewAlbum(n1.state, 'dark')?.def.id).toBe('album-dark-2');
+  });
+
+  it('발매한 싱글과 무관하게 속성마다 지정 순서대로 낸다', () => {
+    const s = ready(1e14);
     expect(s.singles).toHaveLength(0);
     let cur = s;
-    for (const def of ALBUM_CATALOG) {
-      const r = releaseAlbum(cur);
+    // 일반 → 어둠을 번갈아 내도 각자 순서대로 나온다
+    const order: ('normal' | 'dark')[] = ['normal', 'dark', 'normal', 'dark', 'dark', 'normal', 'normal', 'normal', 'normal'];
+    const expected = [...albumSeries('normal')];
+    const expectedDark = [...albumSeries('dark')];
+    for (const type of order) {
+      const r = releaseAlbum(cur, type);
       expect(r.ok).toBe(true);
       if (!r.ok) return;
-      expect(r.def.id).toBe(def.id);
+      expect(r.def.id).toBe((type === 'normal' ? expected : expectedDark).shift()!.id);
       expect(r.state.singles).toHaveLength(0);
       cur = r.state;
     }
-    expect(cur.albums.map((a) => a.title)).toEqual(['SAPA', 'MONO', 'cybergirl.vst3']);
+    expect(cur.albums.map((a) => a.id)).toEqual(['album-1', 'album-dark-1', 'album-2', 'album-dark-2', 'album-dark-3', 'album-3', 'album-4', 'album-5', 'album-6']);
     expect(cur.tutorialFlags.album).toBe(true);
   });
 
-  it('모두 발매하면 더 낼 수 없다', () => {
-    let cur = ready();
-    for (let i = 0; i < ALBUM_CATALOG.length; i++) {
-      const r = releaseAlbum(cur);
+  it('속성별로 모두 발매하면 그 속성은 더 낼 수 없고 다른 속성은 낼 수 있다', () => {
+    let cur = ready(1e14);
+    for (let i = 0; i < albumSeries('dark').length; i++) {
+      const r = releaseAlbum(cur, 'dark');
+      expect(r.ok).toBe(true);
       if (!r.ok) return;
       cur = r.state;
     }
-    expect(previewAlbum(cur)).toBeNull();
-    expect(releaseAlbum(cur)).toMatchObject({ ok: false, reason: 'no_more_albums' });
+    expect(cur.albums).toHaveLength(3);
+    expect(previewAlbum(cur, 'dark')).toBeNull();
+    expect(releaseAlbum(cur, 'dark')).toMatchObject({ ok: false, reason: 'no_more_albums' });
+    expect(previewAlbum(cur, 'normal')).not.toBeNull();
+    for (let i = 0; i < albumSeries('normal').length; i++) {
+      const r = releaseAlbum(cur, 'normal');
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      cur = r.state;
+    }
+    expect(cur.albums).toHaveLength(ALBUM_CATALOG.length);
+    expect(previewAlbum(cur, 'normal')).toBeNull();
+    expect(releaseAlbum(cur, 'normal')).toMatchObject({ ok: false, reason: 'no_more_albums' });
   });
 
   it('코인 부족이면 아무것도 바뀌지 않는다', () => {
     const s = ready(9_999);
-    const r = releaseAlbum(s);
-    expect(r).toMatchObject({ ok: false, reason: 'insufficient_coins' });
-    expect(r.state).toBe(s);
+    for (const type of ['normal', 'dark'] as const) {
+      const r = releaseAlbum(s, type);
+      expect(r).toMatchObject({ ok: false, reason: 'insufficient_coins' });
+      expect(r.state).toBe(s);
+    }
   });
 
-  it('누적 앨범 수가 다음 비용·팬·인세 배율에 반영', () => {
-    const a1 = releaseAlbum(ready());
+  it('낸 앨범 수가 그 속성의 다음 비용·팬에 반영', () => {
+    const a1 = releaseAlbum(ready(), 'normal');
     expect(a1.ok).toBe(true);
     if (!a1.ok) return;
-    const a2 = releaseAlbum(a1.state);
-    expect(a2.ok && a2.cost).toBe(albumCost(1));
-    expect(a2.ok && a2.fans).toBe(albumFans(1));
+    const a2 = releaseAlbum(a1.state, 'normal');
+    expect(a2.ok && a2.cost).toBe(albumCost('normal', 1));
+    expect(a2.ok && a2.fans).toBe(albumFans('normal', 1));
     expect(a2.ok && a2.state.albums).toHaveLength(2);
   });
 });
