@@ -367,6 +367,164 @@ describe('새 화면 렌더링', () => {
     expect(lost).not.toContain('이펙터 ');
   });
 
+  it('공연: 중형 공연장은 음파 튕기기로 직접 공연한다', async () => {
+    const g = { ...richState(), fans: 20_000 };
+    const normal = await render('concert', g);
+    expect(normal).toContain('직접 공연 · 음파 튕기기');
+    expect(normal).toContain('중형 공연장은 음파 튕기기');
+    expect(normal).toContain('손가락으로 음파를 쏠 방향을 정하면');
+    expect(normal).not.toContain('음파를 삼키는 방음벽이 섞이고');
+    const dark = await render('concert', { ...g, activePersona: 'dark' });
+    expect(dark).toContain('음파를 삼키는 방음벽이 섞이고 관객이 단단한 대신 보상 ×2');
+    // 다른 공연장 표시는 그대로
+    expect(normal).toContain('직접 공연 · 응원봉 머지 웨이브');
+    expect(normal).toContain('직접 공연 · 무대 세팅 블록');
+  });
+
+  it('음파 튕기기 전체화면과 결과 창', async () => {
+    const g = packState();
+    const loader = () => import('../ConcertStage');
+    const run = { id: 'b1', stageId: 'medium', persona: 'normal', game: 'bounce', difficulty: 1.7, taskGrowth: 1.25, status: 'running' };
+    const html = await renderNamed(loader, 'ConcertStage', 'concert', g, {}, { run });
+    for (const t of ['중형 공연장', '음파 튕기기', '열기 점수', '1곡 · 23초', `응원 ${0} / ${BALANCE.bounce.persona.normal.goals[0]}`, '음파 0개', '3층(맨 뒷줄) ×4', '1층 ×1', '곡이 끝날 때마다 이펙터를 하나 골라요', '공연 포기', '손가락을 움직여 음파를 쏠 방향을 정해요']) expect(html).toContain(t);
+    expect(html).toContain('stage-normal');
+    expect(html).toContain('viewBox="0 0 700 1060"');
+    expect((html.match(/data-cell="/g) ?? []).length).toBeGreaterThan(10);
+    expect(html).not.toContain('방음벽은 부서지기 전까지');
+    const dark = await renderNamed(loader, 'ConcertStage', 'concert', g, {}, { run: { ...run, persona: 'dark' } });
+    expect(dark).toContain('stage-dark');
+    expect(dark).toContain(`응원 0 / ${BALANCE.bounce.persona.dark.goals[0]}`);
+    expect(dark).toContain('방음벽은 부서지기 전까지');
+
+    const bounce = { broken: 212, back: 31, booms: 9, shots: 218, peakBalls: 11, waves: [100, 92, 85, 71], effects: { amp: 2, rate: 0, split: 1, pierce: 0, echo: 0 }, seconds: 92 };
+    const win = { stageId: 'medium', mode: 'manual', persona: 'normal', score: 812, coins: 4100, cleared: true, firstClear: true, firstClearCoins: 7500, diamonds: 30, bounce };
+    const done = await renderNamed(loader, 'ConcertStage', 'concert', g, { concertResult: win }, { run: { ...run, status: 'finished' } });
+    for (const t of ['공연 성공!', '812', '깬 관객 212명', '맨 뒷줄(3층) 31명', '폭죽 9번', '쏜 음파 218개', '최대 동시 11개', '92초', '1곡 100% · 2곡 92% · 3곡 85% · 앙코르 71%', '이펙터 🔊앰프 ×2 · 🔀분열', '첫 클리어 보너스']) expect(done).toContain(t);
+    expect(done).not.toContain('보상 50%');
+
+    const lose = { ...win, score: 300, cleared: false, firstClear: false, firstClearCoins: 0, diamonds: 0, coins: 150, bounce: { ...bounce, waves: [60, 40, 30, 20], effects: { amp: 0, rate: 0, split: 0, pierce: 0, echo: 0 } } };
+    const lost = await renderNamed(loader, 'ConcertStage', 'concert', g, { concertResult: lose }, { run: { ...run, status: 'finished' } });
+    expect(lost).toContain('아쉬운 공연…');
+    expect(lost).toContain('600점 미만이라 보상 50%');
+    expect(lost).not.toContain('이펙터 ');
+  });
+
+  it('공연: 중대형 공연장은 돌발 사고 막기로 직접 공연한다', async () => {
+    const g = { ...richState(), fans: 60_000 };
+    const normal = await render('concert', g);
+    expect(normal).toContain('직접 공연 · 돌발 사고 막기');
+    expect(normal).toContain('위에서 내려오는 사고(하울링·낙하 소품·합선·난입 관객)를 스태프가 자동으로 막아요');
+    expect(normal).not.toContain('정전이 불을 꺼서');
+    const dark = await render('concert', { ...g, activePersona: 'dark' });
+    expect(dark).toContain('정전이 불을 꺼서 그 줄 스태프를 느리게 만드는 대신 보상 ×2');
+    // 다른 공연장 표시는 그대로
+    expect(normal).toContain('직접 공연 · 음파 튕기기');
+    expect(normal).toContain('직접 공연 · 응원봉 머지 웨이브');
+  });
+
+  it('돌발 사고 막기 전체화면과 결과 창', async () => {
+    const g = packState();
+    const loader = () => import('../ConcertStage');
+    const run = { id: 'd1', stageId: 'large', persona: 'normal', game: 'defense', difficulty: 1.7, taskGrowth: 1.25, status: 'running' };
+    const html = await renderNamed(loader, 'ConcertStage', 'concert', g, {}, { run });
+    for (const t of ['중대형 공연장', '돌발 사고 막기', '열기 점수', '1곡 · 준비 중', `💰 예산 ${BALANCE.defense.startMoney}`, '막은 비율 0%', '무대 앞 — 여기까지 오면 사고!', '1곡 사고 예보', '하울링', '낙하 소품', '1곡 시작', '음향팀', '무대팀', '조명팀', '안전팀', '공연 포기', `다음 고용 비용 ${BALANCE.defense.hireBase}`]) expect(html).toContain(t);
+    expect(html).toContain('stage-normal');
+    expect(html).toContain('viewBox="0 0 500 850"');
+    expect((html.match(/data-slot="/g) ?? []).length).toBe(15);
+    expect(html).not.toContain('정전');
+    const dark = await renderNamed(loader, 'ConcertStage', 'concert', g, {}, { run: { ...run, persona: 'dark' } });
+    expect(dark).toContain('stage-dark');
+    expect(dark).toContain('정전 ×');
+    expect(dark).toContain('정전이 살아 있는 줄 아래 스태프는 공격이 느려져요');
+
+    const defense = { blocked: 41, leaked: 17, hires: 16, merges: 9, topRank: 3, taps: 33, waves: [96, 94, 60, 52], seconds: 94 };
+    const win = { stageId: 'large', mode: 'manual', persona: 'normal', score: 750, coins: 9100, cleared: true, firstClear: true, firstClearCoins: 18000, diamonds: 40, defense };
+    const done = await renderNamed(loader, 'ConcertStage', 'concert', g, { concertResult: win }, { run: { ...run, status: 'finished' } });
+    for (const t of ['공연 성공!', '750', '막은 사고 41건', '놓친 사고 17건', '고용 16명', '승급 9번', '최고 직급 팀장', '직접 막기 33번', '94초', '1곡 96% · 2곡 94% · 3곡 60% · 앙코르 52%', '첫 클리어 보너스']) expect(done).toContain(t);
+    expect(done).not.toContain('보상 50%');
+
+    const lose = { ...win, score: 300, cleared: false, firstClear: false, firstClearCoins: 0, diamonds: 0, coins: 450, defense: { ...defense, merges: 0, topRank: 1, waves: [60, 30, 20, 10] } };
+    const lost = await renderNamed(loader, 'ConcertStage', 'concert', g, { concertResult: lose }, { run: { ...run, status: 'finished' } });
+    expect(lost).toContain('아쉬운 공연…');
+    expect(lost).toContain('600점 미만이라 보상 50%');
+    expect(lost).toContain('최고 직급 신입');
+  });
+
+  it('공연: 대형 콘서트는 무대 서바이버로 직접 공연한다', async () => {
+    const g = { ...richState(), fans: 200_000 };
+    const normal = await render('concert', g);
+    expect(normal).toContain('직접 공연 · 무대 서바이버');
+    expect(normal).toContain('손가락을 끌어 무대를 움직이며 몰려오는 파파라치 드론을 피해요');
+    expect(normal).not.toContain('폭죽 탄막을 쏘는 엘리트 드론이 나오고');
+    const dark = await render('concert', { ...g, activePersona: 'dark' });
+    expect(dark).toContain('폭죽 탄막을 쏘는 엘리트 드론이 나오고 목표가 낮은 대신 보상 ×2');
+    expect(normal).toContain('직접 공연 · 돌발 사고 막기');
+  });
+
+  it('무대 서바이버 전체화면과 결과 창', async () => {
+    const g = packState();
+    const loader = () => import('../ConcertStage');
+    const run = { id: 's1', stageId: 'arena', persona: 'normal', game: 'survivor', difficulty: 1.7, taskGrowth: 1.25, status: 'running' };
+    const html = await renderNamed(loader, 'ConcertStage', 'concert', g, {}, { run });
+    for (const t of ['대형 콘서트', '무대 서바이버', '열기 점수', '1곡 · 23초', `응원 0 / ${BALANCE.survivor.persona.normal.goals[0]}`, 'Lv.1', '🔦 스포트라이트 1', '💡 조명 1', '공연 포기', '손가락(마우스)을 끌어서 움직여요']) expect(html).toContain(t);
+    expect(html).toContain('stage-normal');
+    expect(html).toContain('viewBox="0 0 700 950"');
+    expect(html).not.toContain('엘리트 드론은 멀리서');
+    const dark = await renderNamed(loader, 'ConcertStage', 'concert', g, {}, { run: { ...run, persona: 'dark' } });
+    expect(dark).toContain('stage-dark');
+    expect(dark).toContain(`응원 0 / ${BALANCE.survivor.persona.dark.goals[0]}`);
+    expect(dark).toContain('엘리트 드론은 멀리서 폭죽 탄막을 쏴요');
+
+    const survivor = { kills: 144, gems: 187, level: 9, heartsLeft: 2, died: false, weapons: { spot: 4, orbit: 3, laser: 2, firework: 0 }, passives: { speed: 1, magnet: 0, amp: 2, heart: 1 }, waves: [100, 96, 88, 71], seconds: 92 };
+    const win = { stageId: 'arena', mode: 'manual', persona: 'normal', score: 889, coins: 9100, cleared: true, firstClear: true, firstClearCoins: 45000, diamonds: 50, survivor };
+    const done = await renderNamed(loader, 'ConcertStage', 'concert', g, { concertResult: win }, { run: { ...run, status: 'finished' } });
+    for (const t of ['공연 성공!', '889', '쓰러뜨린 드론 144대', '모은 응원 187', '레벨 9', '남은 하트 2개', '92초', '1곡 100% · 2곡 96% · 3곡 88% · 앙코르 71%', '🔦스포트라이트 4', '💡조명 3', '⚡레이저 2', '👟발걸음 1', '📣열기 증폭 2', '❤️하트 1', '첫 클리어 보너스']) expect(done).toContain(t);
+    expect(done).not.toContain('🎆폭죽');
+    expect(done).not.toContain('보상 50%');
+
+    const lose = { ...win, score: 310, cleared: false, firstClear: false, firstClearCoins: 0, diamonds: 0, coins: 500, survivor: { ...survivor, died: true, heartsLeft: 0, waves: [90, 60, 0, 0] } };
+    const lost = await renderNamed(loader, 'ConcertStage', 'concert', g, { concertResult: lose }, { run: { ...run, status: 'finished' } });
+    expect(lost).toContain('아쉬운 공연…');
+    expect(lost).toContain('무대에서 쓰러졌어요');
+    expect(lost).toContain('600점 미만이라 보상 50%');
+  });
+
+  it('공연: 월클 콘서트는 월드투어 인크리멘탈로 직접 공연한다', async () => {
+    const g = { ...richState(), fans: 1_000_000 };
+    const normal = await render('concert', g);
+    expect(normal).toContain('직접 공연 · 월드투어 인크리멘탈');
+    expect(normal).toContain('무대를 눌러 팬을 모으고, 팬으로 대륙 응원단을 사서 자동으로 팬이 늘게 해요');
+    expect(normal).not.toContain('비용이 비싸고 별빛 하나의 효과가 약하지만');
+    const dark = await render('concert', { ...g, activePersona: 'dark' });
+    expect(dark).toContain('비용이 비싸고 별빛 하나의 효과가 약하지만 목표가 낮고 보상 ×2');
+    expect(normal).toContain('직접 공연 · 무대 서바이버');
+  });
+
+  it('월드투어 인크리멘탈 전체화면과 결과 창', async () => {
+    const g = packState();
+    const loader = () => import('../ConcertStage');
+    const run = { id: 'w1', stageId: 'world', persona: 'normal', game: 'prestige', difficulty: 1.7, taskGrowth: 1.25, status: 'running' };
+    const html = await renderNamed(loader, 'ConcertStage', 'concert', g, {}, { run });
+    for (const t of ['월클 콘서트', '월드투어 인크리멘탈', '열기 점수', '1곡 · 23초', `목표 ${BALANCE.prestige.persona.normal.goals[0]}`, '별빛 0', '영구 배율 ×1.00', '아시아 응원단', '오세아니아 응원단', '탭 강화', '합창', '곡이 끝날 때마다 영구 퍼크를 하나 골라요', '공연 포기', '무대를 눌러 팬을 모으고']) expect(html).toContain(t);
+    expect(html).toContain('stage-normal');
+    expect(html).not.toContain('어둠은 비용이 비싸고');
+    const dark = await renderNamed(loader, 'ConcertStage', 'concert', g, {}, { run: { ...run, persona: 'dark' } });
+    expect(dark).toContain('stage-dark');
+    expect(dark).toContain('어둠은 비용이 비싸고 별빛 하나의 효과가 약해요');
+
+    const prestige = { produced: 70_000_000, stars: 27, mult: 5.05, taps: 530, goldens: 9, perks: { tapx: 1, autox: 2, seed: 0, discount: 0, luck: 0, star: 1 }, waves: [100, 96, 88, 71], seconds: 92 };
+    const win = { stageId: 'world', mode: 'manual', persona: 'normal', score: 889, coins: 90000, cleared: true, firstClear: true, firstClearCoins: 120000, diamonds: 80, prestige };
+    const done = await renderNamed(loader, 'ConcertStage', 'concert', g, { concertResult: win }, { run: { ...run, status: 'finished' } });
+    for (const t of ['공연 성공!', '889', '만든 팬 70.0M명', '별빛 27', '영구 배율 ×5.05', '탭 530번', '월드 스포트라이트 9번', '92초', '1곡 100% · 2곡 96% · 3곡 88% · 앙코르 71%', '🎤팬서비스', '🌍월드 응원단 ×2', '✨별빛 증폭', '첫 클리어 보너스']) expect(done).toContain(t);
+    expect(done).not.toContain('보상 50%');
+
+    const lose = { ...win, score: 200, cleared: false, firstClear: false, firstClearCoins: 0, diamonds: 0, coins: 1000, prestige: { ...prestige, perks: { tapx: 0, autox: 0, seed: 0, discount: 0, luck: 0, star: 0 }, waves: [50, 20, 0, 0] } };
+    const lost = await renderNamed(loader, 'ConcertStage', 'concert', g, { concertResult: lose }, { run: { ...run, status: 'finished' } });
+    expect(lost).toContain('아쉬운 공연…');
+    expect(lost).toContain('600점 미만이라 보상 50%');
+    expect(lost).not.toContain('영구 퍼크 ');
+  });
+
   it('장비·작업실·도감도 새 필드와 함께 그려진다', async () => {
     const g = richState();
     expect(await render('equip', g)).toContain('오프라인 정산 확장');

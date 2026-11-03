@@ -531,12 +531,15 @@ describe('단콘 직접 공연 연결', () => {
     return { ...s, fans: 100_000, concerts: { ...s.concerts, room: cleared, club: cleared, hall: cleared } };
   };
 
-  it('단콘만 응원봉 머지 웨이브이고 다른 공연장은 그대로다', () => {
+  it('단콘은 응원봉 머지 웨이브이고 다른 공연장은 각자 자기 게임이다', () => {
     expect(manualGameOf('solo')).toBe('merge');
     expect(manualGameOf('hall')).toBe('blocks');
     expect(manualGameOf('club')).toBe('run');
     expect(manualGameOf('room')).toBe('timing');
-    expect(manualGameOf('medium')).toBe('timing');
+    expect(manualGameOf('medium')).toBe('bounce');
+    expect(manualGameOf('large')).toBe('defense');
+    expect(manualGameOf('arena')).toBe('survivor');
+    expect(manualGameOf('world')).toBe('prestige');
     expect(manualGameOf('ruins')).toBe('run');
   });
 

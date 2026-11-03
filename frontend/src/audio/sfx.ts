@@ -186,6 +186,14 @@ export const sfx = {
       { freq: base * 1.5, dur: 0.14, at: 0.12, type: 'triangle', gain: 0.08 },
     ]);
   },
+  /** 음파 튕기기: 음파가 관객에게 닿는 작은 소리 */
+  tick() {
+    play([{ freq: 1900, dur: 0.025, type: 'square', gain: 0.012 }]);
+  },
+  /** 음파 튕기기: 폭죽 관객이 터지는 소리 */
+  boom() {
+    play([{ freq: 160, slideTo: 45, dur: 0.22, type: 'sawtooth', gain: 0.08 }, { freq: 880, slideTo: 330, dur: 0.12, at: 0.02, type: 'triangle', gain: 0.05 }]);
+  },
   jump(second: boolean) {
     play([{ freq: second ? 620 : 440, slideTo: second ? 980 : 760, dur: 0.12, type: 'triangle', gain: 0.07 }]);
   },

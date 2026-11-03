@@ -2662,19 +2662,31 @@ span.rar {
 .merge-combo {
   color: #ffe27a;
 }
-.merge-meter {
+.merge-meter,
+.bounce-meter,
+.defense-meter,
+.survivor-meter,
+.prestige-meter {
   height: 10px;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.16);
   overflow: hidden;
 }
-.merge-meter i {
+.merge-meter i,
+.bounce-meter i,
+.defense-meter i,
+.survivor-meter i,
+.prestige-meter i {
   display: block;
   height: 100%;
   border-radius: 10px;
   background: linear-gradient(90deg, #ffb35a, #ffe27a);
 }
-.merge-power {
+.merge-power,
+.bounce-power,
+.defense-power,
+.survivor-power,
+.prestige-power {
   margin-top: -6px;
   font-size: 12px;
   text-align: right;
@@ -2797,7 +2809,11 @@ span.rar {
     transform: translate(-50%, -150%);
   }
 }
-.merge-banner {
+.merge-banner,
+.bounce-banner,
+.defense-banner,
+.survivor-banner,
+.prestige-banner {
   position: absolute;
   top: 2%;
   left: 0;
@@ -2810,13 +2826,24 @@ span.rar {
   pointer-events: none;
   animation: judge-pop 1.3s ease-out forwards;
 }
-.merge-banner-good {
+.merge-banner-good,
+.bounce-banner-good,
+.defense-banner-good,
+.survivor-banner-good,
+.prestige-banner-good {
   color: #5ad7a6;
 }
-.merge-banner-bad {
+.merge-banner-bad,
+.bounce-banner-bad,
+.defense-banner-bad,
+.survivor-banner-bad,
+.prestige-banner-bad {
   color: #ff6b8f;
 }
-.merge-pick {
+.merge-pick,
+.bounce-pick,
+.survivor-pick,
+.prestige-pick {
   position: absolute;
   inset: 0;
   z-index: 5;
@@ -2830,15 +2857,27 @@ span.rar {
   text-align: center;
 }
 .merge-pick h3,
-.merge-pick p {
+.merge-pick p,
+.bounce-pick h3,
+.bounce-pick p,
+.survivor-pick h3,
+.survivor-pick p,
+.prestige-pick h3,
+.prestige-pick p {
   margin: 0;
 }
-.merge-offers {
+.merge-offers,
+.bounce-offers,
+.survivor-offers,
+.prestige-offers {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-.merge-offer {
+.merge-offer,
+.bounce-offer,
+.survivor-offer,
+.prestige-offer {
   display: grid;
   grid-template-columns: 40px 1fr;
   grid-template-rows: auto auto auto;
@@ -2852,30 +2891,684 @@ span.rar {
   color: #fff;
   cursor: pointer;
 }
-.merge-offer-icon {
+.merge-offer-icon,
+.bounce-offer-icon,
+.survivor-offer-icon,
+.prestige-offer-icon {
   grid-row: 1 / 4;
   font-size: 28px;
   text-align: center;
 }
-.merge-offer small {
+.merge-offer small,
+.bounce-offer small,
+.survivor-offer small,
+.prestige-offer small {
   color: #cfc8ee;
 }
-.merge-effects {
+.merge-effects,
+.bounce-effects,
+.survivor-perks,
+.prestige-perks {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   justify-content: center;
   font-size: 12.5px;
 }
-.merge-effect {
+.merge-effect,
+.bounce-effect,
+.survivor-perk,
+.prestige-perk {
   padding: 3px 9px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.14);
 }
-.merge-hint {
+.merge-hint,
+.bounce-hint,
+.defense-hint,
+.survivor-hint,
+.prestige-hint {
   margin: 0;
   font-size: 12.5px;
   line-height: 1.5;
+}
+
+/* ---------- 음파 튕기기(중형 공연장 직접 공연). 이펙터 고르기·진행바 등은 응원봉 머지 웨이브와 같은 규칙을 쓴다 ---------- */
+.bounce-play {
+  --bk-1: #6fb7ff;
+  --bk-2: #b58cff;
+  --bk-3: #ffcf5a;
+}
+.stage-dark .bounce-play {
+  --bk-1: #ff7aa8;
+  --bk-2: #c04bff;
+  --bk-3: #ff9a3d;
+}
+.bounce-balls {
+  color: #bfe6ff;
+}
+.bounce-field {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  align-self: center;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.38);
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.bounce-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  touch-action: none;
+  cursor: crosshair;
+}
+.bounce-tier-a {
+  fill: rgba(255, 255, 255, 0.03);
+}
+.bounce-tier-b {
+  fill: rgba(255, 255, 255, 0.07);
+}
+.bounce-tier-label {
+  font-size: 30px;
+  font-weight: 700;
+  fill: rgba(255, 255, 255, 0.45);
+  pointer-events: none;
+}
+.bk {
+  stroke: rgba(0, 0, 0, 0.35);
+  stroke-width: 3;
+}
+.bk-t1 {
+  fill: var(--bk-1);
+}
+.bk-t2 {
+  fill: var(--bk-2);
+}
+.bk-t3 {
+  fill: var(--bk-3);
+}
+.bk-boom {
+  fill: #ff7a3d;
+}
+.bk-mute {
+  fill: #5a5470;
+}
+.bk-hit {
+  filter: brightness(1.7);
+}
+.bk-num,
+.bk-icon {
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+.bk-num {
+  font-size: 44px;
+  font-weight: 800;
+  fill: rgba(0, 0, 0, 0.72);
+}
+.bk-num-small {
+  font-size: 28px;
+  fill: rgba(255, 255, 255, 0.92);
+}
+.bk-icon {
+  font-size: 44px;
+}
+.bounce-ball {
+  fill: #fff;
+  stroke: #7fd0ff;
+  stroke-width: 4;
+}
+.bounce-aim {
+  stroke: rgba(255, 255, 255, 0.7);
+  stroke-width: 5;
+  stroke-dasharray: 14 14;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+.bounce-mic circle {
+  fill: rgba(255, 255, 255, 0.18);
+  stroke: rgba(255, 255, 255, 0.6);
+  stroke-width: 3;
+}
+.bounce-mic line {
+  stroke: #fff;
+  stroke-width: 8;
+  stroke-linecap: round;
+}
+.bounce-mic text {
+  font-size: 34px;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+
+/* ---------- 무대 서바이버(대형 콘서트 직접 공연). 진행바·알림·퍼크 고르기는 응원봉 머지 웨이브와 같은 규칙을 쓴다 ---------- */
+.survivor-hearts {
+  letter-spacing: 1px;
+}
+.survivor-xp {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.survivor-xp b {
+  min-width: 42px;
+  color: #bfe6ff;
+}
+.survivor-xp span {
+  flex: 1;
+  height: 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.16);
+  overflow: hidden;
+}
+.survivor-xp i {
+  display: block;
+  height: 100%;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #6fb7ff, #b58cff);
+}
+.survivor-field {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  align-self: center;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.38);
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.survivor-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  touch-action: none;
+  cursor: grab;
+}
+.survivor-floor {
+  fill: rgba(30, 24, 60, 0.7);
+}
+.survivor-grid {
+  stroke: rgba(255, 255, 255, 0.06);
+  stroke-width: 2;
+}
+.sv-icon {
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+.sv-enemy circle {
+  fill: rgba(40, 30, 70, 0.95);
+  stroke: #ff9a9a;
+  stroke-width: 4;
+}
+.sv-swift circle {
+  stroke: #ffe27a;
+}
+.sv-shield circle {
+  stroke: #7fd0ff;
+  stroke-width: 6;
+}
+.sv-elite circle {
+  fill: rgba(70, 20, 40, 0.95);
+  stroke: #ff6b8f;
+  stroke-width: 6;
+}
+.sv-hit circle {
+  fill: rgba(255, 255, 255, 0.85);
+}
+.sv-bar {
+  fill: #5ad7a6;
+}
+.sv-gem {
+  fill: #ffe27a;
+  stroke: rgba(0, 0, 0, 0.4);
+  stroke-width: 2;
+}
+.sv-gem-big {
+  fill: #ff9a3d;
+}
+.sv-heart {
+  font-size: 34px;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+.sv-bolt {
+  fill: #fff;
+  stroke: #7fd0ff;
+  stroke-width: 3;
+}
+.sv-shot {
+  fill: #ff6b8f;
+  stroke: #fff;
+  stroke-width: 2;
+}
+.sv-orbit {
+  fill: #ffe27a;
+  stroke: #fff;
+  stroke-width: 3;
+  opacity: 0.9;
+}
+.sv-laser {
+  stroke: #b58cff;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+.sv-boom {
+  fill: rgba(255, 154, 61, 0.35);
+  stroke: #ff9a3d;
+  stroke-width: 4;
+  pointer-events: none;
+}
+.sv-body {
+  fill: rgba(255, 255, 255, 0.2);
+  stroke: #fff;
+  stroke-width: 4;
+}
+.sv-blink {
+  opacity: 0.35;
+}
+.sv-magnet {
+  fill: none;
+  stroke: rgba(255, 226, 122, 0.18);
+  stroke-width: 2;
+  stroke-dasharray: 6 8;
+  pointer-events: none;
+}
+.sv-stick-ring {
+  fill: rgba(255, 255, 255, 0.06);
+  stroke: rgba(255, 255, 255, 0.3);
+  stroke-width: 3;
+}
+.sv-stick-knob {
+  fill: rgba(255, 255, 255, 0.45);
+}
+
+/* ---------- 월드투어 인크리멘탈(월클 콘서트 직접 공연). 진행바·알림·퍼크 고르기는 응원봉 머지 웨이브와 같은 규칙을 쓴다 ---------- */
+.prestige-star {
+  color: #ffe27a;
+  font-weight: 700;
+}
+.prestige-fans {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.prestige-fans strong {
+  font-size: 26px;
+}
+.prestige-fans small {
+  color: #cfc8ee;
+}
+.prestige-field {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  align-self: center;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.38);
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.prestige-tap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  height: 210px;
+  border: 0;
+  background: radial-gradient(circle at 50% 45%, rgba(111, 183, 255, 0.28), rgba(0, 0, 0, 0) 70%);
+  color: #fff;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.prestige-tap:active .prestige-globe {
+  transform: scale(0.9);
+}
+.prestige-globe {
+  font-size: 84px;
+  line-height: 1;
+  transition: transform 0.06s;
+}
+.prestige-tap small {
+  color: #cfc8ee;
+}
+.prestige-golden {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 2px solid #ffe27a;
+  background: rgba(255, 226, 122, 0.25);
+  font-size: 34px;
+  cursor: pointer;
+  animation: judge-pop 0.4s ease-out;
+}
+.prestige-golden i {
+  position: absolute;
+  left: 6px;
+  bottom: -8px;
+  height: 4px;
+  border-radius: 4px;
+  background: #ffe27a;
+  max-width: 52px;
+}
+.prestige-shop {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.prestige-item {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  align-items: center;
+  text-align: left;
+  padding: 7px 9px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  cursor: pointer;
+}
+.prestige-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.prestige-item > span {
+  grid-row: 1 / 3;
+  font-size: 22px;
+  text-align: center;
+}
+.prestige-item strong {
+  font-size: 12.5px;
+}
+.prestige-item small {
+  grid-column: 2;
+  font-size: 11px;
+  color: #cfc8ee;
+}
+.prestige-item b {
+  grid-column: 3;
+  grid-row: 1 / 3;
+  font-size: 13px;
+  color: #ffe27a;
+}
+.prestige-item-up {
+  border-color: rgba(181, 140, 255, 0.6);
+}
+
+/* ---------- 돌발 사고 막기(중대형 공연장 직접 공연). 진행바·알림·안내 글은 응원봉 머지 웨이브와 같은 규칙을 쓴다 ---------- */
+.defense-play {
+  --ds-sound: #6fb7ff;
+  --ds-stage: #ffb35a;
+  --ds-light: #ffe27a;
+  --ds-safety: #7be0a0;
+}
+.defense-cash {
+  color: #ffe27a;
+  font-weight: 700;
+}
+.defense-field {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+  align-self: center;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.38);
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.defense-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  touch-action: none;
+}
+.defense-lane-a {
+  fill: rgba(255, 255, 255, 0.03);
+}
+.defense-lane-b {
+  fill: rgba(255, 255, 255, 0.07);
+}
+.defense-line {
+  fill: rgba(255, 107, 143, 0.14);
+  stroke: rgba(255, 107, 143, 0.55);
+  stroke-width: 3;
+  stroke-dasharray: 12 10;
+}
+.defense-line-hit {
+  fill: rgba(255, 107, 143, 0.55);
+}
+.defense-line-label {
+  font-size: 20px;
+  font-weight: 700;
+  fill: rgba(255, 255, 255, 0.72);
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+.ds {
+  stroke: rgba(0, 0, 0, 0.35);
+  stroke-width: 3;
+  cursor: grab;
+}
+.ds-empty {
+  fill: rgba(255, 255, 255, 0.05);
+  stroke: rgba(255, 255, 255, 0.22);
+  stroke-dasharray: 8 8;
+  cursor: pointer;
+}
+.ds-sound {
+  fill: var(--ds-sound);
+}
+.ds-stage {
+  fill: var(--ds-stage);
+}
+.ds-light {
+  fill: var(--ds-light);
+}
+.ds-safety {
+  fill: var(--ds-safety);
+}
+.ds-selected {
+  stroke: #fff;
+  stroke-width: 6;
+}
+.ds-can {
+  stroke: #ff6b8f;
+  stroke-width: 6;
+}
+.ds-icon,
+.ds-rank {
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+.ds-icon {
+  font-size: 40px;
+}
+.ds-rank {
+  font-size: 22px;
+  font-weight: 800;
+  fill: rgba(0, 0, 0, 0.74);
+}
+.defense-range {
+  fill: rgba(255, 255, 255, 0.06);
+  stroke: rgba(255, 255, 255, 0.45);
+  stroke-width: 3;
+  stroke-dasharray: 10 10;
+  pointer-events: none;
+}
+.di circle {
+  fill: rgba(30, 24, 60, 0.92);
+  stroke: #fff;
+  stroke-width: 4;
+}
+.di-howl circle {
+  stroke: var(--ds-sound);
+}
+.di-prop circle {
+  stroke: var(--ds-stage);
+}
+.di-spark circle,
+.di-blackout circle {
+  stroke: var(--ds-light);
+}
+.di-crasher circle {
+  stroke: var(--ds-safety);
+}
+.di-blackout circle {
+  fill: #0d0a1f;
+}
+.di-slow circle {
+  stroke-dasharray: 7 6;
+}
+.di-icon,
+.di-counter {
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+.di-icon {
+  font-size: 40px;
+}
+.di-counter {
+  font-size: 22px;
+}
+.di-bar-bg {
+  fill: rgba(0, 0, 0, 0.55);
+}
+.di-bar {
+  fill: #5ad7a6;
+}
+.defense-dark rect {
+  fill: rgba(0, 0, 0, 0.5);
+}
+.defense-dark text {
+  font-size: 36px;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+.defense-shot {
+  stroke-width: 6;
+  stroke-linecap: round;
+  opacity: 0.9;
+  pointer-events: none;
+}
+.defense-shot-sound {
+  stroke: var(--ds-sound);
+}
+.defense-shot-stage {
+  stroke: var(--ds-stage);
+  stroke-width: 10;
+}
+.defense-shot-light {
+  stroke: var(--ds-light);
+}
+.defense-shot-safety {
+  stroke: var(--ds-safety);
+}
+.defense-tap {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 4;
+  opacity: 0.8;
+  pointer-events: none;
+}
+.defense-hire {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.defense-hire-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  cursor: pointer;
+}
+.defense-hire-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.defense-hire-btn span {
+  font-size: 24px;
+}
+.defense-hire-btn strong {
+  font-size: 13px;
+}
+.defense-hire-btn small {
+  font-size: 11px;
+  line-height: 1.3;
+  text-align: center;
+  color: #cfc8ee;
+}
+.defense-hire-sound {
+  border-color: var(--ds-sound);
+}
+.defense-hire-stage {
+  border-color: var(--ds-stage);
+}
+.defense-hire-light {
+  border-color: var(--ds-light);
+}
+.defense-hire-safety {
+  border-color: var(--ds-safety);
+}
+.defense-cost {
+  margin-top: -4px;
+  font-size: 12px;
+  text-align: center;
+}
+.defense-board {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+}
+.defense-forecast-title {
+  font-weight: 700;
+  font-size: 13.5px;
+}
+.defense-forecast {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.defense-chip {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 12.5px;
+}
+.defense-chip i {
+  font-style: normal;
+  opacity: 0.85;
+}
+.defense-report {
+  margin: 0;
+  font-size: 13px;
+  color: #ffe27a;
 }
 
 /* ---------- 콘텐츠 팩 2: 챌린지·차트·결산·샘플러 ---------- */

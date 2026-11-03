@@ -41,6 +41,10 @@ import { buySlot, collectPost, startPost } from '../game/monogram';
 import { buyCampaign, buyCostume, buySnack, buyTheme, setCostume, setTheme } from '../game/shop';
 import { InputLimiter } from '../game/input';
 import type { BlocksSummary } from '../game/blocks';
+import type { BounceSummary } from '../game/bounce';
+import type { DefenseSummary } from '../game/defense';
+import type { SurvivorSummary } from '../game/survivor';
+import type { PrestigeSummary } from '../game/prestige';
 import type { MergeSummary } from '../game/merge';
 import type { Judgement } from '../game/minigame';
 import {
@@ -134,6 +138,10 @@ export interface ConcertResult extends ConcertOutcome {
   run?: RunSummary;
   blocks?: BlocksSummary;
   merge?: MergeSummary;
+  bounce?: BounceSummary;
+  defense?: DefenseSummary;
+  survivor?: SurvivorSummary;
+  prestige?: PrestigeSummary;
 }
 
 /** 공연 종류에 따라 붙는 결과 정보 */
@@ -142,6 +150,10 @@ export interface ConcertExtra {
   run?: RunSummary;
   blocks?: BlocksSummary;
   merge?: MergeSummary;
+  bounce?: BounceSummary;
+  defense?: DefenseSummary;
+  survivor?: SurvivorSummary;
+  prestige?: PrestigeSummary;
   /** 점수와 별개로 클리어가 정해지는 공연(모노사파런: 완주)이면 넘긴다. */
   cleared?: boolean;
 }
@@ -861,7 +873,7 @@ export function finishManualConcertRun(runId: string, score: number, extra: Conc
 }
 
 function onConcertDone(outcome: ConcertOutcome, extra: ConcertExtra = {}): void {
-  set({ concertResult: { ...outcome, tally: extra.tally, run: extra.run, blocks: extra.blocks, merge: extra.merge } });
+  set({ concertResult: { ...outcome, tally: extra.tally, run: extra.run, blocks: extra.blocks, merge: extra.merge, bounce: extra.bounce, defense: extra.defense, survivor: extra.survivor, prestige: extra.prestige } });
   sfx.finish(outcome.cleared);
   say(outcome.cleared ? 'concertWin' : 'concertLose', true);
   if (outcome.stageId === TOUR_STAGE && outcome.firstClear && !ui.game.tutorialFlags.tourCardSeen) {

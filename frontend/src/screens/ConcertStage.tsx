@@ -24,7 +24,14 @@ import {
 } from '../game/minigame';
 import type { ConcertRun } from '../game/commands';
 import { BlocksPlay } from './BlockStage';
+import { BOUNCE_EFFECT_TEXT, BouncePlay } from './BounceStage';
+import { DefensePlay, RANK_NAME } from './DefenseStage';
+import { PERK_TEXT, SurvivorPlay } from './SurvivorStage';
+import { PRESTIGE_PERK_TEXT, PrestigePlay } from './PrestigeStage';
+import { PERK_IDS as PRESTIGE_PERK_IDS } from '../game/prestige';
+import { PASSIVE_IDS, WEAPON_IDS } from '../game/survivor';
 import { EFFECT_TEXT, MergePlay, SET_NAMES } from './MergeStage';
+import type { EffectId as BounceEffectId } from '../game/bounce';
 import type { EffectId } from '../game/merge';
 import { RunPlay } from './RunStage';
 import {
@@ -54,6 +61,14 @@ export function ConcertStage({ run }: { run: ConcertRun }) {
         <BlocksPlay key={run.id} run={run} />
       ) : run.game === 'merge' ? (
         <MergePlay key={run.id} run={run} />
+      ) : run.game === 'bounce' ? (
+        <BouncePlay key={run.id} run={run} />
+      ) : run.game === 'defense' ? (
+        <DefensePlay key={run.id} run={run} />
+      ) : run.game === 'survivor' ? (
+        <SurvivorPlay key={run.id} run={run} />
+      ) : run.game === 'prestige' ? (
+        <PrestigePlay key={run.id} run={run} />
       ) : (
         <Play key={run.id} run={run} />
       )}
@@ -252,6 +267,10 @@ function ResultPanel({ result }: { result: ConcertResult }) {
   const r = result.run;
   const b = result.blocks;
   const m = result.merge;
+  const bn = result.bounce;
+  const df = result.defense;
+  const sv = result.survivor;
+  const pr = result.prestige;
   return (
     <div className="stage-result">
       <h2>{result.cleared ? (r ? '완주 성공!' : '공연 성공!') : r ? '아쉬운 질주…' : '아쉬운 공연…'}</h2>
@@ -290,6 +309,62 @@ function ResultPanel({ result }: { result: ConcertResult }) {
               {(Object.keys(m.effects) as EffectId[])
                 .filter((id) => m.effects[id] > 0)
                 .map((id) => `${EFFECT_TEXT[id].icon}${EFFECT_TEXT[id].name}${m.effects[id] > 1 ? ` ×${m.effects[id]}` : ''}`)
+                .join(' · ')}
+            </p>
+          )}
+        </>
+      )}
+      {bn && (
+        <>
+          <p className="muted">
+            깬 관객 {bn.broken}명 · 맨 뒷줄(3층) {bn.back}명 · 폭죽 {bn.booms}번 · 쏜 음파 {bn.shots}개 · 최대 동시 {bn.peakBalls}개 · {bn.seconds}초
+          </p>
+          <p className="muted">열기 목표 {bn.waves.map((w, i) => `${SET_NAMES[i]} ${w}%`).join(' · ')}</p>
+          {(Object.keys(bn.effects) as BounceEffectId[]).some((id) => bn.effects[id] > 0) && (
+            <p className="muted">
+              이펙터{' '}
+              {(Object.keys(bn.effects) as BounceEffectId[])
+                .filter((id) => bn.effects[id] > 0)
+                .map((id) => `${BOUNCE_EFFECT_TEXT[id].icon}${BOUNCE_EFFECT_TEXT[id].name}${bn.effects[id] > 1 ? ` ×${bn.effects[id]}` : ''}`)
+                .join(' · ')}
+            </p>
+          )}
+        </>
+      )}
+      {df && (
+        <>
+          <p className="muted">
+            막은 사고 {df.blocked}건 · 놓친 사고 {df.leaked}건 · 고용 {df.hires}명 · 승급 {df.merges}번 · 최고 직급 {RANK_NAME[df.topRank] || '-'} · 직접 막기 {df.taps}번 · {df.seconds}초
+          </p>
+          <p className="muted">막은 비율 {df.waves.map((w, i) => `${SET_NAMES[i]} ${w}%`).join(' · ')}</p>
+        </>
+      )}
+      {sv && (
+        <>
+          <p className="muted">
+            쓰러뜨린 드론 {sv.kills}대 · 모은 응원 {sv.gems} · 레벨 {sv.level} · {sv.died ? '무대에서 쓰러졌어요' : `남은 하트 ${sv.heartsLeft}개`} · {sv.seconds}초
+          </p>
+          <p className="muted">열기 목표 {sv.waves.map((w, i) => `${SET_NAMES[i]} ${w}%`).join(' · ')}</p>
+          <p className="muted">
+            퍼크{' '}
+            {[...WEAPON_IDS.map((id) => [id, sv.weapons[id]] as const), ...PASSIVE_IDS.map((id) => [id, sv.passives[id]] as const)]
+              .filter(([, lv]) => lv > 0)
+              .map(([id, lv]) => `${PERK_TEXT[id].icon}${PERK_TEXT[id].name} ${lv}`)
+              .join(' · ')}
+          </p>
+        </>
+      )}
+      {pr && (
+        <>
+          <p className="muted">
+            만든 팬 {fmt(pr.produced)}명 · 별빛 {pr.stars} · 영구 배율 ×{pr.mult.toFixed(2)} · 탭 {pr.taps}번 · 월드 스포트라이트 {pr.goldens}번 · {pr.seconds}초
+          </p>
+          <p className="muted">열기 목표 {pr.waves.map((w, i) => `${SET_NAMES[i]} ${w}%`).join(' · ')}</p>
+          {PRESTIGE_PERK_IDS.some((id) => pr.perks[id] > 0) && (
+            <p className="muted">
+              영구 퍼크{' '}
+              {PRESTIGE_PERK_IDS.filter((id) => pr.perks[id] > 0)
+                .map((id) => `${PRESTIGE_PERK_TEXT[id].icon}${PRESTIGE_PERK_TEXT[id].name}${pr.perks[id] > 1 ? ` ×${pr.perks[id]}` : ''}`)
                 .join(' · ')}
             </p>
           )}

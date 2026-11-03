@@ -469,12 +469,15 @@ describe('소형 공연장 직접 공연 연결', () => {
     };
   };
 
-  it('소형 공연장만 무대 세팅 블록이고 나머지 공연장은 그대로다', () => {
+  it('소형 공연장은 무대 세팅 블록이고 다른 공연장은 각자 자기 게임이다', () => {
     expect(manualGameOf('hall')).toBe('blocks');
     expect(manualGameOf('room')).toBe('timing');
     expect(manualGameOf('club')).toBe('run');
     expect(manualGameOf('solo')).toBe('merge');
-    expect(manualGameOf('medium')).toBe('timing');
+    expect(manualGameOf('medium')).toBe('bounce');
+    expect(manualGameOf('large')).toBe('defense');
+    expect(manualGameOf('arena')).toBe('survivor');
+    expect(manualGameOf('world')).toBe('prestige');
     expect(manualGameOf('ruins')).toBe('run');
   });
 

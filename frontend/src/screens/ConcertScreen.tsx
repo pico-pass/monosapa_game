@@ -8,7 +8,7 @@ import type { StageId } from '../game/types';
 import { doAutoConcert, doSkipCooldown, setTourCardOpen, startManualConcert, useUi } from '../store/gameStore';
 
 /** 직접 공연 버튼에 붙는 게임 이름(마이크 타이밍은 따로 이름을 붙이지 않는다) */
-const GAME_LABEL: Partial<Record<ManualGame, string>> = { run: '모노사파런', blocks: '무대 세팅 블록', merge: '응원봉 머지 웨이브' };
+const GAME_LABEL: Partial<Record<ManualGame, string>> = { run: '모노사파런', blocks: '무대 세팅 블록', merge: '응원봉 머지 웨이브', bounce: '음파 튕기기', defense: '돌발 사고 막기', survivor: '무대 서바이버', prestige: '월드투어 인크리멘탈' };
 
 /** 무대 세팅 블록 안내 */
 function blocksNote(persona: 'normal' | 'dark'): string {
@@ -26,12 +26,66 @@ function mergeNote(persona: 'normal' | 'dark'): string {
     : base;
 }
 
+/** 음파 튕기기 안내 */
+function bounceNote(persona: 'normal' | 'dark'): string {
+  const base = '손가락으로 음파를 쏠 방향을 정하면 음파가 자동으로 나가서 벽에 튕기며 객석 관객을 깨요. 뒷줄(3층)일수록 응원이 커요. 곡마다 열기 목표를 채우면 250점씩, 곡이 끝나면 이펙터를 하나 골라 빌드를 키워요. 열기 점수 600 이상이면 성공이에요.';
+  return persona === 'dark'
+    ? `${base} 어둠은 음파를 삼키는 방음벽이 섞이고 관객이 단단한 대신 보상 ×${BALANCE.bounce.persona.dark.rewardMult}.`
+    : base;
+}
+
+/** 돌발 사고 막기 안내 */
+function defenseNote(persona: 'normal' | 'dark'): string {
+  const base = '위에서 내려오는 사고(하울링·낙하 소품·합선·난입 관객)를 스태프가 자동으로 막아요. 곡 사이에 사고 예보를 보고 직군(음향·무대·조명·안전)을 고용하고, 같은 직군·직급끼리 합쳐서 키워요. 사고를 직접 눌러 거들 수도 있어요. 곡마다 막은 비율만큼 250점씩, 열기 점수 600 이상이면 성공이에요.';
+  return persona === 'dark'
+    ? `${base} 어둠은 사고가 겹쳐서 나오고, 정전이 불을 꺼서 그 줄 스태프를 느리게 만드는 대신 보상 ×${BALANCE.defense.persona.dark.rewardMult}.`
+    : base;
+}
+
+/** 무대 서바이버 안내 */
+function survivorNote(persona: 'normal' | 'dark'): string {
+  const base = '손가락을 끌어 무대를 움직이며 몰려오는 파파라치 드론을 피해요. 조명과 빔은 자동으로 나가고, 쓰러뜨린 드론이 떨어뜨린 응원을 주워 곡마다 열기 목표를 채우면 250점씩이에요. 응원이 쌓여 레벨이 오르거나 곡이 끝나면 퍼크를 하나 골라요. 하트가 다 닳으면 거기서 끝나고, 열기 점수 600 이상이면 성공이에요.';
+  return persona === 'dark'
+    ? `${base} 어둠은 폭죽 탄막을 쏘는 엘리트 드론이 나오고 목표가 낮은 대신 보상 ×${BALANCE.survivor.persona.dark.rewardMult}.`
+    : base;
+}
+
+/** 월드투어 인크리멘탈 안내 */
+function prestigeNote(persona: 'normal' | 'dark'): string {
+  const base = '무대를 눌러 팬을 모으고, 팬으로 대륙 응원단을 사서 자동으로 팬이 늘게 해요. 곡이 끝나면 팬과 응원단이 리셋되는 대신 만든 팬만큼 별빛(영구 배율)을 얻고 영구 퍼크를 하나 골라요. 곡마다 만든 팬이 목표에 가까울수록 250점씩, 열기 점수 600 이상이면 성공이에요.';
+  return persona === 'dark'
+    ? `${base} 어둠은 비용이 비싸고 별빛 하나의 효과가 약하지만 목표가 낮고 보상 ×${BALANCE.prestige.persona.dark.rewardMult}.`
+    : base;
+}
+
 /** 모노사파런 안내: 공연장과 자아에 따라 목표 거리가 다르다 */
 function runNote(stage: StageId, persona: 'normal' | 'dark'): string {
   const goal = courseConfig(stage, persona).goalM.toLocaleString();
   return persona === 'dark'
     ? `달리면서 점점 빨라져요. ${goal}m를 완주하면 성공, 젤리를 많이 먹을수록 보상이 커져요. 어둠은 보상 ×${BALANCE.run.persona.dark.rewardMult}.`
     : `달리면서 점점 빨라져요. ${goal}m를 완주하면 성공, 젤리를 많이 먹을수록 보상이 커져요.`;
+}
+
+/** 직접 공연 종류에 맞는 안내 */
+function manualNote(stage: StageId, persona: 'normal' | 'dark'): string {
+  switch (manualGameOf(stage)) {
+    case 'run':
+      return runNote(stage, persona);
+    case 'blocks':
+      return blocksNote(persona);
+    case 'merge':
+      return mergeNote(persona);
+    case 'bounce':
+      return bounceNote(persona);
+    case 'defense':
+      return defenseNote(persona);
+    case 'survivor':
+      return survivorNote(persona);
+    case 'prestige':
+      return prestigeNote(persona);
+    default:
+      return persona === 'dark' ? `어둠은 판정이 더 좁은 대신 보상 ×${BALANCE.concert.personaRewardMult.dark}.` : '';
+  }
 }
 
 export function ConcertScreen() {
@@ -44,7 +98,7 @@ export function ConcertScreen() {
     <section className="screen" aria-label="공연">
       <h2 className="section-title">공연</h2>
       <p className="muted">
-        자동 공연은 기본 코인을 바로 받고 클리어로 인정돼요. 직접 공연(방구석은 마이크 타이밍, 지하 클럽은 모노사파런, 소형 공연장은 무대 세팅 블록, 단콘은 응원봉 머지 웨이브)은 더 많이 벌 수 있지만 필수는 아니에요. 공연 보상은 코인이고, 공연장을 처음 클리어하면 다이아도 받아요.
+        자동 공연은 기본 코인을 바로 받고 클리어로 인정돼요. 직접 공연(방구석은 마이크 타이밍, 지하 클럽은 모노사파런, 소형 공연장은 무대 세팅 블록, 단콘은 응원봉 머지 웨이브, 중형 공연장은 음파 튕기기)은 더 많이 벌 수 있지만 필수는 아니에요. 공연 보상은 코인이고, 공연장을 처음 클리어하면 다이아도 받아요.
       </p>
 
       {isTourComplete(g) && (
@@ -113,7 +167,7 @@ export function ConcertScreen() {
             </div>
             {st.canRun && (
               <small className="muted">
-                직접 공연 자아는 시작할 때 현재 자아({PERSONA_TEXT[persona].short})로 고정돼요. {manualGameOf(def.id) === 'run' ? runNote(def.id, persona) : manualGameOf(def.id) === 'blocks' ? blocksNote(persona) : manualGameOf(def.id) === 'merge' ? mergeNote(persona) : persona === 'dark' ? `어둠은 판정이 더 좁은 대신 보상 ×${BALANCE.concert.personaRewardMult.dark}.` : ''}
+                직접 공연 자아는 시작할 때 현재 자아({PERSONA_TEXT[persona].short})로 고정돼요. {manualNote(def.id, persona)}
               </small>
             )}
           </div>
