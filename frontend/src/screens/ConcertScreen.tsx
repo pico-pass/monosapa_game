@@ -1,11 +1,30 @@
 import { fmt, fmtCountdown } from '../components/format';
 import { PersonaBadge } from '../components/parts';
-import { BALANCE, STAGES, manualGameOf } from '../game/balance';
+import { BALANCE, STAGES, manualGameOf, type ManualGame } from '../game/balance';
 import { PERSONA_TEXT, STAGE_TEXT } from '../game/content';
 import { courseConfig } from '../game/runner';
 import { hiddenSecretStage, isTourComplete, stageStatus } from '../game/selectors';
 import type { StageId } from '../game/types';
 import { doAutoConcert, doSkipCooldown, setTourCardOpen, startManualConcert, useUi } from '../store/gameStore';
+
+/** 직접 공연 버튼에 붙는 게임 이름(마이크 타이밍은 따로 이름을 붙이지 않는다) */
+const GAME_LABEL: Partial<Record<ManualGame, string>> = { run: '모노사파런', blocks: '무대 세팅 블록', merge: '응원봉 머지 웨이브' };
+
+/** 무대 세팅 블록 안내 */
+function blocksNote(persona: 'normal' | 'dark'): string {
+  const base = '악기 블록을 끌어다 8×8 무대에 놓고 가로·세로 줄을 채워 합주를 터뜨려요. 곡이 바뀔 때마다 장비가 고장 나고(불량 칸), 놓을 곳이 없으면 스태프가 한 번 줄을 치워 줘요. 열기 점수 600 이상이면 성공이에요.';
+  return persona === 'dark'
+    ? `${base} 어둠은 던져진 물건이 더 많이 깔리고 어려운 블록이 일찍 나오고 성공선이 높은 대신 보상 ×${BALANCE.blocks.persona.dark.rewardMult}.`
+    : base;
+}
+
+/** 응원봉 머지 웨이브 안내 */
+function mergeNote(persona: 'normal' | 'dark'): string {
+  const base = '같은 색·같은 단계 응원봉이 3개 이상 붙으면 눌러서 한 단계 위로 합쳐요(5개 이상이면 두 단계). 곡마다 열기 목표를 채우면 250점씩, 곡이 끝나면 이펙터를 하나 골라 빌드를 키워요. 열기 점수 600 이상이면 성공이에요.';
+  return persona === 'dark'
+    ? `${base} 어둠은 야유꾼이 섞여 들어와 응원을 깎고 목표가 높은 대신 보상 ×${BALANCE.merge.persona.dark.rewardMult}.`
+    : base;
+}
 
 /** 모노사파런 안내: 공연장과 자아에 따라 목표 거리가 다르다 */
 function runNote(stage: StageId, persona: 'normal' | 'dark'): string {
@@ -25,7 +44,7 @@ export function ConcertScreen() {
     <section className="screen" aria-label="공연">
       <h2 className="section-title">공연</h2>
       <p className="muted">
-        자동 공연은 기본 코인을 바로 받고 클리어로 인정돼요. 직접 공연(방구석은 마이크 타이밍, 지하 클럽은 모노사파런)은 더 많이 벌 수 있지만 필수는 아니에요. 공연 보상은 코인이고, 공연장을 처음 클리어하면 다이아도 받아요.
+        자동 공연은 기본 코인을 바로 받고 클리어로 인정돼요. 직접 공연(방구석은 마이크 타이밍, 지하 클럽은 모노사파런, 소형 공연장은 무대 세팅 블록, 단콘은 응원봉 머지 웨이브)은 더 많이 벌 수 있지만 필수는 아니에요. 공연 보상은 코인이고, 공연장을 처음 클리어하면 다이아도 받아요.
       </p>
 
       {isTourComplete(g) && (
@@ -89,12 +108,12 @@ export function ConcertScreen() {
                 자동 공연
               </button>
               <button type="button" className="btn btn-accent" disabled={!st.canRun || busy} onClick={() => startManualConcert(def.id)}>
-                직접 공연{manualGameOf(def.id) === 'run' ? ' · 모노사파런' : ''} <PersonaBadge persona={persona} />
+                직접 공연{GAME_LABEL[manualGameOf(def.id)] ? ` · ${GAME_LABEL[manualGameOf(def.id)]}` : ''} <PersonaBadge persona={persona} />
               </button>
             </div>
             {st.canRun && (
               <small className="muted">
-                직접 공연 자아는 시작할 때 현재 자아({PERSONA_TEXT[persona].short})로 고정돼요. {manualGameOf(def.id) === 'run' ? runNote(def.id, persona) : persona === 'dark' ? `어둠은 판정이 더 좁은 대신 보상 ×${BALANCE.concert.personaRewardMult.dark}.` : ''}
+                직접 공연 자아는 시작할 때 현재 자아({PERSONA_TEXT[persona].short})로 고정돼요. {manualGameOf(def.id) === 'run' ? runNote(def.id, persona) : manualGameOf(def.id) === 'blocks' ? blocksNote(persona) : manualGameOf(def.id) === 'merge' ? mergeNote(persona) : persona === 'dark' ? `어둠은 판정이 더 좁은 대신 보상 ×${BALANCE.concert.personaRewardMult.dark}.` : ''}
               </small>
             )}
           </div>

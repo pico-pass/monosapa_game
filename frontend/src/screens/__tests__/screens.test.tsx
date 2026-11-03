@@ -261,6 +261,112 @@ describe('새 화면 렌더링', () => {
     expect(ruins).toContain('697.4m를 완주하면 성공');
   });
 
+  it('공연: 소형 공연장은 무대 세팅 블록으로 직접 공연한다', async () => {
+    const g = richState();
+    const normal = await render('concert', g);
+    expect(normal).toContain('직접 공연 · 무대 세팅 블록');
+    expect(normal).toContain('악기 블록을 끌어다 8×8 무대에 놓고');
+    expect(normal).toContain('스태프가 한 번 줄을 치워 줘요');
+    expect(normal).toContain('소형 공연장은 무대 세팅 블록');
+    const dark = await render('concert', { ...g, activePersona: 'dark' });
+    expect(dark).toContain('성공선이 높은 대신 보상 ×2');
+    // 방구석(마이크 타이밍)과 지하 클럽(모노사파런) 표시는 그대로
+    expect(normal).toContain('직접 공연 · 모노사파런');
+  });
+
+  it('무대 세팅 블록 전체화면과 결과 창', async () => {
+    const g = packState();
+    const loader = () => import('../ConcertStage');
+    const run = { id: 'h1', stageId: 'hall', persona: 'normal', game: 'blocks', difficulty: 1.57, taskGrowth: 1.25, status: 'running' };
+    const html = await renderNamed(loader, 'ConcertStage', 'concert', g, {}, { run });
+    for (const t of ['소형 공연장', '무대 세팅 블록', '열기 점수', '1곡 · 23초', '곡 점수 ×1', '무대 바닥', '블록 1 끌어서 놓기', '블록 2 끌어서 놓기', '블록 3 끌어서 놓기', '고장 난 장비 칸이 생기고', '공연 포기']) expect(html).toContain(t);
+    expect(html).toContain('stage-normal');
+    expect(html).toContain('블록을 끌어다 무대에 놓아 줄을 채워요'); // 카운트다운 안내
+    expect(html.split('role="gridcell"').length - 1).toBe(64);
+    expect(html).not.toContain('✖'); // 일반은 불량 칸 없이 시작한다
+    const dark = await renderNamed(loader, 'ConcertStage', 'concert', g, {}, { run: { ...run, persona: 'dark' } });
+    expect(dark).toContain('stage-dark');
+    expect(dark).toContain('던져진 물건 칸이 생기고');
+    expect(dark.split('✖').length - 1).toBe(3); // 어둠은 던져진 물건 3칸이 깔린 채 시작한다
+
+    const blocks = { lines: 21, pieces: 38, bestCombo: 6, perfects: 1, rescues: 1, seconds: 92, stuck: false };
+    const win = { stageId: 'hall', mode: 'manual', persona: 'normal', score: 812, coins: 2100, cleared: true, firstClear: true, firstClearCoins: 1200, diamonds: 15, blocks };
+    const done = await renderNamed(loader, 'ConcertStage', 'concert', g, { concertResult: win }, { run: { ...run, status: 'finished' } });
+    for (const t of ['공연 성공!', '812', '터뜨린 줄 21', '놓은 블록 38', '최고 콤보 6', '퍼펙트 1번', '스태프 정리 1번', '92초', '첫 클리어 보너스']) expect(done).toContain(t);
+    expect(done).not.toContain('보상 50%');
+    expect(done).not.toContain('중간에 끝났어요');
+
+    const lose = { ...win, score: 300, cleared: false, firstClear: false, firstClearCoins: 0, diamonds: 0, coins: 90, blocks: { ...blocks, perfects: 0, rescues: 0, stuck: true } };
+    const lost = await renderNamed(loader, 'ConcertStage', 'concert', g, { concertResult: lose }, { run: { ...run, status: 'finished' } });
+    expect(lost).toContain('아쉬운 공연…');
+    expect(lost).toContain('놓을 곳이 없어 중간에 끝났어요');
+    expect(lost).toContain('600점 미만이라 보상 50%');
+    expect(lost).not.toContain('퍼펙트');
+    expect(lost).not.toContain('스태프 정리');
+  });
+
+  it('블록 끌기: 손가락·마우스 위치에서 놓일 칸을 구한다', async () => {
+    const { anchorFor } = await import('../BlockStage');
+    const { PIECES } = await import('../../game/blocks');
+    const rect = { left: 100, top: 200, width: 400 }; // 한 칸 50px
+    const dot = PIECES[0];
+    const bar3 = PIECES.find((p) => p.w === 3 && p.h === 1)!;
+    // 칸 한가운데에 점 블록: 그 칸
+    expect(anchorFor(100 + 50 * 2 + 25, 200 + 50 * 3 + 25, rect, dot, 0)).toEqual({ row: 3, col: 2 });
+    // 가로 3칸 블록은 가운데 칸 위에 손가락을 두면 왼쪽 위가 한 칸 왼쪽이다
+    expect(anchorFor(100 + 50 * 4 + 25, 200 + 50 * 1 + 25, rect, bar3, 0)).toEqual({ row: 1, col: 3 });
+    // 터치는 손가락 위로 띄운 만큼 위쪽 칸에 놓인다
+    expect(anchorFor(100 + 25, 200 + 50 * 5 + 25, rect, dot, 2)).toEqual({ row: 3, col: 0 });
+    // 판 밖이면 음수나 8 이상이 나온다(놓을 수 없는 자리)
+    expect(anchorFor(0, 0, rect, dot, 0).col).toBeLessThan(0);
+    expect(anchorFor(9999, 9999, rect, dot, 0).row).toBeGreaterThanOrEqual(8);
+  });
+
+  it('공연: 단콘은 응원봉 머지 웨이브로 직접 공연한다', async () => {
+    const g = richState();
+    const normal = await render('concert', g);
+    expect(normal).toContain('직접 공연 · 응원봉 머지 웨이브');
+    expect(normal).toContain('같은 색·같은 단계 응원봉이 3개 이상 붙으면 눌러서 한 단계 위로 합쳐요');
+    expect(normal).toContain('단콘은 응원봉 머지 웨이브');
+    expect(normal).not.toContain('야유꾼이 섞여 들어와');
+    const dark = await render('concert', { ...g, activePersona: 'dark' });
+    expect(dark).toContain('야유꾼이 섞여 들어와 응원을 깎고 목표가 높은 대신 보상 ×2');
+    // 소형 공연장(무대 세팅 블록)·지하 클럽(모노사파런) 표시는 그대로
+    expect(normal).toContain('직접 공연 · 무대 세팅 블록');
+    expect(normal).toContain('직접 공연 · 모노사파런');
+  });
+
+  it('응원봉 머지 웨이브 전체화면과 결과 창', async () => {
+    const g = packState();
+    const loader = () => import('../ConcertStage');
+    const run = { id: 's1', stageId: 'solo', persona: 'normal', game: 'merge', difficulty: 1.7, taskGrowth: 1.25, status: 'running' };
+    const html = await renderNamed(loader, 'ConcertStage', 'concert', g, {}, { run });
+    for (const t of ['단콘', '응원봉 머지 웨이브', '열기 점수', '1곡 · 23초', '응원 파워 0 / 600', '무대 응원봉', '곡이 끝날 때마다 이펙터를 하나 골라요', '공연 포기', '같은 색·같은 단계 3개 이상이 붙은 응원봉을 눌러 합쳐요']) expect(html).toContain(t);
+    expect(html).toContain('stage-normal');
+    expect(html.split('role="gridcell"').length - 1).toBe(25);
+    expect(html).not.toContain('🗯 야유꾼');
+    const dark = await renderNamed(loader, 'ConcertStage', 'concert', g, {}, { run: { ...run, persona: 'dark' } });
+    expect(dark).toContain('stage-dark');
+    expect(dark).toContain('응원 파워 0 / 700');
+    expect(dark).toContain('야유꾼은 합칠 수 없고');
+
+    const merge = { merges: 58, bestChain: 2, bestCombo: 7, topLevel: 5, stars: 1, heckled: 0, waves: [100, 92, 85, 71], effects: { amp: 2, light: 0, chorus: 1, chain: 0, pair: 0 }, seconds: 92 };
+    const win = { stageId: 'solo', mode: 'manual', persona: 'normal', score: 812, coins: 2100, cleared: true, firstClear: true, firstClearCoins: 3000, diamonds: 20, merge };
+    const done = await renderNamed(loader, 'ConcertStage', 'concert', g, { concertResult: win }, { run: { ...run, status: 'finished' } });
+    for (const t of ['공연 성공!', '812', '합친 횟수 58', '최고 연쇄 2', '최고 콤보 7', '최고 단계 별', '별 응원봉 1번', '92초', '1곡 100% · 2곡 92% · 3곡 85% · 앙코르 71%', '이펙터 🔊앰프 ×2 · 🎶코러스', '첫 클리어 보너스']) expect(done).toContain(t);
+    expect(done).not.toContain('야유꾼 퇴치');
+    expect(done).not.toContain('보상 50%');
+
+    const lose = { ...win, score: 300, cleared: false, firstClear: false, firstClearCoins: 0, diamonds: 0, coins: 150, merge: { ...merge, topLevel: 3, stars: 0, heckled: 6, waves: [60, 40, 30, 20], effects: { amp: 0, light: 0, chorus: 0, chain: 0, pair: 0 } } };
+    const lost = await renderNamed(loader, 'ConcertStage', 'concert', g, { concertResult: lose }, { run: { ...run, status: 'finished' } });
+    expect(lost).toContain('아쉬운 공연…');
+    expect(lost).toContain('최고 단계 3');
+    expect(lost).toContain('야유꾼 퇴치 6명');
+    expect(lost).toContain('600점 미만이라 보상 50%');
+    expect(lost).not.toContain('별 응원봉');
+    expect(lost).not.toContain('이펙터 ');
+  });
+
   it('장비·작업실·도감도 새 필드와 함께 그려진다', async () => {
     const g = richState();
     expect(await render('equip', g)).toContain('오프라인 정산 확장');

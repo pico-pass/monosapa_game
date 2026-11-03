@@ -256,7 +256,8 @@ export interface ConcertOutcome {
 
 /**
  * 직접 공연 보상 = 기본 코인 × (1 + 점수/1000) × 자아 배율. 클리어하지 못하면 failRewardRate배.
- * 타이밍은 점수 600 이상이 클리어, 모노사파런은 완주가 클리어(cleared로 넘긴다). 어둠 배율은 타이밍 1.5, 모노사파런 4.
+ * 타이밍·무대 세팅 블록·응원봉 머지 웨이브는 점수 600 이상이 클리어, 모노사파런은 완주가 클리어(cleared로 넘긴다).
+ * 어둠 배율은 타이밍 1.5, 모노사파런 4, 무대 세팅 블록·응원봉 머지 웨이브 2.
  */
 export function manualConcertReward(
   baseCoins: number,
@@ -265,7 +266,12 @@ export function manualConcertReward(
   game: ManualGame = 'timing',
   cleared: boolean = score >= BALANCE.concert.clearScore,
 ): number {
-  const mult = game === 'run' ? BALANCE.run.persona[persona].rewardMult : BALANCE.concert.personaRewardMult[persona];
+  const mult =
+    game === 'run' ? BALANCE.run.persona[persona].rewardMult : game === 'blocks'
+      ? BALANCE.blocks.persona[persona].rewardMult
+      : game === 'merge'
+        ? BALANCE.merge.persona[persona].rewardMult
+        : BALANCE.concert.personaRewardMult[persona];
   const raw = baseCoins * (1 + score / 1000) * mult;
   return Math.floor(cleared ? raw : raw * BALANCE.concert.failRewardRate);
 }

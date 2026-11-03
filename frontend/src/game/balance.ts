@@ -297,6 +297,118 @@ export const BALANCE = {
     } as Partial<Record<StageId, Record<Persona, { goalM: number; lengthU: number; startSpeed: number; endSpeed: number }>>>,
   },
   /**
+   * 무대 세팅 블록 (소형 공연장의 직접 공연, 사용자 요청으로 추가, 원안에 없음). 수치는 모두 제안값이다.
+   *   8×8 무대 바닥에 악기 모양 블록 3개를 끌어다 놓는다(회전 없음). 가로·세로 한 줄이 가득 차면 합주가 터져서 줄이 사라지고 점수가 오른다.
+   *   손에 든 3개를 다 놓으면 새 3개를 받는다. 새 블록은 지금 바닥에 하나씩은 들어가는 것만 나온다(안 되면 작은 것으로 채운다).
+   *   공연은 곡 4개(마지막이 앙코르) × 곡당 sets[].ms 동안이다. 곡이 바뀔 때마다 무대 사고로 불량 칸이 brokenPerSet만큼 생기고(어둠은 시작할 때도 startBroken칸),
+   *   불량 칸은 채워진 칸으로 치지만 지우기 전에는 못 놓는다. 그 칸이 낀 줄이 터지면 같이 사라진다. 곡마다 점수 배율(mult)이 올라서 뒤 곡일수록 한 수가 값지다.
+   *   점수(점) = (놓은 칸 수 × placePoint + clearPoint × n(n+1)/2 × 콤보 배율) × 곡 배율. n은 한 번에 터뜨린 줄 수(가로+세로 합).
+   *   콤보 = 줄을 터뜨린 수가 이어진 횟수. 줄을 못 터뜨린 수가 comboGrace번 넘게 이어지면 끊기고, 배율 = 1 + comboStep × min(콤보 − 1, comboMax). 바닥이 통째로 비면 perfectBonus.
+   *   놓을 곳이 없으면(어느 블록도 안 들어가면) 스태프가 가장 찬 가로줄·세로줄을 치워 주고 새 블록을 준다(rescues번까지, 일반·어둠 모두 1번). 그 뒤에도 막히면 공연이 거기서 끝난다.
+   *   열기 점수(0~1000) = 1000 × min(1, 점수 ÷ target). 점수 600 이상이 클리어(concert.clearScore, 점수 = target × 0.6 이상). 어둠은 불량 칸이 많고 어려운 블록이 일찍 나오고 target이 높은 대신 보상이 2배다.
+   *   블록은 tiers 가중치로 뽑는다(tier 0 작은 것, 1 중간, 2 큰 것). 어둠은 같은 곡에서 한 단계 어려운 가중치를 쓴다.
+   *   봇 시뮬레이션(시드 300개, 휴리스틱으로 놓는 봇이 한 수에 걸리는 시간을 바꿔 가며): 한 수에 1.8초 걸리는 숙련 봇은 일반 96%·어둠 83% 클리어(열기 점수 평균 956·774),
+   *   2.5초는 일반 94%·어둠 41%(813·569), 3.5초에 실수가 섞이면 일반 20%·어둠 0%(517·372), 5초는 둘 다 0%, 아무 데나 놓는 봇은 일반 16%·어둠 0%, 가만히 있으면 0점.
+   *   한 판에 놓는 블록은 숙련 봇 기준 35~49개다. 사람의 실제 난이도는 측정하지 못했다.
+   */
+  blocks: {
+    size: 8,
+    hand: 3,
+    /** 곡마다 길이(ms)와 점수 배율. 마지막 곡이 앙코르다. */
+    sets: [
+      { ms: 23_000, mult: 1 },
+      { ms: 23_000, mult: 1.15 },
+      { ms: 23_000, mult: 1.3 },
+      { ms: 23_000, mult: 1.5 },
+    ],
+    placePoint: 1,
+    clearPoint: 10,
+    comboStep: 0.25,
+    comboMax: 4,
+    comboGrace: 2,
+    perfectBonus: 60,
+    /** 새 블록이 바닥에 하나씩 들어가는 조합을 찾는 시도 횟수 */
+    dealTries: 12,
+    persona: {
+      normal: {
+        startBroken: 0,
+        brokenPerSet: [0, 1, 1, 2],
+        tiers: [
+          [8, 2, 0],
+          [6, 4, 0],
+          [4, 5, 1],
+          [3, 5, 2],
+        ],
+        rescues: 1,
+        target: 480,
+        rewardMult: 1,
+      },
+      dark: {
+        startBroken: 3,
+        brokenPerSet: [0, 1, 2, 2],
+        tiers: [
+          [6, 4, 0],
+          [4, 5, 1],
+          [3, 5, 2],
+          [2, 5, 3],
+        ],
+        rescues: 1,
+        target: 750,
+        rewardMult: 2,
+      },
+    },
+  },
+  /**
+   * 응원봉 머지 웨이브 (단콘의 직접 공연, 사용자 요청으로 추가, 원안에 없음). 수치는 모두 제안값이다.
+   *   5×5 무대에 응원봉이 가득 있다. 색은 3가지, 단계는 1~4. 같은 색·같은 단계가 상하좌우로 minGroup개 이상 붙어 있으면 그중 하나를 탭해서 합친다:
+   *   탭한 칸에 한 단계 높은 응원봉이 생기고 나머지 칸은 비며, 빈 칸은 새 1단계 응원봉(무작위 색)으로 다시 채워진다. 4단계를 합치면 별 응원봉이 되어 터진다.
+   *   합칠 때 얻는 응원 파워 = power[합쳐서 나온 단계] × 묶음 크기 ÷ 3 × 콤보 배율 × 앰프 배율(+ 연쇄·야유 정리 보너스).
+   *   콤보: 직전 합치기에서 comboMs 안에 또 합치면 이어지고 배율 = 1 + comboStep × min(콤보 − 1, comboMax). 합칠 수 없는 곳을 탭하면 콤보가 끊긴다.
+   *   묶음이 jumpGroup(5)개 이상이면 한 단계가 아니라 두 단계를 뛰어오른다(예: 1단계 5개 → 3단계). 묶음이 클수록 얻는 파워도 커져서(크기 ÷ 3) 바로 누를지 더 키울지 고르게 된다.
+   *   연쇄: 합쳐서 생긴 응원봉이 같은 색·같은 단계 minGroup개 이상과 붙게 되면 저절로 이어서 합쳐지고(최대 chainMax번), k번째 연쇄는 파워 × (1 + chainStep × k)(체인 증폭기로 chainStep이 오른다).
+   *   공연은 곡 4개(마지막이 앙코르) × 곡당 waves[].ms. 곡마다 열기 목표(goals)가 있고, 그 곡에서 모은 응원 파워 ÷ 목표(1이 상한)만큼 waveScore점(곡당 250점)을 받는다.
+   *   곡이 끝나면 시간이 멈추고(앙코르 제외) 이펙터 offers개 중 하나를 고른다. 같은 이펙터를 또 고르면 겹쳐진다(작은 합창은 한 번만):
+   *     앰프(파워 +ampStep씩) · 조명(이후 곡마다 시간 +lightMs씩) · 코러스(새 응원봉이 chorusStep 확률로 2단계로 나옴) · 체인 증폭기(연쇄 보너스 chainStep +chainBoost씩) · 작은 합창(minGroup이 3 → 2, 3개 미만 묶음의 파워는 pairPower배).
+   *   합칠 수 있는 묶음이 하나도 없어지면 1단계 응원봉의 색을 다시 섞고, 그래도 없으면 이어진 세 칸을 1단계로 바꿔서 항상 한 수는 남게 한다.
+   *   어둠은 새로 채워질 때 야유꾼(🗯)이 섞여 나온다(곡마다 heckleChance, 판 위에 heckleMax명까지). 야유꾼은 합칠 수 없는 칸이고, 합친 묶음에 붙어 있으면 사라지며 heckleBonus 파워를 준다. 판 위에 야유꾼이 있는 동안은 합치기 파워가 한 명당 heckleDrain(7%)씩 줄어든다.
+   *   열기 점수(0~1000) = 곡별 waveScore 합. 600 이상이 클리어(concert.clearScore). 어둠은 목표가 높고 야유꾼이 끼는 대신 보상이 2배다.
+   *   봇 시뮬레이션(시드 200개, 가장 값진 묶음을 누르는 봇이 한 번 누르는 데 걸리는 시간을 바꿔 가며, 이펙터는 앰프·체인·코러스·조명·작은 합창 순으로 고름):
+   *     한 번에 1.2초 걸리는 숙련 봇은 일반·어둠 모두 100% 클리어(열기 점수 평균 939·924), 1.8초는 일반 98%·어둠 92%(806·720), 2.8초는 일반 33%·어둠 3%(546·419).
+   *     아무 묶음이나 1.8초마다 누르는 봇은 일반 74%·어둠 33%, 가만히 있으면 0점. 이펙터를 무작위로 골라도 1.8초 봇은 일반 98%·어둠 84%, 작은 합창을 먼저 고르면 일반 98%·어둠 65%라
+   *     어느 한 이펙터가 압도하지는 않는다. 한 판에 누르는 횟수는 숙련 봇 약 82회, 1.8초 봇 약 55회다.
+   *   사람의 실제 난이도는 측정하지 못했다.
+   */
+  merge: {
+    size: 5,
+    colors: 3,
+    maxLevel: 4,
+    minGroup: 3,
+    /** 이 수 이상 붙은 묶음을 합치면 한 단계가 아니라 두 단계를 뛰어오른다 */
+    jumpGroup: 5,
+    /** 합쳐서 나온 단계(2~5)별 기본 응원 파워. 5단계는 4단계를 합친 별 응원봉이 터질 때다. */
+    power: [0, 0, 10, 36, 130, 480],
+    comboMs: 2500,
+    comboStep: 0.1,
+    comboMax: 5,
+    chainStep: 0.5,
+    chainMax: 6,
+    waves: [{ ms: 23_000 }, { ms: 23_000 }, { ms: 23_000 }, { ms: 23_000 }],
+    waveScore: 250,
+    offers: 3,
+    effects: { ampStep: 0.2, lightMs: 3000, chorusStep: 0.25, chainBoost: 0.5, pairMin: 2, pairPower: 0.6 },
+    /** 이펙터 한도(겹쳐 고를 수 있는 횟수). 작은 합창은 한 번뿐이다. */
+    effectMax: { amp: 3, light: 3, chorus: 3, chain: 3, pair: 1 },
+    heckleBonus: 6,
+    /** 합치는 순간 판 위에 야유꾼이 한 명 있을 때마다 그 합치기 파워가 이만큼(비율) 줄어든다 */
+    heckleDrain: 0.07,
+    /** 합칠 수 있는 묶음이 없을 때 색을 다시 섞는 시도 횟수 */
+    reshuffleTries: 20,
+    persona: {
+      normal: { goals: [600, 470, 460, 460], heckleChance: [0, 0, 0, 0], heckleMax: 0, rewardMult: 1 },
+      dark: { goals: [700, 570, 640, 680], heckleChance: [0.06, 0.1, 0.14, 0.18], heckleMax: 5, rewardMult: 2 },
+    },
+  },
+  /**
    * 콘텐츠 팩 2(사용자 요청으로 추가, 원안에 없음). 아래 수치는 모두 제안값이고 설계는 docs/pack2-design.md에 있다.
    * 영구 보너스는 전부 "1에 더하는 비율"이라 가진 것이 없으면 기존 수치 그대로다.
    */
@@ -616,9 +728,15 @@ export const STAGES: readonly StageDef[] = [
 
 export const STAGE_IDS: readonly StageId[] = STAGES.map((s) => s.id);
 
+/**
+ * 임시: 팬 수·앞 공연장 클리어 조건 없이 입장할 수 있는 공연장. 새 직접 공연(소형 공연장 무대 세팅 블록, 단콘 응원봉 머지 웨이브)을 해 보려고 연다.
+ * 되돌릴 때는 배열을 비운다. (원래 조건: 소형 공연장 팬 1,200명 + 지하 클럽 클리어, 단콘 팬 3,000명 + 소형 공연장 클리어, 쿨다운·속성 조건은 그대로)
+ */
+export const TEMP_OPEN_STAGES: readonly StageId[] = ['hall', 'solo'];
+
 /** 직접 공연 종류. 적혀 있지 않은 공연장은 마이크 타이밍이다. */
-export type ManualGame = 'timing' | 'run';
-const STAGE_GAMES: Partial<Record<StageId, ManualGame>> = { club: 'run', ruins: 'run' };
+export type ManualGame = 'timing' | 'run' | 'blocks' | 'merge';
+const STAGE_GAMES: Partial<Record<StageId, ManualGame>> = { club: 'run', hall: 'blocks', solo: 'merge', ruins: 'run' };
 export const manualGameOf = (id: StageId): ManualGame => STAGE_GAMES[id] ?? 'timing';
 export const LAST_STAGE: StageId = STAGES[STAGES.length - 1].id;
 /** 일반 공연장의 마지막. 이걸 클리어하면 비밀 공연장이 열린다. */

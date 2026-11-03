@@ -724,9 +724,9 @@ describe('공연', () => {
   it('소형 공연장 이후 단콘→중형→중대형→대형→월클 순서로 열린다', () => {
     const order = ['hall', 'solo', 'medium', 'large', 'arena', 'world'] as const;
     expect(STAGES.filter((d) => !d.darkOnly).map((d) => d.id)).toEqual(['room', 'club', ...order]);
-    // 팬이 충분해도 앞 공연장을 클리어해야 열린다
+    // 팬이 충분해도 앞 공연장을 클리어해야 열린다 (소형 공연장·단콘은 TEMP_OPEN_STAGES 로 임시 개방 중이라 중형으로 확인)
     let s = fanned(1e6);
-    expect(stageStatus(s, 'solo').unlocked).toBe(false);
+    expect(stageStatus(s, 'medium').unlocked).toBe(false);
     for (const id of ['room', 'club', ...order] as const) {
       expect(stageStatus(s, id).unlocked).toBe(true);
       const r = runAutoConcert(s, id);
@@ -736,7 +736,7 @@ describe('공연', () => {
     }
     expect(s.concerts.world.cleared).toBe(true);
     // 팬 조건: 팬이 모자라면 열리지 않는다
-    expect(stageStatus({ ...fanned(2999), concerts: { ...fanned(2999).concerts, hall: { cleared: true, bestScore: 0, cooldownUntil: 0 } } }, 'solo').unlocked).toBe(false);
+    expect(stageStatus({ ...fanned(7999), concerts: { ...fanned(7999).concerts, solo: { cleared: true, bestScore: 0, cooldownUntil: 0 } } }, 'medium').unlocked).toBe(false);
     expect(stageDifficulty('world')).toBeCloseTo(1.3 * 1.1 ** 7, 9);
   });
 

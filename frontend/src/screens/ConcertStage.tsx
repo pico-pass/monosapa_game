@@ -23,6 +23,9 @@ import {
   type MinigameState,
 } from '../game/minigame';
 import type { ConcertRun } from '../game/commands';
+import { BlocksPlay } from './BlockStage';
+import { EFFECT_TEXT, MergePlay, SET_NAMES } from './MergeStage';
+import type { EffectId } from '../game/merge';
 import { RunPlay } from './RunStage';
 import {
   abandonManualConcert,
@@ -43,7 +46,17 @@ export function ConcertStage({ run }: { run: ConcertRun }) {
   const finished = run.status === 'finished' && result;
   return (
     <div className={`stage-overlay stage-${run.persona}`} role="dialog" aria-modal="true" aria-label={`${STAGE_TEXT[run.stageId].name} 직접 공연`}>
-      {finished ? <ResultPanel result={result} /> : run.game === 'run' ? <RunPlay key={run.id} run={run} /> : <Play key={run.id} run={run} />}
+      {finished ? (
+        <ResultPanel result={result} />
+      ) : run.game === 'run' ? (
+        <RunPlay key={run.id} run={run} />
+      ) : run.game === 'blocks' ? (
+        <BlocksPlay key={run.id} run={run} />
+      ) : run.game === 'merge' ? (
+        <MergePlay key={run.id} run={run} />
+      ) : (
+        <Play key={run.id} run={run} />
+      )}
     </div>
   );
 }
@@ -237,6 +250,8 @@ function Play({ run }: { run: ConcertRun }) {
 function ResultPanel({ result }: { result: ConcertResult }) {
   const t = result.tally;
   const r = result.run;
+  const b = result.blocks;
+  const m = result.merge;
   return (
     <div className="stage-result">
       <h2>{result.cleared ? (r ? '완주 성공!' : '공연 성공!') : r ? '아쉬운 질주…' : '아쉬운 공연…'}</h2>
@@ -253,6 +268,32 @@ function ResultPanel({ result }: { result: ConcertResult }) {
         <p className="muted">
           {r.distanceM.toLocaleString()} / {r.goalM.toLocaleString()}m · 젤리 {r.jellies}/{r.totalJellies} · 남은 하트 {r.heartsLeft} · {r.seconds}초
         </p>
+      )}
+      {b && (
+        <p className="muted">
+          터뜨린 줄 {b.lines} · 놓은 블록 {b.pieces} · 최고 콤보 {b.bestCombo}
+          {b.perfects > 0 && ` · 퍼펙트 ${b.perfects}번`}
+          {b.rescues > 0 && ` · 스태프 정리 ${b.rescues}번`} · {b.seconds}초{b.stuck && ' · 놓을 곳이 없어 중간에 끝났어요'}
+        </p>
+      )}
+      {m && (
+        <>
+          <p className="muted">
+            합친 횟수 {m.merges} · 최고 연쇄 {m.bestChain} · 최고 콤보 {m.bestCombo} · 최고 단계 {m.topLevel > BALANCE.merge.maxLevel ? '별' : m.topLevel}
+            {m.stars > 0 && ` · 별 응원봉 ${m.stars}번`}
+            {m.heckled > 0 && ` · 야유꾼 퇴치 ${m.heckled}명`} · {m.seconds}초
+          </p>
+          <p className="muted">열기 목표 {m.waves.map((w, i) => `${SET_NAMES[i]} ${w}%`).join(' · ')}</p>
+          {(Object.keys(m.effects) as EffectId[]).some((id) => m.effects[id] > 0) && (
+            <p className="muted">
+              이펙터{' '}
+              {(Object.keys(m.effects) as EffectId[])
+                .filter((id) => m.effects[id] > 0)
+                .map((id) => `${EFFECT_TEXT[id].icon}${EFFECT_TEXT[id].name}${m.effects[id] > 1 ? ` ×${m.effects[id]}` : ''}`)
+                .join(' · ')}
+            </p>
+          )}
+        </>
       )}
       <ul className="reward-list">
         <li>

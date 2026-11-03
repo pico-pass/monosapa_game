@@ -2460,6 +2460,424 @@ span.rar {
   pointer-events: none;
 }
 
+/* ---------- 무대 세팅 블록(소형 공연장 직접 공연) ---------- */
+.block-play {
+  --bc-1: #ff7aa8;
+  --bc-2: #ffb347;
+  --bc-3: #4fd1b5;
+  --bc-4: #a58bff;
+  --bc-5: #5aa9ff;
+}
+.stage-dark .block-play {
+  --bc-1: #ff4d88;
+  --bc-2: #ff9a3d;
+  --bc-3: #c04dff;
+  --bc-4: #5f6bff;
+  --bc-5: #3ddcc8;
+}
+.block-combo {
+  color: #ffe27a;
+}
+.block-meter {
+  position: relative;
+  height: 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.16);
+}
+.block-meter i {
+  display: block;
+  height: 100%;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #ffb35a, #ffe27a);
+}
+.block-meter b {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: #fff;
+}
+.block-field {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  align-self: center;
+  padding: 6px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.38);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.block-board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 2px;
+  aspect-ratio: 1;
+  border-radius: 8px;
+}
+.block-flash {
+  animation: block-glow 0.35s ease-out;
+}
+@keyframes block-glow {
+  from {
+    box-shadow: 0 0 0 3px #ffe27a, 0 0 22px #ffe27a;
+  }
+  to {
+    box-shadow: 0 0 0 0 transparent, 0 0 0 transparent;
+  }
+}
+.bc {
+  display: block;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  font-style: normal;
+}
+.block-board .bc {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+}
+.bc-1 {
+  background: var(--bc-1);
+}
+.bc-2 {
+  background: var(--bc-2);
+}
+.bc-3 {
+  background: var(--bc-3);
+}
+.bc-4 {
+  background: var(--bc-4);
+}
+.bc-5 {
+  background: var(--bc-5);
+}
+.bc-x {
+  background: #2a2a33;
+  border: 1px dashed rgba(255, 255, 255, 0.35);
+}
+.block-board .gh-ok {
+  background: rgba(255, 255, 255, 0.5);
+}
+.block-board .gh-bad {
+  background: rgba(255, 70, 100, 0.45);
+}
+.block-board .will-clear {
+  box-shadow: inset 0 0 0 2px #ffe27a;
+  filter: brightness(1.35);
+}
+.block-piece {
+  display: grid;
+  gap: 2px;
+}
+.block-hand {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  max-width: 440px;
+  align-self: center;
+}
+.block-slot {
+  flex: 1;
+  min-width: 0;
+  height: 112px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.block-slot:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+.block-slot.is-dragging {
+  opacity: 0.35;
+}
+.block-drag {
+  position: fixed;
+  z-index: 90;
+  pointer-events: none;
+  opacity: 0.88;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5));
+}
+.block-pop {
+  position: absolute;
+  top: 40%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 28px;
+  font-weight: 900;
+  color: #ffe27a;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  animation: judge-pop 0.9s ease-out forwards;
+}
+.block-banner {
+  position: absolute;
+  top: 3%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+  animation: judge-pop 1.3s ease-out forwards;
+}
+.block-banner-good {
+  color: #5ad7a6;
+}
+.block-banner-bad {
+  color: #ff6b8f;
+}
+.block-hint {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* ---------- 응원봉 머지 웨이브(단콘 직접 공연) ---------- */
+.merge-play {
+  --mc-1: #ff6fa5;
+  --mc-2: #5aa9ff;
+  --mc-3: #ffd24a;
+}
+.stage-dark .merge-play {
+  --mc-1: #ff3d8b;
+  --mc-2: #9a6bff;
+  --mc-3: #ff9a3d;
+}
+.merge-combo {
+  color: #ffe27a;
+}
+.merge-meter {
+  height: 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.16);
+  overflow: hidden;
+}
+.merge-meter i {
+  display: block;
+  height: 100%;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #ffb35a, #ffe27a);
+}
+.merge-power {
+  margin-top: -6px;
+  font-size: 12px;
+  text-align: right;
+  color: #cfc8ee;
+}
+.merge-field {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  align-self: center;
+  padding: 8px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.38);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.merge-board {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  aspect-ratio: 1;
+}
+.mc {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.07);
+  color: inherit;
+  font-size: 26px;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.mc:disabled {
+  opacity: 1;
+  cursor: default;
+}
+.mc b {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 15px;
+  color: rgba(0, 0, 0, 0.65);
+  background: var(--tok, #fff);
+}
+.mc-c1 {
+  --tok: var(--mc-1);
+}
+.mc-c2 {
+  --tok: var(--mc-2);
+}
+.mc-c3 {
+  --tok: var(--mc-3);
+}
+.mc-l1 b {
+  width: 46%;
+  height: 46%;
+}
+.mc-l2 b {
+  width: 60%;
+  height: 60%;
+}
+.mc-l3 b {
+  width: 74%;
+  height: 74%;
+  box-shadow: 0 0 10px var(--tok);
+}
+.mc-l4 b {
+  width: 88%;
+  height: 88%;
+  font-size: 18px;
+  box-shadow: 0 0 16px var(--tok), inset 0 0 0 3px rgba(255, 255, 255, 0.7);
+}
+.mc.can {
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.55);
+  animation: merge-ping 1.4s ease-in-out infinite;
+}
+@keyframes merge-ping {
+  50% {
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.15);
+  }
+}
+.mc-heckler {
+  background: rgba(0, 0, 0, 0.4);
+}
+.mc-miss {
+  animation: merge-shake 0.3s;
+}
+@keyframes merge-shake {
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+.merge-pop {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-size: 22px;
+  font-weight: 900;
+  white-space: nowrap;
+  color: #ffe27a;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+  animation: merge-float 0.9s ease-out forwards;
+}
+@keyframes merge-float {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -150%);
+  }
+}
+.merge-banner {
+  position: absolute;
+  top: 2%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+  animation: judge-pop 1.3s ease-out forwards;
+}
+.merge-banner-good {
+  color: #5ad7a6;
+}
+.merge-banner-bad {
+  color: #ff6b8f;
+}
+.merge-pick {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(10, 8, 24, 0.92);
+  text-align: center;
+}
+.merge-pick h3,
+.merge-pick p {
+  margin: 0;
+}
+.merge-offers {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.merge-offer {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  grid-template-rows: auto auto auto;
+  column-gap: 10px;
+  align-items: center;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  cursor: pointer;
+}
+.merge-offer-icon {
+  grid-row: 1 / 4;
+  font-size: 28px;
+  text-align: center;
+}
+.merge-offer small {
+  color: #cfc8ee;
+}
+.merge-effects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  font-size: 12.5px;
+}
+.merge-effect {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+}
+.merge-hint {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
 /* ---------- 콘텐츠 팩 2: 챌린지·차트·결산·샘플러 ---------- */
 .ch-theme {
   align-items: stretch;

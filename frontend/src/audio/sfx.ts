@@ -173,6 +173,19 @@ export const sfx = {
     else if (j === 'good') play([{ freq: 880, dur: 0.1, type: 'triangle', gain: 0.08 }]);
     else play([{ freq: 150, dur: 0.12, type: 'square', gain: 0.04 }]);
   },
+  /** 무대 세팅 블록: 블록을 놓는 소리 */
+  place() {
+    play([{ freq: 330, slideTo: 247, dur: 0.07, type: 'triangle', gain: 0.07 }]);
+  },
+  /** 줄이 터지는 소리. 한 번에 많이 터뜨릴수록(lines) 음이 더 올라간다. */
+  clear(lines: number) {
+    const base = 523 * 2 ** (Math.min(lines, 4) / 12 * 2);
+    play([
+      { freq: base, dur: 0.08, type: 'triangle', gain: 0.08 },
+      { freq: base * 1.26, dur: 0.08, at: 0.06, type: 'triangle', gain: 0.08 },
+      { freq: base * 1.5, dur: 0.14, at: 0.12, type: 'triangle', gain: 0.08 },
+    ]);
+  },
   jump(second: boolean) {
     play([{ freq: second ? 620 : 440, slideTo: second ? 980 : 760, dur: 0.12, type: 'triangle', gain: 0.07 }]);
   },

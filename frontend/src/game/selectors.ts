@@ -1,4 +1,4 @@
-import { BALANCE, SECRET_STAGE_IDS, STAGES, STREAM_PLATFORMS, TOUR_STAGE, WORLD_STAGE, type AchievementMetric, type MissionMetric } from './balance';
+import { BALANCE, SECRET_STAGE_IDS, STAGES, STREAM_PLATFORMS, TEMP_OPEN_STAGES, TOUR_STAGE, WORLD_STAGE, type AchievementMetric, type MissionMetric } from './balance';
 import { albumSeries, singleTitle, type AlbumDef } from './content';
 import { bonuses, completedSets, mascotStage, photoDistinct, songCardOf, type BonusState } from './packdata';
 import type { Album, AlbumType, CostumeId, CounterKey, DiamondUpgradeKind, Equipment, EquipmentKind, GameState, Persona, StageId, Streaming } from './types';
@@ -513,8 +513,9 @@ export function stageStatus(s: GameState, id: StageId, at: number = s.lastSettle
   const idx = STAGES.findIndex((x) => x.id === id);
   const def = STAGES[idx];
   const rec = s.concerts[id];
-  const previousCleared = idx === 0 ? true : s.concerts[STAGES[idx - 1].id].cleared;
-  const fansOk = s.fans >= def.fans;
+  const tempOpen = TEMP_OPEN_STAGES.includes(id);
+  const previousCleared = tempOpen || idx === 0 ? true : s.concerts[STAGES[idx - 1].id].cleared;
+  const fansOk = tempOpen || s.fans >= def.fans;
   const unlocked = fansOk && previousCleared;
   const cooldownLeftMs = Math.max(0, rec.cooldownUntil - at);
   const darkOnly = !!def.darkOnly;
