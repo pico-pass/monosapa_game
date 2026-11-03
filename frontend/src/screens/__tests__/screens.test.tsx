@@ -3,7 +3,7 @@ import { createElement } from 'react';
 import { renderToString } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PET_GROWN_STAGE, petImage, ASSETS } from '../../assets';
-import { STAGES } from '../../game/balance';
+import { BALANCE, STAGES } from '../../game/balance';
 import { albumDefById, albumSeries } from '../../game/content';
 import { createInitialState } from '../../game/persistence';
 import type { GameState, Mail, Single } from '../../game/types';
@@ -341,13 +341,13 @@ describe('새 화면 렌더링', () => {
     const loader = () => import('../ConcertStage');
     const run = { id: 's1', stageId: 'solo', persona: 'normal', game: 'merge', difficulty: 1.7, taskGrowth: 1.25, status: 'running' };
     const html = await renderNamed(loader, 'ConcertStage', 'concert', g, {}, { run });
-    for (const t of ['단콘', '응원봉 머지 웨이브', '열기 점수', '1곡 · 23초', '응원 파워 0 / 600', '무대 응원봉', '곡이 끝날 때마다 이펙터를 하나 골라요', '공연 포기', '같은 색·같은 단계 3개 이상이 붙은 응원봉을 눌러 합쳐요']) expect(html).toContain(t);
+    for (const t of ['단콘', '응원봉 머지 웨이브', '열기 점수', '1곡 · 23초', `응원 파워 0 / ${BALANCE.merge.persona.normal.goals[0]}`, '무대 응원봉', '곡이 끝날 때마다 이펙터를 하나 골라요', '공연 포기', '같은 색·같은 단계 3개 이상이 붙은 응원봉을 눌러 합쳐요']) expect(html).toContain(t);
     expect(html).toContain('stage-normal');
     expect(html.split('role="gridcell"').length - 1).toBe(25);
     expect(html).not.toContain('🗯 야유꾼');
     const dark = await renderNamed(loader, 'ConcertStage', 'concert', g, {}, { run: { ...run, persona: 'dark' } });
     expect(dark).toContain('stage-dark');
-    expect(dark).toContain('응원 파워 0 / 700');
+    expect(dark).toContain(`응원 파워 0 / ${BALANCE.merge.persona.dark.goals[0]}`);
     expect(dark).toContain('야유꾼은 합칠 수 없고');
 
     const merge = { merges: 58, bestChain: 2, bestCombo: 7, topLevel: 5, stars: 1, heckled: 0, waves: [100, 92, 85, 71], effects: { amp: 2, light: 0, chorus: 1, chain: 0, pair: 0 }, seconds: 92 };
