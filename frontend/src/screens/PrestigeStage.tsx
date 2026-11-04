@@ -228,7 +228,7 @@ export function PrestigePlay({ run }: { run: ConcertRun }) {
           <button
             type="button"
             className="prestige-golden"
-            style={{ left: `${golden.x * 100}%`, top: `${golden.y * 100}%` }}
+            style={{ left: `clamp(34px, ${golden.x * 100}%, calc(100% - 34px))`, top: `clamp(34px, ${golden.y * 100}%, calc(100% - 34px))` }}
             onPointerDown={(e) => {
               e.preventDefault();
               e.stopPropagation();

@@ -3226,7 +3226,8 @@ span.rar {
   justify-content: center;
   gap: 4px;
   width: 100%;
-  height: 210px;
+  /* 작은 폰에서도 응원단 목록이 한 화면에 같이 보이도록 화면 높이에 맞춰 줄인다 */
+  height: clamp(150px, 28dvh, 210px);
   border: 0;
   background: radial-gradient(circle at 50% 45%, rgba(111, 183, 255, 0.28), rgba(0, 0, 0, 0) 70%);
   color: #fff;
@@ -3237,7 +3238,7 @@ span.rar {
   transform: scale(0.9);
 }
 .prestige-globe {
-  font-size: 84px;
+  font-size: clamp(60px, 11dvh, 84px);
   line-height: 1;
   transition: transform 0.06s;
 }
@@ -3309,6 +3310,47 @@ span.rar {
 }
 .prestige-item-up {
   border-color: rgba(181, 140, 255, 0.6);
+}
+.prestige-item strong,
+.prestige-item small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* 좁은 폰: 칸이 반쪽(150px 안팎)이라 이름 칸이 너무 좁아 글자가 넘치므로 가격을 아래 줄로 내린다 */
+@media (max-width: 420px) {
+  .prestige-item {
+    grid-template-columns: 24px 1fr;
+  }
+  .prestige-item > span {
+    grid-row: 1 / 4;
+  }
+  .prestige-item b {
+    grid-column: 2;
+    grid-row: auto;
+  }
+}
+/* 영구 퍼크 고르기는 높이가 고정된 탭 영역 안에 두면 잘려서, 화면 전체를 덮고 넘치면 스크롤되게 한다 */
+.prestige-pick {
+  position: fixed;
+  inset: 0;
+  align-items: center;
+  justify-content: flex-start;
+  overflow-y: auto;
+  padding: calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
+  border-radius: 0;
+}
+.prestige-pick::before,
+.prestige-pick::after {
+  content: '';
+  flex: 1 0 0;
+}
+.prestige-pick > * {
+  flex: none;
+  width: 100%;
+  max-width: 448px;
+}
+.prestige-field .countdown {
+  font-size: 72px;
 }
 
 /* ---------- 돌발 사고 막기(중대형 공연장 직접 공연). 진행바·알림·안내 글은 응원봉 머지 웨이브와 같은 규칙을 쓴다 ---------- */
