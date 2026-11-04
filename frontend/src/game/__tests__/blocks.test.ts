@@ -497,10 +497,10 @@ describe('소형 공연장 직접 공연 연결', () => {
     expect(st.previousCleared).toBe(true);
     expect(st.canRun).toBe(true);
     expect(beginManualConcert(s, 'hall', 'h1').ok).toBe(true);
-    // 단콘도 같이 열려 있고, 나머지 공연장은 원래 조건 그대로
-    expect(stageStatus(s, 'solo').canRun).toBe(true);
+    // 단콘~월클도 같이 열려 있고, 지하 클럽과 월클 뒤의 비밀 공연장은 원래 조건 그대로
+    for (const id of ['solo', 'medium', 'large', 'arena', 'world'] as const) expect(stageStatus(s, id).canRun).toBe(true);
     expect(stageStatus(s, 'club').unlocked).toBe(false);
-    expect(stageStatus(s, 'medium').unlocked).toBe(false);
+    expect(stageStatus(s, 'rooftop').unlocked).toBe(false);
   });
 
   it('보상: 어둠은 2배, 클리어하지 못하면 절반', () => {

@@ -1043,10 +1043,12 @@ export const STAGES: readonly StageDef[] = [
 export const STAGE_IDS: readonly StageId[] = STAGES.map((s) => s.id);
 
 /**
- * 임시: 팬 수·앞 공연장 클리어 조건 없이 입장할 수 있는 공연장. 새 직접 공연(소형 공연장 무대 세팅 블록, 단콘 응원봉 머지 웨이브)을 해 보려고 연다.
- * 되돌릴 때는 배열을 비운다. (원래 조건: 소형 공연장 팬 1,200명 + 지하 클럽 클리어, 단콘 팬 3,000명 + 소형 공연장 클리어, 쿨다운·속성 조건은 그대로)
+ * 임시: 팬 수·앞 공연장 클리어 조건 없이 입장할 수 있는 공연장. 새 직접 공연(소형 공연장 무대 세팅 블록, 단콘 응원봉 머지 웨이브, 중형 음파 튕기기,
+ * 중대형 돌발 사고 막기, 대형 무대 서바이버, 월클 월드투어 인크리멘탈)을 해 보려고 연다.
+ * 되돌릴 때는 배열을 비운다. (원래 조건: 소형 공연장 팬 1,200명 + 지하 클럽 클리어, 단콘 팬 3,000명 + 소형 공연장 클리어, 중형 팬 8,000명,
+ * 중대형 20,000명, 대형 50,000명, 월클 150,000명 + 각각 바로 앞 공연장 클리어, 쿨다운·속성 조건은 그대로. 월클 뒤의 비밀 공연장은 이 목록과 상관없이 월클 클리어가 필요하다)
  */
-export const TEMP_OPEN_STAGES: readonly StageId[] = ['hall', 'solo'];
+export const TEMP_OPEN_STAGES: readonly StageId[] = ['hall', 'solo', 'medium', 'large', 'arena', 'world'];
 
 /** 직접 공연 종류. 적혀 있지 않은 공연장은 마이크 타이밍이다. */
 export type ManualGame = 'timing' | 'run' | 'blocks' | 'merge' | 'bounce' | 'defense' | 'survivor' | 'prestige';
