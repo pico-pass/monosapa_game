@@ -38,6 +38,7 @@ backend는 Nest CLI가 TypeScript 6 API를 쓰므로 backend 안에 typescript@6
   - `persistence.ts` 저장 검증·백업. (파일 내보내기·불러오기·초기화는 없다. 진행 데이터는 계정 DB로만 오간다.) 손상 저장은 자동으로 덮어쓰지 않는다.
 - `frontend/src/store/gameStore.ts` — 엔진과 UI를 잇는 외부 스토어(tick, 저장, 말풍선, 모달 상태). 로그인 전에는 게임을 시작하지 않고, 로컬 저장 키는 계정 ID 접두사로 나뉜다.
 - `frontend/src/platform/cloudSave.ts` — 계정 저장 동기화. 로컬(localStorage)에 먼저 저장하고 10초 간격으로(탭 숨김·닫힘은 즉시) 서버에 올린다. 시작할 때 서버 저장과 맞추고, 서버가 더 새로우면(버전 불일치) 서버 저장을 따른다.
+- `frontend/src/platform/updateCheck.ts` — 시작할 때 서버의 index.html 번들 해시와 열린 화면의 것을 비교해 다르면 한 번 새로고침한다(nginx 가 index.html 에 캐시 헤더를 안 줘서 배포가 늦게 반영될 수 있다). `platform/api.ts`는 읽기(GET) 요청을 실패하면 한 번 더 보낸다.
 - `frontend/src/screens/`, `frontend/src/components/` — UI. 규칙 계산은 `game/selectors.ts`를 통해서만.
 - `frontend/src/assets/index.ts` — 이미지·효과음 교체 매니페스트. `frontend/src/audio/` — 합성 효과음, `track.ts`(리듬 음원 곡 재생·AudioContext 시계, 판정이 이 시계를 따라간다).
 - 화면 렌더 횟수로 재화를 더하지 않는다. 항상 실제 경과 시간을 엔진에 넣는다.

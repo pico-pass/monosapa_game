@@ -9,7 +9,8 @@ export class ApiError extends Error {
   }
 }
 
-const TIMEOUT_MS = 8000;
+// 도메인 DNS 에 응답 없는 주소가 섞이면 새 연결이 7.5초 뒤에야 맺어지는 일이 있어 8초는 빠듯하다.
+const TIMEOUT_MS = 12000;
 
 function messageOf(data: unknown): string | null {
   if (typeof data !== 'object' || data === null) return null;
@@ -21,12 +22,15 @@ function messageOf(data: unknown): string | null {
 
 export async function api<T = void>(path: string, opts: { method?: 'GET' | 'POST' | 'DELETE'; body?: unknown } = {}): Promise<T> {
   const { method = 'GET', body } = opts;
-  const res = await fetch(`/api/${path}`, {
-    method,
-    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-  });
+  const send = () =>
+    fetch(`/api/${path}`, {
+      method,
+      headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  // 읽기만 하는 요청은 네트워크가 끊기거나 시간이 지났을 때 한 번 더 시도한다. (보내기·삭제는 두 번 실행될 수 있어 다시 하지 않는다.)
+  const res = method === 'GET' ? await send().catch(() => send()) : await send();
   if (res.status === 204) return undefined as T;
   const data: unknown = await res.json().catch(() => null);
   if (!res.ok) {

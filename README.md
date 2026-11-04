@@ -118,7 +118,7 @@ frontend/src/game/        게임 규칙(순수 TS, React 비의존): balance · 
                           리듬 rhythm · 생존 survival · 가사 덱 lyricdeck · 계단 tower(+보스전 towerbattle) · 피켓팅 ticketing · 결산 wrapped · 서버 보상 반영 serverRewards · 저장 검증 pack-state/parse
 frontend/src/store/       엔진과 UI를 잇는 스토어(tick, 저장, 말풍선, 모달 상태)
 frontend/src/screens/     작업실 · 발매 · 장비 · 공연(+직접 공연 화면) · 더보기(상점 · 미션 · 업적 · 팬 DM · 모노그램 · 수집 · 아케이드(+전체화면 게임 4종) · 챌린지 · 차트 · 결산 · 샘플러 · 챗방 · 문의함 · 통계 · 랭킹 · 도감) · 설정
-frontend/src/platform/    계정 저장 동기화(cloudSave) · 탭 잠금 · 서버 API 호출(api) · 샘플러 기기 저장(sampler) · 결산 공유 카드(shareCard)
+frontend/src/platform/    계정 저장 동기화(cloudSave) · 탭 잠금 · 서버 API 호출(api, 읽기 요청은 실패하면 한 번 더) · 배포 후 옛 화면 새로고침(updateCheck) · 샘플러 기기 저장(sampler) · 결산 공유 카드(shareCard)
 frontend/src/components/  SVG 작업실/캐릭터, 게이지, 작업 패드, 모달
 frontend/src/audio/       합성 효과음 + 자아별 배경음악(bgm.ts)
 frontend/src/assets/      이미지·효과음 교체 매니페스트
