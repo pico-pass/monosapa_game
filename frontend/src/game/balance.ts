@@ -973,6 +973,40 @@ export const BALANCE = {
     present: { intervalMs: 6 * 3600_000, coinSecs: 300, diamondChance: 0.1, minCoins: 20 },
   },
   /**
+   * 모노사파 육성(콘텐츠 팩 3): 마스코트와는 따로, 자아마다 모노사파 본체를 돌본다. 팬 unlockFans명부터 열린다.
+   *   게이지 넷(포만감·기분(어둠은 쾌락지수)·피로도·청결도, 0~100)은 시간이 지나면 변한다. awake 값은 깨어 있을 때의 시간당 변화이고,
+   *   자는 동안은 포만감·기분·청결의 변화가 sleep.decayFactor배로 느려지고 피로도는 시간당 sleep.restPerHour씩 내려간다.
+   *   게이지가 나빠져도 죽지는 않는다. 대신 컨디션(포만감·기분·청결도·100−피로도의 평균)이 낮을수록 성장도가 적게 쌓인다(efficiency).
+   *   행동: 일반은 밥주기·놀아주기·씻겨주기·잠자기. 어둠은 알코올 8단계·놀기 11단계(NURTURE_ACTIONS)·씻겨주기·잠자기이고, 어둠은 밥 대신 술이 포만감을 조금 채운다.
+   *   행동 한 번 = 코인(그 자아의 인세 costSecs초 분량, 최소 minCoins) 지불 + 게이지 변화 + 성장도(xp × 컨디션 배율).
+   *   주 게이지(밥주기=포만감, 놀아주기·술·놀기=기분, 씻겨주기=청결도)가 needBelow보다 높으면 아직 필요 없어서 할 수 없고, 놀거나 마실 때 피로도가 tooTired보다 높으면 못 한다.
+   *   어둠의 술·놀기는 단계마다 레벨로 열리고(unlockLevel), 이미 열린 더 센 단계가 있으면 낮은 단계의 쾌락·성장도가 내성만큼 줄어든다(tolerance).
+   *   레벨은 성장도 합계로 정한다: 레벨 L → L+1에 ceil(levelXp.base × levelXp.growth^(L−1)). 레벨 효과는 그 자아의 라임 생산 +perLevel.rhyme/레벨,
+   *   인세 +perLevel.coin/레벨이고, milestones의 레벨마다 일반은 팬 획득, 어둠은 공연·계단 전투력이 더 붙는다. diamonds.every레벨마다 다이아를 준다.
+   */
+  nurture: {
+    unlockFans: 80_000,
+    maxLevel: 40,
+    levelXp: { base: 40, growth: 1.1 },
+    perLevel: { rhyme: 0.01, coin: 0.008 },
+    milestones: {
+      normal: { vibe: 'fan', steps: [{ level: 10, value: 0.02 }, { level: 20, value: 0.02 }, { level: 30, value: 0.03 }, { level: 40, value: 0.03 }] },
+      dark: { vibe: 'power', steps: [{ level: 10, value: 0.02 }, { level: 20, value: 0.02 }, { level: 30, value: 0.03 }, { level: 40, value: 0.03 }] },
+    } as Record<Persona, { vibe: 'fan' | 'power'; steps: { level: number; value: number }[] }>,
+    diamonds: { every: 5, amount: 3 },
+    gauge: { max: 100, start: { full: 60, mood: 60, tired: 20, clean: 60 } },
+    awake: {
+      normal: { full: -7, mood: -6, tired: 4, clean: -3.5 },
+      dark: { full: -6, mood: -8, tired: 4, clean: -3.5 },
+    } as Record<Persona, Record<'full' | 'mood' | 'tired' | 'clean', number>>,
+    sleep: { ms: 2 * 3600_000, restPerHour: 50, decayFactor: 0.3, minTired: 25 },
+    needBelow: 80,
+    tooTired: 85,
+    efficiency: { min: 0.3, max: 1.2 },
+    tolerance: { perTier: 0.85, min: 0.35 },
+    minCoins: 50,
+  },
+  /**
    * 아케이드 공통: 점수(0~1000)로 등급을 정하고(grades 이상이 S·A·B, 미만은 C) 등급별로 보상한다.
    *   코인 = max(minCoins, ceil(현재 인세/초 × coinSecs[등급])), 팬 = ceil(팬 × fansPct[등급])
    *   다이아는 그 대상(곡·게임)에서 A·S 등급에 처음 닿을 때 한 번(firstDiamonds).
@@ -1341,6 +1375,81 @@ export const LYRIC_CARDS: readonly LyricCardDef[] = [
 ];
 export const lyricCardById = (id: string): LyricCardDef | undefined => LYRIC_CARDS.find((c) => c.id === id);
 export const LYRIC_CARD_IDS: readonly string[] = LYRIC_CARDS.map((c) => c.id);
+
+/* ---------- 모노사파 육성 행동 ---------- */
+
+export type NurtureKind = 'feed' | 'play' | 'wash' | 'sleep' | 'drink' | 'fun';
+
+export interface NurtureActionDef {
+  /** 일반은 `n-`, 어둠은 `d-`로 시작한다. 문구는 content.ts의 NURTURE_TEXT에서 ID로 찾는다. */
+  id: string;
+  persona: Persona;
+  kind: NurtureKind;
+  /** 술·놀기의 단계(1부터). 나머지는 0 */
+  tier: number;
+  /** 이 레벨부터 할 수 있다 */
+  unlockLevel: number;
+  /** 지불하는 코인 = 그 자아의 인세/초 × costSecs (0이면 무료) */
+  costSecs: number;
+  /** 게이지 변화량(0~100 안에서 자른다). tired는 오르면 더 지친 것이다. */
+  full: number;
+  mood: number;
+  tired: number;
+  clean: number;
+  /** 성장도(컨디션 배율 곱하기 전) */
+  xp: number;
+}
+
+const care = (id: string, persona: Persona, kind: NurtureKind, costSecs: number, d: Partial<Record<'full' | 'mood' | 'tired' | 'clean', number>>, xp: number): NurtureActionDef => ({
+  id, persona, kind, tier: 0, unlockLevel: 1, costSecs, full: d.full ?? 0, mood: d.mood ?? 0, tired: d.tired ?? 0, clean: d.clean ?? 0, xp,
+});
+
+/** 어둠속성 사다리 한 칸: [레벨, 코인(초), 포만감, 쾌락, 피로, 청결, 성장도] */
+type Rung = readonly [number, number, number, number, number, number, number];
+const ladder = (kind: 'drink' | 'fun', ids: readonly string[], rungs: readonly Rung[]): NurtureActionDef[] =>
+  rungs.map(([unlockLevel, costSecs, full, mood, tired, clean, xp], i) => ({ id: ids[i], persona: 'dark', kind, tier: i + 1, unlockLevel, costSecs, full, mood, tired, clean, xp }));
+
+/** 알코올: 카스레몬 → 테라 → 새로 → 참이슬 → 참이슬(빨뚜) → 양주 → 고량주(96°) → 퍼플드링크. 셀수록 포만감은 덜 차고 쾌락·피로가 크다. */
+const DRINKS: readonly Rung[] = [
+  [1, 15, 18, 14, 3, -1, 16],
+  [3, 25, 20, 17, 4, -1, 22],
+  [6, 40, 14, 21, 6, -2, 29],
+  [10, 60, 12, 25, 8, -2, 38],
+  [15, 90, 10, 29, 10, -3, 49],
+  [20, 140, 8, 34, 13, -3, 62],
+  [26, 210, 6, 40, 16, -4, 78],
+  [32, 320, 4, 46, 20, -5, 96],
+];
+/** 놀기: 디스코팡팡 → 클럽 → 떡치기 → 오디 → 떨 → 브액 → LSD → 캔디 → PCP → 펜타닐 → 아이스 (약 이름은 모두 가상의 게임 속 이름이다). */
+const FUNS: readonly Rung[] = [
+  [1, 25, -4, 22, 8, -3, 20],
+  [3, 40, -6, 28, 11, -5, 27],
+  [5, 60, -8, 34, 15, -8, 35],
+  [8, 90, -10, 40, 19, -10, 45],
+  [11, 130, -12, 46, 23, -12, 57],
+  [15, 190, -14, 52, 27, -14, 71],
+  [19, 280, -16, 58, 31, -16, 87],
+  [23, 400, -18, 64, 36, -18, 105],
+  [28, 600, -20, 70, 41, -20, 125],
+  [33, 900, -22, 76, 47, -22, 148],
+  [38, 1400, -24, 84, 54, -25, 175],
+];
+export const DRINK_IDS: readonly string[] = DRINKS.map((_, i) => `d-drink${i + 1}`);
+export const FUN_IDS: readonly string[] = FUNS.map((_, i) => `d-fun${i + 1}`);
+
+export const NURTURE_ACTIONS: readonly NurtureActionDef[] = [
+  care('n-feed', 'normal', 'feed', 60, { full: 35, mood: 3, clean: -5 }, 20),
+  care('n-play', 'normal', 'play', 0, { mood: 30, full: -8, tired: 15, clean: -8 }, 24),
+  care('n-wash', 'normal', 'wash', 30, { clean: 50, mood: -3 }, 14),
+  care('n-sleep', 'normal', 'sleep', 0, {}, 12),
+  ...ladder('drink', DRINK_IDS, DRINKS),
+  ...ladder('fun', FUN_IDS, FUNS),
+  care('d-wash', 'dark', 'wash', 30, { clean: 50, mood: -4 }, 14),
+  care('d-sleep', 'dark', 'sleep', 0, {}, 12),
+];
+export const nurtureActionById = (id: string): NurtureActionDef | undefined => NURTURE_ACTIONS.find((a) => a.id === id);
+export const nurtureActionsOf = (persona: Persona): NurtureActionDef[] => NURTURE_ACTIONS.filter((a) => a.persona === persona);
+export const NURTURE_ACTION_IDS: readonly string[] = NURTURE_ACTIONS.map((a) => a.id);
 
 /* ---------- 미션 ---------- */
 

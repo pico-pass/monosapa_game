@@ -1,4 +1,5 @@
 import { BALANCE, CARD_RARITIES, FEAT_NPCS, PHOTO_GRADES, PHOTO_SETS, featDefById, photoCardId, type FeatDef } from './balance';
+import { nurtureBonus } from './nurturedata';
 import { mulberry32 } from './runner';
 import { mix } from './streaming';
 import type { CardRarity, GameState, Mascot, Persona, Single, SongCards, Vibe } from './types';
@@ -114,8 +115,10 @@ export const mascotBonus = (m: Mascot, at: number): number => BALANCE.mascot.sta
 export interface Bonuses {
   /** 라임 생산(자아별) */
   rhyme: Record<Persona, number>;
-  /** 인세 */
+  /** 인세 (모든 자아) */
   coin: number;
+  /** 인세 (그 자아만): 모노사파 육성 레벨 */
+  coinBy: Record<Persona, number>;
   /** 싱글·앨범·모노그램 팬 획득 */
   fan: number;
   /** 미니게임·계단 전투력 */
@@ -124,11 +127,11 @@ export interface Bonuses {
   offlineMs: number;
 }
 
-export type BonusState = Pick<GameState, 'cards' | 'photo' | 'feat' | 'mascot' | 'singles' | 'lastSettledAt'>;
+export type BonusState = Pick<GameState, 'cards' | 'photo' | 'feat' | 'mascot' | 'nurture' | 'singles' | 'lastSettledAt'>;
 
 /** 수집품이 주는 영구 보너스. 아무것도 없으면 전부 0이라 곱하는 쪽은 ×1이다. 마스코트 기분은 lastSettledAt 시점 기준이다. */
 export function bonuses(s: BonusState): Bonuses {
-  const b: Bonuses = { rhyme: { normal: 0, dark: 0 }, coin: 0, fan: 0, power: 0, offlineMs: 0 };
+  const b: Bonuses = { rhyme: { normal: 0, dark: 0 }, coin: 0, coinBy: { normal: 0, dark: 0 }, fan: 0, power: 0, offlineMs: 0 };
   const add = (vibe: Vibe, v: number, persona?: Persona) => {
     if (vibe === 'rhyme') {
       if (persona) b.rhyme[persona] += v;
@@ -157,6 +160,13 @@ export function bonuses(s: BonusState): Bonuses {
       for (const v of VIBES) add(v, sb.value);
     } else add(sb.kind, sb.value);
   }
-  for (const p of ['normal', 'dark'] as const) b.rhyme[p] += mascotBonus(s.mascot[p], s.lastSettledAt);
+  for (const p of ['normal', 'dark'] as const) {
+    b.rhyme[p] += mascotBonus(s.mascot[p], s.lastSettledAt);
+    // 모노사파 육성 레벨: 그 자아의 라임·인세, 이정표 레벨은 일반이 팬 획득, 어둠이 전투력
+    const n = nurtureBonus(p, s.nurture[p].xp);
+    b.rhyme[p] += n.rhyme;
+    b.coinBy[p] += n.coin;
+    b[n.vibe] += n.extra;
+  }
   return b;
 }

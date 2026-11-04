@@ -4414,3 +4414,155 @@ span.rar {
   font-size: 12.5px;
   line-height: 1.5;
 }
+
+/* ---------- 모노사파 육성 ---------- */
+.nurture-normal {
+  --accent: #7b6cf6;
+  --accent2: #5aaee8;
+}
+.nurture-dark {
+  --accent: #ff2e5f;
+  --accent2: #b45cff;
+}
+.nurture-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.nurture-face {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  font-size: 38px;
+  border-radius: 50%;
+  background: var(--panel-soft);
+  border: 2px solid var(--accent);
+}
+.nurture-asleep {
+  filter: saturate(0.6);
+}
+.nurture-line {
+  margin: 0 0 2px;
+  font-weight: 700;
+}
+.nurture-bonus {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.nurture-gauges {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.nurture-gauge {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr) 30px;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.nurture-gauge-label {
+  white-space: nowrap;
+}
+.nurture-gauge-num {
+  text-align: right;
+}
+.nurture-gauge-full .progress-fill {
+  background: linear-gradient(90deg, #f6b94b, #ff8a3d);
+}
+.nurture-gauge-mood .progress-fill {
+  background: linear-gradient(90deg, #ff7eb6, var(--accent));
+}
+.nurture-gauge-tired .progress-fill {
+  background: linear-gradient(90deg, #5aaee8, #7b6cf6);
+}
+.nurture-gauge-clean .progress-fill {
+  background: linear-gradient(90deg, #5ad0d6, #3a9be8);
+}
+.nurture-bad .progress {
+  border-color: var(--danger);
+}
+.nurture-bad .progress-fill {
+  background: var(--danger);
+}
+.nurture-bad .nurture-gauge-num {
+  color: var(--danger);
+}
+.nurture-sleep {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--panel-soft);
+  font-weight: 700;
+}
+.nurture-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.nurture-ladder h4 {
+  margin: 4px 0;
+  font-size: 14px;
+}
+.nurture-rungs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.nurture-act {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  grid-template-areas: 'icon name' 'icon meta';
+  align-items: center;
+  column-gap: 8px;
+  min-height: 52px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-soft);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.nurture-act:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.nurture-act:not(:disabled):active {
+  transform: scale(0.98);
+}
+.nurture-act-icon {
+  grid-area: icon;
+  font-size: 22px;
+  text-align: center;
+}
+.nurture-act-name {
+  grid-area: name;
+  font-weight: 700;
+}
+.nurture-act-meta {
+  grid-area: meta;
+  font-size: 12px;
+  color: var(--muted);
+}
+.nurture-locked {
+  border-style: dashed;
+}
+.nurture-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--danger);
+  vertical-align: middle;
+}

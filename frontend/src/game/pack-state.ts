@@ -1,8 +1,9 @@
-import { BALANCE, FEAT_IDS, FEAT_LEGACY_IDS, LYRIC_CARD_IDS, PHOTO_SETS, lyricCardById } from './balance';
+import { BALANCE, FEAT_IDS, FEAT_LEGACY_IDS, LYRIC_CARD_IDS, PHOTO_SETS, lyricCardById, nurtureActionById } from './balance';
 import { bool, countMap, int, isObj, num, MAX_TIME, bad, type Obj } from './parse';
+import { emptyNurtureSide } from './nurturedata';
 import { isPhotoCard } from './packdata';
 import { streamSeedFrom } from './streaming';
-import type { Arcade, ArcadeRecord, Featuring, Mascot, Mascots, PhotoBook, SongCards, Stats } from './types';
+import type { Arcade, ArcadeRecord, Featuring, Mascot, Mascots, NurtureSide, Nurtures, Persona, PhotoBook, SongCards, Stats } from './types';
 
 /* 콘텐츠 팩 2 상태의 초기값과 저장 검증. 나중에 추가된 필드라 없는 예전 저장은 기본값으로 읽는다. */
 
@@ -11,6 +12,7 @@ export const emptyPhoto = (seed: number): PhotoBook => ({ seed, pulls: 0, pity: 
 export const emptyFeat = (seed: number): Featuring => ({ seed, pulls: 0, pity: 0, guaranteed: false, owned: {}, slots: [] });
 export const emptyMascot = (): Mascot => ({ xp: 0, fullUntil: 0, playReadyAt: 0, giftReadyAt: 0, fed: 0 });
 export const emptyMascots = (): Mascots => ({ normal: emptyMascot(), dark: emptyMascot() });
+export const emptyNurtures = (): Nurtures => ({ normal: emptyNurtureSide(), dark: emptyNurtureSide() });
 const emptyRecord = (): ArcadeRecord => ({ cooldownUntil: 0, best: 0, plays: 0 });
 export const emptyArcade = (): Arcade => ({
   rhythm: { ...emptyRecord(), songs: {} },
@@ -89,6 +91,31 @@ export function parseMascots(raw: unknown): Mascots {
   if (raw === undefined) return emptyMascots();
   if (!isObj(raw)) return bad('mascot이 올바르지 않습니다.');
   return { normal: parseMascot(raw.normal, 'mascot.normal'), dark: parseMascot(raw.dark, 'mascot.dark') };
+}
+
+function parseNurtureSide(raw: unknown, who: Persona, label: string): NurtureSide {
+  if (raw === undefined) return emptyNurtureSide();
+  if (!isObj(raw)) return bad(`${label}이 올바르지 않습니다.`);
+  const max = BALANCE.nurture.gauge.max;
+  const at = num(raw, 'at', 0, MAX_TIME, `${label}.at`);
+  const sleepUntil = num(raw, 'sleepUntil', 0, MAX_TIME, `${label}.sleepUntil`);
+  return {
+    xp: int(raw, 'xp', 0, BIG, `${label}.xp`),
+    full: num(raw, 'full', 0, max, `${label}.full`),
+    mood: num(raw, 'mood', 0, max, `${label}.mood`),
+    tired: num(raw, 'tired', 0, max, `${label}.tired`),
+    clean: num(raw, 'clean', 0, max, `${label}.clean`),
+    at,
+    // 자는 시간은 한 번에 sleep.ms까지라, 기록 시각보다 그 이상 먼 값은 고쳐진 저장이다
+    sleepUntil: at > 0 ? Math.min(sleepUntil, at + BALANCE.nurture.sleep.ms) : 0,
+    uses: countMap(raw.uses, (id) => nurtureActionById(id)?.persona === who, BIG, `${label}.uses`),
+  };
+}
+
+export function parseNurtures(raw: unknown): Nurtures {
+  if (raw === undefined) return emptyNurtures();
+  if (!isObj(raw)) return bad('nurture가 올바르지 않습니다.');
+  return { normal: parseNurtureSide(raw.normal, 'normal', 'nurture.normal'), dark: parseNurtureSide(raw.dark, 'dark', 'nurture.dark') };
 }
 
 function parseRecord(raw: unknown, label: string): ArcadeRecord {

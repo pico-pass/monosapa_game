@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "sim": "tsx scripts/simulate.ts"
+    "sim": "tsx scripts/simulate.ts",
+    "sim:nurture": "tsx scripts/nurture-sim.ts"
   },
   "dependencies": {
     "react": "^19.3.1",

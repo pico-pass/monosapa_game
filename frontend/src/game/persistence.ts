@@ -4,7 +4,7 @@ import { emptyFanMail } from './fanmail';
 import { emptyMissions } from './missions';
 import { emptyMonogram } from './monogram';
 import { Invalid, MAX_TIME, bad, bool, int, isObj, num, persona, str, type Obj } from './parse';
-import { emptyArcade, emptyCards, emptyFeat, emptyMascots, emptyPhoto, emptyStats, packSeeds, parseArcade, parseCards, parseFeat, parseMascots, parsePhoto, parseStats } from './pack-state';
+import { emptyArcade, emptyCards, emptyFeat, emptyMascots, emptyNurtures, emptyPhoto, emptyStats, packSeeds, parseArcade, parseCards, parseFeat, parseMascots, parseNurtures, parsePhoto, parseStats } from './pack-state';
 import { retroactiveDiamonds } from './selectors';
 import { streamSeedFrom, zeroTotals } from './streaming';
 import { COUNTER_KEYS, zeroCounters } from './tracking';
@@ -78,6 +78,7 @@ export function createInitialState(now: number, reducedMotion = false): GameStat
     photo: emptyPhoto(packSeeds(now).photo),
     feat: emptyFeat(packSeeds(now).feat),
     mascot: emptyMascots(),
+    nurture: emptyNurtures(),
     arcade: emptyArcade(),
     stats: emptyStats(),
     // 첫 정산은 시작 후 정산 간격이 지나야 한다.
@@ -376,6 +377,7 @@ export function validateState(input: unknown): Validation {
     const photo = parsePhoto(o.photo, seeds.photo);
     const feat = parseFeat(o.feat, seeds.feat);
     const mascot = parseMascots(o.mascot);
+    const nurture = parseNurtures(o.nurture);
     const arcade = parseArcade(o.arcade, singleIdSet);
     const stats = parseStats(o.stats);
 
@@ -411,6 +413,7 @@ export function validateState(input: unknown): Validation {
       photo,
       feat,
       mascot,
+      nurture,
       arcade,
       stats,
       streaming,

@@ -181,6 +181,28 @@ export interface Mascot {
 }
 export type Mascots = Record<Persona, Mascot>;
 
+/* ---------- 모노사파 육성 ---------- */
+
+/** 육성 게이지 네 가지. mood는 일반속성에서는 「기분」, 어둠속성에서는 「쾌락지수」다. tired는 높을수록 지친 것이다. */
+export type NurtureGauge = 'full' | 'mood' | 'tired' | 'clean';
+
+/** 자아 하나의 육성 상태. 게이지 값은 `at` 시각의 값이고, 지금 값은 시간이 흐른 만큼 계산한다(nurturedata.ts). */
+export interface NurtureSide {
+  /** 성장도. 레벨은 여기서 계산한다. */
+  xp: number;
+  full: number;
+  mood: number;
+  tired: number;
+  clean: number;
+  /** 게이지 값이 기록된 시각. 0이면 아직 한 번도 돌보지 않아 시간이 흐르지 않은 처음 값이다. */
+  at: number;
+  /** 이 시각까지 자는 중이다(지났으면 깨어 있음). */
+  sleepUntil: number;
+  /** 행동별로 해 준 횟수 (행동 ID → 횟수) */
+  uses: Record<string, number>;
+}
+export type Nurtures = Record<Persona, NurtureSide>;
+
 /* ---------- 아케이드 ---------- */
 
 export type ArcadeKind = 'rhythm' | 'survival' | 'lyric' | 'ticketing';
@@ -316,6 +338,7 @@ export interface GameState {
   photo: PhotoBook;
   feat: Featuring;
   mascot: Mascots;
+  nurture: Nurtures;
   arcade: Arcade;
   stats: Stats;
   /** 음원 플랫폼별 스트리밍 기록과 정산 상태 */
@@ -374,7 +397,14 @@ export type FailReason =
   | 'no_ticket'
   | 'need_duplicate'
   | 'full_slots'
-  | 'too_few_cards';
+  | 'too_few_cards'
+  // 모노사파 육성
+  | 'nurture_locked'
+  | 'level_low'
+  | 'sleeping'
+  | 'gauge_high'
+  | 'too_tired'
+  | 'not_sleepy';
 
 export type Fail = { ok: false; reason: FailReason; state: GameState };
 export type Ok<T = object> = { ok: true; state: GameState } & T;

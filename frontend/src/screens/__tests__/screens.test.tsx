@@ -46,6 +46,7 @@ async function render(tab: TabId, game: GameState): Promise<string> {
     studio: () => import('../StudioScreen'),
     stats: () => import('../StatsScreen'),
     release: () => import('../ReleaseScreen'),
+    nurture: () => import('../NurtureScreen'),
   };
   const mod = await screens[tab]();
   const Screen = Object.values(mod).find((v) => typeof v === 'function') as () => React.ReactElement;
@@ -844,5 +845,37 @@ describe('콘텐츠 팩 2 화면', () => {
     expect(await renderNamed(loader, 'TowerBoard', 'ranking', g, {}, { best: 0 })).toContain('한 층이라도 깨면 순위에 올라요');
     const arcade = await renderNamed(() => import('../ArcadeScreen'), 'ArcadeScreen', 'arcade', g);
     expect(arcade).toContain('계단 랭킹 보러 가기');
+  });
+});
+
+describe('모노사파 육성 화면', () => {
+  const open = (patch: Partial<GameState> = {}): GameState => ({ ...richState(), fans: BALANCE.nurture.unlockFans, ...patch });
+
+  it('팬이 모자라면 잠금 안내와 남은 조건을 보여 준다', async () => {
+    const html = await render('nurture', open({ fans: 5000 }));
+    expect(html).toContain('팬 80.0K명부터 열려요');
+    expect(html).not.toContain('밥주기');
+  });
+
+  it('일반: 게이지 네 가지와 행동 네 가지가 나온다', async () => {
+    const html = await render('nurture', open({ activePersona: 'normal' }));
+    for (const w of ['포만감', '기분', '피로도', '청결도', '밥주기', '놀아주기', '씻겨주기', '잠자기', 'Lv 1']) expect(html, w).toContain(w);
+    expect(html).not.toContain('카스레몬');
+  });
+
+  it('어둠: 쾌락지수 게이지와 술 8단계·놀기 11단계가 레벨 잠금과 함께 나온다', async () => {
+    const html = await render('nurture', open({ activePersona: 'dark' }));
+    for (const w of ['쾌락지수', '카스레몬', '테라', '새로', '참이슬(빨뚜)', '양주', '고량주(96°)', '퍼플드링크', '디스코팡팡', '클럽', '떡치기', '오디', '브액', 'LSD', '캔디', 'PCP', '펜타닐', '아이스', 'Lv 38']) {
+      expect(html, w).toContain(w);
+    }
+    expect(html).not.toContain('밥주기');
+  });
+
+  it('자는 중에는 남은 시간과 깨우기가 보이고, 하단 더보기에 육성 항목이 있다', async () => {
+    const g = open({ activePersona: 'normal', nurture: { ...open().nurture, normal: { ...open().nurture.normal, at: T0, sleepUntil: T0 + 3600_000 } }, lastSettledAt: T0 });
+    const html = await render('nurture', g);
+    expect(html).toContain('자는 중');
+    expect(html).toContain('깨우기');
+    expect(await render('more', g)).toContain('모노사파 육성');
   });
 });

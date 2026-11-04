@@ -825,7 +825,7 @@ describe('저장 검증(나중에 추가된 필드)', () => {
 describe('더보기 알림', () => {
   it('출석·받을 미션·DM·수확할 게시물을 센다', () => {
     const s = rollMissions(at(base({ singles: single(1), fans: 100 }), T0));
-    expect(moreAlerts(s)).toEqual({ missions: 1, mail: 0, monogram: 0, collect: 0, total: 1 }); // 출석만
+    expect(moreAlerts(s)).toEqual({ missions: 1, mail: 0, monogram: 0, collect: 0, nurture: 0, total: 1 }); // 출석만
     const a = claimAttendance(s);
     if (!a.ok) throw new Error('attend failed');
     expect(moreAlerts(a.state).total).toBe(0);
@@ -834,6 +834,6 @@ describe('더보기 알림', () => {
     const posted = startPost(withMail, 'lyric');
     if (!posted.ok) throw new Error('post failed');
     const done = at(posted.state, posted.post.endsAt);
-    expect(moreAlerts(done)).toEqual({ missions: 1, mail: 1, monogram: 1, collect: 0, total: 3 });
+    expect(moreAlerts(done)).toEqual({ missions: 1, mail: 1, monogram: 1, collect: 0, nurture: 0, total: 3 });
   });
 });

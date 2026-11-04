@@ -30,6 +30,7 @@ import { evaluateAchievements, setTitle } from '../game/achievements';
 import { featPull, toggleFeat, type FeatPullResult } from '../game/featuring';
 import { addLyricCard, draftChoices, trimLyricCard } from '../game/lyricdeck';
 import { claimPresent, feedMascot, giftMascot, playMascot } from '../game/mascot';
+import { nurtureAct, nurtureWake } from '../game/nurture';
 import { buyTickets, craftPhoto, dismantlePhoto, giveCard, photoPull, takeCard, type PhotoPullResult } from '../game/photocards';
 import { applyChallengeClaim, applyChallengePosted, applyChartClaim } from '../game/serverRewards';
 import { remasterCard, toggleDeck } from '../game/songcards';
@@ -105,9 +106,10 @@ export type TabId =
   | 'challenge'
   | 'chart'
   | 'wrapped'
-  | 'sampler';
+  | 'sampler'
+  | 'nurture';
 /** 하단 탭의 「더보기」 안에 있는 화면들 */
-export const MORE_TABS: readonly TabId[] = ['stats', 'ranking', 'collection', 'shop', 'missions', 'achievements', 'mail', 'monogram', 'chat', 'inquiry', 'collect', 'arcade', 'challenge', 'chart', 'wrapped', 'sampler'];
+export const MORE_TABS: readonly TabId[] = ['stats', 'ranking', 'collection', 'shop', 'missions', 'achievements', 'mail', 'monogram', 'chat', 'inquiry', 'collect', 'nurture', 'arcade', 'challenge', 'chart', 'wrapped', 'sampler'];
 export type Phase = 'booting' | 'ready' | 'readonly' | 'corrupt';
 
 export interface Bubble {
@@ -241,6 +243,12 @@ const FAIL_TEXT: Record<FailReason, string> = {
   need_duplicate: '중복으로 가진 카드만 쓸 수 있어요.',
   full_slots: '자리가 가득 찼어요.',
   too_few_cards: '덱은 이보다 줄일 수 없어요.',
+  nurture_locked: '팬 8만 명부터 열려요.',
+  level_low: '아직 레벨이 모자라요.',
+  sleeping: '지금은 자고 있어요. 깨우거나 기다려 주세요.',
+  gauge_high: '아직 필요 없어요. 수치가 내려가면 다시 해 주세요.',
+  too_tired: '너무 지쳐서 못 해요. 먼저 재워 주세요.',
+  not_sleepy: '아직 졸리지 않아요.',
 };
 
 /* ---------- 런타임(저장하지 않는) 변수 ---------- */
@@ -1010,6 +1018,29 @@ export function doClaimPresent(persona: Persona): void {
   if (!r.ok) return failToast(r.reason);
   sfx.buy();
   toast(`🎁 마스코트의 선물 🪙 +${fmt(r.coins)}${r.diamonds > 0 ? ` · 💎 +${r.diamonds}` : ''}`, 'good');
+  saveNow();
+}
+
+/** 모노사파 육성: 돌보기 한 번. 성장도·레벨업을 알려 준다. */
+export function doNurture(persona: Persona, actionId: string): void {
+  const r = exec((s) => nurtureAct(s, persona, actionId));
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  sfx.mascot();
+  if (r.levelTo > r.levelFrom) {
+    sfx.unlock();
+    toast(`🎉 ${persona === 'normal' ? '일반' : '어둠'} 육성 Lv ${r.levelTo}!${r.diamonds > 0 ? ` · 💎 +${r.diamonds}` : ''}`, 'good');
+  } else {
+    toast(`성장도 +${r.xp}`, 'info');
+  }
+  saveNow();
+}
+
+export function doNurtureWake(persona: Persona): void {
+  const r = exec((s) => nurtureWake(s, persona));
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  sfx.mascot();
   saveNow();
 }
 

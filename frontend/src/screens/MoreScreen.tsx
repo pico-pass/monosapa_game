@@ -1,13 +1,14 @@
 import { moreAlerts } from '../game/alerts';
 import { setTab, useUi, type TabId } from '../store/gameStore';
 
-const ITEMS: { id: TabId; icon: string; name: string; desc: string; alert?: 'missions' | 'mail' | 'monogram' | 'collect' }[] = [
+const ITEMS: { id: TabId; icon: string; name: string; desc: string; alert?: 'missions' | 'mail' | 'monogram' | 'collect' | 'nurture' }[] = [
   { id: 'shop', icon: '🛒', name: '상점', desc: '간식·홍보 캠페인·테마' },
   { id: 'missions', icon: '📅', name: '미션·출석', desc: '일일·주간 미션 보상', alert: 'missions' },
   { id: 'achievements', icon: '🏅', name: '업적·칭호', desc: '달성하고 칭호를 달아요' },
   { id: 'mail', icon: '💌', name: '팬 DM', desc: '응원·공감·안티 메시지', alert: 'mail' },
   { id: 'monogram', icon: '📸', name: '모노그램', desc: '게시물로 팬을 모아요', alert: 'monogram' },
   { id: 'collect', icon: '🃏', name: '수집', desc: '곡 카드·포토카드·피처링·마스코트', alert: 'collect' },
+  { id: 'nurture', icon: '🍼', name: '모노사파 육성', desc: '밥·놀이·술로 키우고 레벨로 강해져요', alert: 'nurture' },
   { id: 'arcade', icon: '🎮', name: '아케이드', desc: '리듬·생존·가사 덱·계단·피켓팅' },
   { id: 'challenge', icon: '#️⃣', name: '해시태그 챌린지', desc: '주간 주제로 한 줄 가사' },
   { id: 'chart', icon: '📈', name: '음원 차트', desc: '실시간 TOP100과 순위 보상' },

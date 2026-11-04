@@ -1031,6 +1031,58 @@ export const MOOD_TEXT: Record<'happy' | 'hungry' | 'sulk', { name: string; line
   sulk: { name: '삐짐', line: '등을 돌리고 앉았어요. 간식을 주면 풀려요. (보너스 없음)' },
 };
 
+/* ---------- 모노사파 육성 ---------- */
+
+export const NURTURE_TEXT: Record<Persona, { title: string; moodName: string; moodIcon: string }> = {
+  normal: { title: '일반속성 모노사파', moodName: '기분', moodIcon: '😊' },
+  dark: { title: '어둠속성 모노사파', moodName: '쾌락지수', moodIcon: '🌀' },
+};
+
+/** 행동별 이름·아이콘·한 줄. 키는 balance.ts의 NURTURE_ACTIONS ID. 약 이름은 모두 가상의 게임 속 이름이다. */
+export const NURTURE_ACTION_TEXT: Record<string, { name: string; icon: string; line: string }> = {
+  'n-feed': { name: '밥주기', icon: '🍚', line: '따끈한 밥 한 공기. 먹는 게 남는 거예요.' },
+  'n-play': { name: '놀아주기', icon: '🎈', line: '같이 뛰어놀면 기분이 올라가요. 대신 지쳐요.' },
+  'n-wash': { name: '씻겨주기', icon: '🛁', line: '뽀득뽀득. 물은 싫어하지만 개운해해요.' },
+  'n-sleep': { name: '잠자기', icon: '😴', line: '두 시간쯤 푹 자요. 자는 동안은 아무것도 줄지 않아요.' },
+  'd-wash': { name: '씻겨주기', icon: '🚿', line: '어젯밤의 흔적을 박박 지워요.' },
+  'd-sleep': { name: '잠자기', icon: '🛌', line: '해 뜰 무렵에야 겨우 눕는다. 두 시간쯤 잔다.' },
+  'd-drink1': { name: '카스레몬', icon: '🍋', line: '상큼해서 술인 줄도 모르는 입문 단계.' },
+  'd-drink2': { name: '테라', icon: '🍺', line: '청정 라거. 부드럽게 넘어간다.' },
+  'd-drink3': { name: '새로', icon: '🥂', line: '달달하게 넘어가는 새 소주.' },
+  'd-drink4': { name: '참이슬', icon: '🍶', line: '초록 병의 정석. 오늘도 한 잔.' },
+  'd-drink5': { name: '참이슬(빨뚜)', icon: '🔴', line: '뚜껑이 빨갛다. 목이 먼저 알아챈다.' },
+  'd-drink6': { name: '양주', icon: '🥃', line: '얼음 소리만 들어도 지갑이 얇아진다.' },
+  'd-drink7': { name: '고량주(96°)', icon: '🔥', line: '마시는 게 아니라 버티는 것.' },
+  'd-drink8': { name: '퍼플드링크', icon: '🟣', line: '보랏빛 한 잔. 어디까지 올라갈 셈이야.' },
+  'd-fun1': { name: '디스코팡팡', icon: '🎡', line: '빙글빙글 놀이공원 입문. 소리 지르면 끝.' },
+  'd-fun2': { name: '클럽', icon: '🪩', line: '베이스가 심장을 대신 뛴다.' },
+  'd-fun3': { name: '떡치기', icon: '🌙', line: '밤은 길고, 둘만의 이야기는 생략.' },
+  'd-fun4': { name: '오디', icon: '💫', line: '오늘 밤은 필름이 끊기기 쉽다.' },
+  'd-fun5': { name: '떨', icon: '🌿', line: '연기 속에서 시간이 느려진다.' },
+  'd-fun6': { name: '브액', icon: '🧪', line: '이름만 알고 시작하는 게 아니다.' },
+  'd-fun7': { name: 'LSD', icon: '🌈', line: '벽이 숨을 쉬기 시작한다.' },
+  'd-fun8': { name: '캔디', icon: '🍬', line: '달콤한 포장지 속의 어두운 맛.' },
+  'd-fun9': { name: 'PCP', icon: '🌀', line: '경계가 흐려진다. 어디가 바닥이지?' },
+  'd-fun10': { name: '펜타닐', icon: '💀', line: '한 번에 끝이 보인다.' },
+  'd-fun11': { name: '아이스', icon: '🧊', line: '투명하고 차갑게 빠져든다. 이 위는 없다.' },
+};
+
+/** 컨디션과 상태별 얼굴과 한마디 */
+export function nurtureFace(persona: Persona, v: { sleeping: boolean; condition: number }): { icon: string; line: string } {
+  if (v.sleeping) return persona === 'normal' ? { icon: '😴', line: '쿨쿨… 꿈에서도 가사를 쓰는 중이에요.' } : { icon: '💤', line: '…(깊이 곯아떨어졌다)' };
+  const c = v.condition;
+  if (persona === 'normal') {
+    if (c >= 75) return { icon: '😊', line: '컨디션 최고! 오늘은 뭐든 해낼 것 같아요.' };
+    if (c >= 50) return { icon: '🙂', line: '그럭저럭 괜찮아요.' };
+    if (c >= 30) return { icon: '😞', line: '조금 힘들어 보여요. 돌봐 주세요.' };
+    return { icon: '😫', line: '많이 지쳤어요… 살려 주세요.' };
+  }
+  if (c >= 75) return { icon: '😈', line: '오늘 밤은 아직 안 끝났다.' };
+  if (c >= 50) return { icon: '😏', line: '나쁘지 않네.' };
+  if (c >= 30) return { icon: '😒', line: '뭐라도 좀 줘 봐.' };
+  return { icon: '🥴', line: '바닥이다… 정신 좀 차려야 한다.' };
+}
+
 /* ---------- 콘텐츠 팩 2: 아케이드 ---------- */
 
 export const ARCADE_TEXT: Record<'rhythm' | 'survival' | 'lyric' | 'tower' | 'ticketing', { name: string; icon: string; blurb: string }> = {

@@ -38,6 +38,7 @@ import { MailScreen } from './screens/MailScreen';
 import { MissionScreen } from './screens/MissionScreen';
 import { MonogramScreen } from './screens/MonogramScreen';
 import { MoreScreen } from './screens/MoreScreen';
+import { NurtureScreen } from './screens/NurtureScreen';
 import { RankingScreen } from './screens/RankingScreen';
 import { ReleaseScreen } from './screens/ReleaseScreen';
 import { GachaModal, TowerModal } from './screens/ResultModals';
@@ -89,6 +90,7 @@ const SUB_TITLE: Partial<Record<TabId, string>> = {
   chat: '챗방',
   inquiry: '문의함',
   collect: '수집',
+  nurture: '모노사파 육성',
   arcade: '아케이드',
   challenge: '해시태그 챌린지',
   chart: '음원 차트',
@@ -167,6 +169,7 @@ function Game() {
         {ui.tab === 'chat' && <ChatScreen />}
         {ui.tab === 'inquiry' && <InquiryScreen />}
         {ui.tab === 'collect' && <CollectScreen />}
+        {ui.tab === 'nurture' && <NurtureScreen />}
         {ui.tab === 'arcade' && <ArcadeScreen />}
         {ui.tab === 'challenge' && <ChallengeScreen />}
         {ui.tab === 'chart' && <ChartScreen />}

@@ -59,11 +59,11 @@ export function shopPrice(base: number, fans: number): number {
 /** 오프라인 정산으로 인정하는 최대 시간(ms). 기본 2시간 + 다이아 업그레이드. */
 export function offlineCapMs(s: Pick<GameState, 'diamondUpgrades'> & Partial<BonusState>): number {
   const u = BALANCE.diamond.upgrade.offline;
-  const extra = s.cards && s.photo && s.feat && s.mascot && s.singles ? bonuses(s as BonusState).offlineMs : 0;
+  const extra = s.cards && s.photo && s.feat && s.mascot && s.nurture && s.singles ? bonuses(s as BonusState).offlineMs : 0;
   return BALANCE.offline.capMs + u.perLevelMs * s.diamondUpgrades.offline + extra;
 }
 
-/** 수집품(곡 카드·피처링·포토 세트·마스코트)이 주는 그 자아의 라임 생산 배율 */
+/** 수집품(곡 카드·피처링·포토 세트·마스코트)과 모노사파 육성 레벨이 주는 그 자아의 라임 생산 배율 */
 export const collectionProductionMult = (s: BonusState, persona: Persona): number => 1 + bonuses(s).rhyme[persona];
 
 /** 싱글·앨범·모노그램으로 얻는 팬에 곱하는 배율: 홍보 캠페인 × 수집 팬 보너스 */
@@ -126,7 +126,8 @@ export function royaltyBreakdown(s: GameState, persona: Persona = s.activePerson
   const albumMult = 1 + albumRoyaltyBonus(s.albums);
   const personaMult = persona === 'normal' ? P.normalRoyaltyMult : P.darkRoyaltyMult;
   const diamondMult = diamondRoyaltyMult(s);
-  const collectionMult = 1 + bonuses(s).coin;
+  const bonus = bonuses(s);
+  const collectionMult = 1 + bonus.coin + bonus.coinBy[persona];
   return {
     perSec: s.fans * BALANCE.royalty.perFan * promotionMult * albumMult * personaMult * diamondMult * collectionMult,
     fans: s.fans,

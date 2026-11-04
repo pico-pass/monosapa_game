@@ -115,7 +115,7 @@ describe('수집 보너스', () => {
   it('아무것도 없으면 보너스가 0이라 기존 수치가 그대로다', () => {
     const s = base({ singles: singles(2) });
     const b = bonuses(s);
-    expect(b).toEqual({ rhyme: { normal: 0, dark: 0 }, coin: 0, fan: 0, power: 0, offlineMs: 0 });
+    expect(b).toEqual({ rhyme: { normal: 0, dark: 0 }, coin: 0, coinBy: { normal: 0, dark: 0 }, fan: 0, power: 0, offlineMs: 0 });
   });
 
   it('곡 카드 덱: 등급·바이브·리마스터가 보너스에 합산되고 라임은 그 곡의 자아에만 붙는다', () => {

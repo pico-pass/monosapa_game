@@ -1,6 +1,7 @@
 import { claimableMissions, attendanceStatus } from './missions';
 import { presentsReady } from './mascot';
 import { readyPosts } from './monogram';
+import { nurtureAlerts } from './nurture';
 import type { GameState } from './types';
 
 /** 「더보기」 안에서 지금 할 일이 있는 화면별 개수. 하단 탭과 메뉴의 알림 점에 쓴다. */
@@ -10,6 +11,8 @@ export interface MoreAlerts {
   monogram: number;
   /** 마스코트가 가져온 선물 + 쓰지 않은 포토카드 티켓이 있으면 1 */
   collect: number;
+  /** 돌봐 줘야 하는 모노사파(자아) 수 */
+  nurture: number;
   total: number;
 }
 
@@ -18,5 +21,6 @@ export function moreAlerts(s: GameState): MoreAlerts {
   const mail = s.fanMail.inbox.length;
   const monogram = readyPosts(s);
   const collect = presentsReady(s) + (s.photo.tickets > 0 ? 1 : 0);
-  return { missions, mail, monogram, collect, total: missions + mail + monogram + collect };
+  const nurture = nurtureAlerts(s);
+  return { missions, mail, monogram, collect, nurture, total: missions + mail + monogram + collect + nurture };
 }
