@@ -478,7 +478,7 @@ describe('소형 공연장 직접 공연 연결', () => {
     expect(manualGameOf('large')).toBe('defense');
     expect(manualGameOf('arena')).toBe('survivor');
     expect(manualGameOf('world')).toBe('prestige');
-    expect(manualGameOf('ruins')).toBe('run');
+    expect(manualGameOf('ruins')).toBe('swipe');
   });
 
   it('직접 공연을 시작하면 블록 게임으로 쿨다운이 확정된다', () => {

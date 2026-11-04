@@ -317,7 +317,7 @@ describe('다이아', () => {
   });
 
   it('공연장마다 값이 다르고 모두 양수', () => {
-    expect(STAGES.map((d) => d.firstClearDiamonds)).toEqual([5, 10, 15, 20, 30, 40, 50, 80, 100, 150, 200]);
+    expect(STAGES.map((d) => d.firstClearDiamonds)).toEqual([5, 10, 15, 20, 30, 40, 50, 80, 200, 300, 400]);
   });
 
   it('앨범 발매: 앨범별 다이아 (30, 60, 120)', () => {
@@ -736,8 +736,8 @@ describe('공연', () => {
     }
     expect(s.concerts.world.cleared).toBe(true);
     // 팬 조건: 팬이 모자라면 열리지 않는다
-    expect(stageStatus({ ...fanned(249999), concerts: { ...fanned(249999).concerts, world: { cleared: true, bestScore: 0, cooldownUntil: 0 } } }, 'rooftop').unlocked).toBe(false);
-    expect(stageStatus({ ...fanned(250000), concerts: { ...fanned(250000).concerts, world: { cleared: true, bestScore: 0, cooldownUntil: 0 } } }, 'rooftop').unlocked).toBe(true);
+    expect(stageStatus({ ...fanned(999999), concerts: { ...fanned(999999).concerts, world: { cleared: true, bestScore: 0, cooldownUntil: 0 } } }, 'rooftop').unlocked).toBe(false);
+    expect(stageStatus({ ...fanned(1000000), concerts: { ...fanned(1000000).concerts, world: { cleared: true, bestScore: 0, cooldownUntil: 0 } } }, 'rooftop').unlocked).toBe(true);
     expect(stageDifficulty('world')).toBeCloseTo(1.3 * 1.1 ** 7, 9);
   });
 

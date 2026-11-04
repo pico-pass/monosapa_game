@@ -9,7 +9,7 @@ import {
   runAutoConcert,
   work,
 } from '../commands';
-import { MAIL_TEMPLATES, mailTemplateById } from '../content';
+import { MAIL_TEMPLATES, STAGE_TEXT, mailTemplateById } from '../content';
 import { mailIntervalMs, replyEffect, replyMail, rollMail } from '../fanmail';
 import {
   allBonusStatus,
@@ -259,7 +259,7 @@ describe('비밀 공연장', () => {
     const r = runAutoConcert(dark, 'rooftop');
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.outcome).toMatchObject({ firstClear: true, diamonds: 100, firstClearCoins: 300000 });
+    expect(r.outcome).toMatchObject({ firstClear: true, diamonds: 200, firstClearCoins: 1200000 });
     expect(r.state.counters.concerts).toBe(1);
     expect(stageStatus(r.state, 'ruins').visible).toBe(true);
   });
@@ -267,9 +267,12 @@ describe('비밀 공연장', () => {
   it('수치와 직접 공연 종류', () => {
     const secret = STAGES.filter((d) => d.darkOnly);
     expect(secret.map((d) => d.id)).toEqual(['rooftop', 'ruins', 'garage']);
-    expect(secret.map((d) => d.firstClearDiamonds)).toEqual([100, 150, 200]);
-    expect(manualGameOf('ruins')).toBe('run');
-    expect(manualGameOf('rooftop')).toBe('timing');
+    expect(secret.map((d) => d.firstClearDiamonds)).toEqual([200, 300, 400]);
+    expect(secret.map((d) => d.firstClearCoins)).toEqual([1_200_000, 4_000_000, 10_000_000]);
+    expect(secret.map((d) => d.baseCoins)).toEqual([60_000, 200_000, 500_000]);
+    expect(secret.map((d) => d.fans)).toEqual([1_000_000, 2_500_000, 5_000_000]);
+    expect(secret.map((d) => STAGE_TEXT[d.id].name)).toEqual(['폐건물 지하공연', '다크웹 라이브공연', '저세상 공연페스티벌']);
+    expect(secret.map((d) => manualGameOf(d.id))).toEqual(['blackout', 'swipe', 'stones']);
   });
 });
 

@@ -180,12 +180,12 @@ describe('새 화면 렌더링', () => {
     const fresh = createInitialState(T0);
     const before = await render('concert', { ...fresh, fans: 1e7 });
     expect(before).toContain('???');
-    expect(before).not.toContain('심야 옥상');
+    expect(before).not.toContain('폐건물 지하공연');
     const after = await render('concert', richState());
-    expect(after).toContain('심야 옥상');
+    expect(after).toContain('폐건물 지하공연');
     expect(after).toContain('어둠속성으로만 입장해요');
     expect(after).not.toContain('???');
-    expect(after).not.toContain('폐건물 지하'); // 앞 공연장을 클리어해야 다음이 보인다
+    expect(after).not.toContain('다크웹 라이브공연'); // 앞 공연장을 클리어해야 다음이 보인다
   });
 
   it('앨범: 일반 4~6번째와 어둠 1~3번째 앨범이 발매 화면과 도감에 나온다', async () => {
@@ -253,12 +253,23 @@ describe('새 화면 렌더링', () => {
     const dark = await render('concert', { ...g, activePersona: 'dark' });
     expect(dark).toContain('697.4m를 완주하면 성공');
     expect(dark).not.toContain('6,900m');
-    // 폐건물 지하는 원래 코스 그대로
-    const opened = { ...g, fans: 1e7, activePersona: 'dark' as const, concerts: { ...g.concerts, rooftop: { ...g.concerts.rooftop, cleared: true } } };
-    const ruins = await render('concert', opened);
-    expect(ruins).toContain('폐건물 지하');
-    expect(ruins).toContain('6,900m를 완주하면 성공');
-    expect(ruins).toContain('697.4m를 완주하면 성공');
+    // 비밀 공연장은 모노사파런을 쓰지 않는다
+    expect(dark).toContain('폐건물 지하공연');
+    expect(dark).not.toContain('6,900m');
+  });
+
+  it('공연: 비밀 공연장 3곳은 각각 정전 속 박자·후원 채팅 스와이프·삼도천 징검다리로 직접 공연한다', async () => {
+    const g = richState();
+    const done = { cleared: true, bestScore: 0, cooldownUntil: 0 };
+    const opened = { ...g, fans: 1e7, activePersona: 'dark' as const, concerts: { ...g.concerts, rooftop: done, ruins: done } };
+    const html = await render('concert', opened);
+    for (const t of ['폐건물 지하공연', '직접 공연 · 정전 속 박자', '노트는 판정선 가까이 와야만 보이고', '다크웹 라이브공연', '직접 공연 · 후원 채팅 스와이프', '검열 규칙이 늘어나고', '저세상 공연페스티벌', '직접 공연 · 삼도천 징검다리', '도깨비불은 따끔']) expect(html).toContain(t);
+    expect(html).toContain('팬 5.00M명');
+    expect(html).toContain('어둠속성만 입장하는 공연장이라 보상 ×2');
+    // 앞 공연장을 클리어하기 전에는 다음 공연장이 보이지 않는다
+    const first = await render('concert', { ...g, fans: 1e7, activePersona: 'dark' as const });
+    expect(first).toContain('폐건물 지하공연');
+    expect(first).not.toContain('다크웹 라이브공연');
   });
 
   it('공연: 소형 공연장은 무대 세팅 블록으로 직접 공연한다', async () => {
@@ -525,6 +536,53 @@ describe('새 화면 렌더링', () => {
     expect(lost).not.toContain('영구 퍼크 ');
   });
 
+  it('정전 속 박자 전체화면과 결과 창', async () => {
+    const g = packState();
+    const loader = () => import('../ConcertStage');
+    const run = { id: 'b1', stageId: 'rooftop', persona: 'dark', game: 'blackout', difficulty: 1.9, taskGrowth: 1.25, status: 'running' };
+    const html = await renderNamed(loader, 'ConcertStage', 'concert', g, {}, { run });
+    for (const t of ['폐건물 지하공연', '정전 속 박자', '열기 점수', '1곡 1/4', '콤보 0', '시야 0.52초', `박자 ${BALANCE.blackout.bpm[0]}`, '1번 레인 (D)', '4번 레인 (K)', '불이 나가서 노트가 안 보여요', '공연 포기']) expect(html).toContain(t);
+    expect(html).toContain('stage-dark');
+
+    const blackout = { perfect: 150, good: 20, miss: 12, stray: 9, bestCombo: 61, notes: 182, waves: [100, 96, 88, 71], seconds: 92 };
+    const win = { stageId: 'rooftop', mode: 'manual', persona: 'dark', score: 889, coins: 400000, cleared: true, firstClear: true, firstClearCoins: 1200000, diamonds: 200, blackout };
+    const done = await renderNamed(loader, 'ConcertStage', 'concert', g, { concertResult: win }, { run: { ...run, status: 'finished' } });
+    for (const t of ['공연 성공!', '889', 'Perfect 150 · Good 20 · Miss 12 · 헛손질 9 · 최고 콤보 61 · 노트 182개 · 92초', '곡별 달성 1곡 100% · 2곡 96% · 3곡 88% · 앙코르 71%', '첫 클리어 보너스', '💎 다이아']) expect(done).toContain(t);
+    expect(done).not.toContain('보상 50%');
+    const lost = await renderNamed(loader, 'ConcertStage', 'concert', g, { concertResult: { ...win, score: 300, cleared: false, firstClear: false, firstClearCoins: 0, diamonds: 0 } }, { run: { ...run, status: 'finished' } });
+    expect(lost).toContain('아쉬운 공연…');
+    expect(lost).toContain('600점 미만이라 보상 50%');
+  });
+
+  it('후원 채팅 스와이프 전체화면과 결과 창', async () => {
+    const g = packState();
+    const loader = () => import('../ConcertStage');
+    const run = { id: 's1', stageId: 'ruins', persona: 'dark', game: 'swipe', difficulty: 2, taskGrowth: 1.25, status: 'running' };
+    const html = await renderNamed(loader, 'ConcertStage', 'concert', g, {}, { run });
+    for (const t of ['다크웹 라이브공연', '후원 채팅 스와이프', '열기 점수', '1곡 1/4', '악플은 차단', `목표 ${BALANCE.swipe.goals[0]}`, '◀ 차단', '수락 ▶', '🚫 차단', '✅ 수락', '글을 오른쪽으로 밀면 수락', '공연 포기']) expect(html).toContain(t);
+    expect(html).not.toContain('링크가 든 글은 차단');
+
+    const swipe = { handled: 88, right: 80, wrong: 6, timeouts: 2, blocked: 41, accepted: 47, bestCombo: 23, waves: [100, 100, 93, 71], seconds: 92 };
+    const win = { stageId: 'ruins', mode: 'manual', persona: 'dark', score: 941, coins: 900000, cleared: true, firstClear: true, firstClearCoins: 4000000, diamonds: 300, swipe };
+    const done = await renderNamed(loader, 'ConcertStage', 'concert', g, { concertResult: win }, { run: { ...run, status: 'finished' } });
+    for (const t of ['공연 성공!', '941', '넘긴 글 88개 · 정답 80 · 오답 6 · 놓침 2 · 수락 47 / 차단 41 · 최고 콤보 23 · 92초', '열기 목표 1곡 100% · 2곡 100% · 3곡 93% · 앙코르 71%', '첫 클리어 보너스']) expect(done).toContain(t);
+  });
+
+  it('삼도천 징검다리 전체화면과 결과 창', async () => {
+    const g = packState();
+    const loader = () => import('../ConcertStage');
+    const run = { id: 't1', stageId: 'garage', persona: 'dark', game: 'stones', difficulty: 2.1, taskGrowth: 1.25, status: 'running' };
+    const html = await renderNamed(loader, 'ConcertStage', 'concert', g, {}, { run });
+    for (const t of ['저세상 공연페스티벌', '삼도천 징검다리', '열기 점수', `${BALANCE.stones.bpm[0]}bpm`, `목표 ${BALANCE.stones.goals[0]}`, '물살 4칸 뒤', '❤️❤️❤️❤️❤️', '앞 줄의 돌', '공연 포기']) expect(html).toContain(t);
+
+    const stones = { hops: 150, onBeat: 118, good: 20, bestStreak: 31, lotuses: 9, splashes: 2, burns: 1, swept: 1, rows: 150, heartsLeft: 1, died: false, waves: [100, 100, 91, 64], seconds: 92 };
+    const win = { stageId: 'garage', mode: 'manual', persona: 'dark', score: 889, coins: 2000000, cleared: true, firstClear: true, firstClearCoins: 10000000, diamonds: 400, stones };
+    const done = await renderNamed(loader, 'ConcertStage', 'concert', g, { concertResult: win }, { run: { ...run, status: 'finished' } });
+    for (const t of ['공연 성공!', '889', '도착한 줄 150 · 뛴 횟수 150 · PERFECT 118 · GOOD 20 · 최고 박자 연속 31 · 연꽃 9개 · 남은 하트 1개 · 92초', '풍덩 2번 · 도깨비불 1번 · 물살에 쓸림 1번', '열기 목표 1곡 100% · 2곡 100% · 3곡 91% · 앙코르 64%', '첫 클리어 보너스']) expect(done).toContain(t);
+    const dead = await renderNamed(loader, 'ConcertStage', 'concert', g, { concertResult: { ...win, score: 300, cleared: false, firstClear: false, firstClearCoins: 0, diamonds: 0, stones: { ...stones, died: true, heartsLeft: 0 } } }, { run: { ...run, status: 'finished' } });
+    expect(dead).toContain('물에 잠겼어요');
+  });
+
   it('장비·작업실·도감도 새 필드와 함께 그려진다', async () => {
     const g = richState();
     expect(await render('equip', g)).toContain('오프라인 정산 확장');
@@ -534,8 +592,8 @@ describe('새 화면 렌더링', () => {
     expect(dark).toContain('/assets/costume-king.webp'); // 어둠속성은 자기 칸의 옷을 입는다
     expect(dark).not.toContain('/assets/costume-bunny.webp');
     // 도감도 비밀 공연장은 월클을 클리어한 뒤에만 보여 준다.
-    expect(await render('collection', g)).toContain('심야 옥상');
-    expect(await render('collection', createInitialState(T0))).not.toContain('심야 옥상');
+    expect(await render('collection', g)).toContain('폐건물 지하공연');
+    expect(await render('collection', createInitialState(T0))).not.toContain('폐건물 지하공연');
   });
 });
 

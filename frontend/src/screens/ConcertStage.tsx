@@ -28,6 +28,9 @@ import { BOUNCE_EFFECT_TEXT, BouncePlay } from './BounceStage';
 import { DefensePlay, RANK_NAME } from './DefenseStage';
 import { PERK_TEXT, SurvivorPlay } from './SurvivorStage';
 import { PRESTIGE_PERK_TEXT, PrestigePlay } from './PrestigeStage';
+import { BlackoutPlay } from './BlackoutStage';
+import { StonesPlay } from './StonesStage';
+import { SwipePlay } from './SwipeStage';
 import { PERK_IDS as PRESTIGE_PERK_IDS } from '../game/prestige';
 import { PASSIVE_IDS, WEAPON_IDS } from '../game/survivor';
 import { EFFECT_TEXT, MergePlay, SET_NAMES } from './MergeStage';
@@ -69,6 +72,12 @@ export function ConcertStage({ run }: { run: ConcertRun }) {
         <SurvivorPlay key={run.id} run={run} />
       ) : run.game === 'prestige' ? (
         <PrestigePlay key={run.id} run={run} />
+      ) : run.game === 'blackout' ? (
+        <BlackoutPlay key={run.id} run={run} />
+      ) : run.game === 'swipe' ? (
+        <SwipePlay key={run.id} run={run} />
+      ) : run.game === 'stones' ? (
+        <StonesPlay key={run.id} run={run} />
       ) : (
         <Play key={run.id} run={run} />
       )}
@@ -271,6 +280,9 @@ function ResultPanel({ result }: { result: ConcertResult }) {
   const df = result.defense;
   const sv = result.survivor;
   const pr = result.prestige;
+  const bo = result.blackout;
+  const sw = result.swipe;
+  const st = result.stones;
   return (
     <div className="stage-result">
       <h2>{result.cleared ? (r ? '완주 성공!' : '공연 성공!') : r ? '아쉬운 질주…' : '아쉬운 공연…'}</h2>
@@ -368,6 +380,33 @@ function ResultPanel({ result }: { result: ConcertResult }) {
                 .join(' · ')}
             </p>
           )}
+        </>
+      )}
+      {bo && (
+        <>
+          <p className="muted">
+            Perfect {bo.perfect} · Good {bo.good} · Miss {bo.miss} · 헛손질 {bo.stray} · 최고 콤보 {bo.bestCombo} · 노트 {bo.notes}개 · {bo.seconds}초
+          </p>
+          <p className="muted">곡별 달성 {bo.waves.map((w, i) => `${SET_NAMES[i]} ${w}%`).join(' · ')}</p>
+        </>
+      )}
+      {sw && (
+        <>
+          <p className="muted">
+            넘긴 글 {sw.handled}개 · 정답 {sw.right} · 오답 {sw.wrong} · 놓침 {sw.timeouts} · 수락 {sw.accepted} / 차단 {sw.blocked} · 최고 콤보 {sw.bestCombo} · {sw.seconds}초
+          </p>
+          <p className="muted">열기 목표 {sw.waves.map((w, i) => `${SET_NAMES[i]} ${w}%`).join(' · ')}</p>
+        </>
+      )}
+      {st && (
+        <>
+          <p className="muted">
+            도착한 줄 {st.rows} · 뛴 횟수 {st.hops} · PERFECT {st.onBeat} · GOOD {st.good} · 최고 박자 연속 {st.bestStreak} · 연꽃 {st.lotuses}개 · {st.died ? '물에 잠겼어요' : `남은 하트 ${st.heartsLeft}개`} · {st.seconds}초
+          </p>
+          <p className="muted">
+            풍덩 {st.splashes}번 · 도깨비불 {st.burns}번 · 물살에 쓸림 {st.swept}번
+          </p>
+          <p className="muted">열기 목표 {st.waves.map((w, i) => `${SET_NAMES[i]} ${w}%`).join(' · ')}</p>
         </>
       )}
       <ul className="reward-list">

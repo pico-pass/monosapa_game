@@ -8,7 +8,7 @@ import type { StageId } from '../game/types';
 import { doAutoConcert, doSkipCooldown, setTourCardOpen, startManualConcert, useUi } from '../store/gameStore';
 
 /** 직접 공연 버튼에 붙는 게임 이름(마이크 타이밍은 따로 이름을 붙이지 않는다) */
-const GAME_LABEL: Partial<Record<ManualGame, string>> = { run: '모노사파런', blocks: '무대 세팅 블록', merge: '응원봉 머지 웨이브', bounce: '음파 튕기기', defense: '돌발 사고 막기', survivor: '무대 서바이버', prestige: '월드투어 인크리멘탈' };
+const GAME_LABEL: Partial<Record<ManualGame, string>> = { run: '모노사파런', blocks: '무대 세팅 블록', merge: '응원봉 머지 웨이브', bounce: '음파 튕기기', defense: '돌발 사고 막기', survivor: '무대 서바이버', prestige: '월드투어 인크리멘탈', blackout: '정전 속 박자', swipe: '후원 채팅 스와이프', stones: '삼도천 징검다리' };
 
 /** 무대 세팅 블록 안내 */
 function blocksNote(persona: 'normal' | 'dark'): string {
@@ -58,6 +58,21 @@ function prestigeNote(persona: 'normal' | 'dark'): string {
     : base;
 }
 
+/** 정전 속 박자 안내 */
+function blackoutNote(): string {
+  return `불이 나간 지하에서 4레인 리듬을 쳐요. 노트는 판정선 가까이 와야만 보이고(콤보가 쌓일수록 멀리 보여요) 박자음은 계속 들려요. 노트가 없는 곳을 누르면 헛손질이에요. 곡마다 맞힌 비율만큼 250점씩, 열기 점수 600 이상이면 성공이에요. 어둠속성만 입장하는 공연장이라 보상 ×${BALANCE.blackout.persona.dark.rewardMult}.`;
+}
+
+/** 후원 채팅 스와이프 안내 */
+function swipeNote(): string {
+  return `방송 채팅에 올라오는 글을 오른쪽(수락)이나 왼쪽(차단)으로 넘겨요. 곡마다 검열 규칙이 늘어나고(악플 → 링크 → 소액 후원 → 사칭 마크), 규칙에 없는 특징은 그냥 받아야 해요. 제한 시간 안에 못 넘기면 놓친 거예요. 곡마다 열기 목표를 채우면 250점씩, 열기 점수 600 이상이면 성공이에요. 어둠속성만 입장하는 공연장이라 보상 ×${BALANCE.swipe.persona.dark.rewardMult}.`;
+}
+
+/** 삼도천 징검다리 안내 */
+function stonesNote(): string {
+  return `3칸 폭 강의 징검다리를 박자에 맞춰 한 줄씩 건너요. 링이 점에 닿는 순간 누르면 PERFECT, 박자를 놓치면 점수가 깎여요. 물은 풍덩, 도깨비불은 따끔(하트 −1)이고 뒤에서 삼도천 물이 쫓아와요. 하트 ${BALANCE.stones.hearts}개가 다 닳으면 거기서 끝나요. 곡마다 목표 점수를 채우면 250점씩, 열기 점수 600 이상이면 성공이에요. 어둠속성만 입장하는 공연장이라 보상 ×${BALANCE.stones.persona.dark.rewardMult}.`;
+}
+
 /** 모노사파런 안내: 공연장과 자아에 따라 목표 거리가 다르다 */
 function runNote(stage: StageId, persona: 'normal' | 'dark'): string {
   const goal = courseConfig(stage, persona).goalM.toLocaleString();
@@ -83,6 +98,12 @@ function manualNote(stage: StageId, persona: 'normal' | 'dark'): string {
       return survivorNote(persona);
     case 'prestige':
       return prestigeNote(persona);
+    case 'blackout':
+      return blackoutNote();
+    case 'swipe':
+      return swipeNote();
+    case 'stones':
+      return stonesNote();
     default:
       return persona === 'dark' ? `어둠은 판정이 더 좁은 대신 보상 ×${BALANCE.concert.personaRewardMult.dark}.` : '';
   }

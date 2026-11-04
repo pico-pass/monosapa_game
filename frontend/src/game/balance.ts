@@ -264,7 +264,7 @@ export const BALANCE = {
    * 코스는 공연장마다 따로 정할 수 있다(stageCourse). 지하 클럽은 사용자 요청으로 짧아진 대신 훨씬 빨라진다:
    *   목표 일반 400m · 어둠 697.4m, 속도 일반 8→20 · 어둠 11→28(u/s). 달리는 시간은 약 69초/86초(원래 약 130초/151초).
    *   같은 자동 플레이어로 돌려 보면 점프 타이밍이 ±0.1초 흔들려도 원래 일반 코스보다 피격이 적다.
-   *   stageCourse에 없는 공연장(폐건물 지하)은 persona의 원래 코스를 쓴다.
+   *   stageCourse에 없는 공연장은 persona의 원래 코스를 쓴다(지금은 모노사파런을 하는 공연장이 지하 클럽뿐이라 원래 코스를 쓰는 공연장은 없다).
    */
   run: {
     viewUnits: 32,
@@ -723,6 +723,125 @@ export const BALANCE = {
     },
   },
   /**
+   * 정전 속 박자 (비밀 공연장 「폐건물 지하공연」의 직접 공연, 사용자 요청으로 추가, 원안에 없음). 수치는 모두 제안값이다.
+   *   전기가 끊긴 지하에서 하는 4레인 리듬 게임. 노트가 어둠에 가려져 판정선에 가까워진 것만 보이고, 박자음(메트로놈)은 계속 들린다.
+   *   보이는 거리(lookAhead) = baseLookMs + 콤보 × lookPerCombo(콤보 comboCap까지). 콤보가 끊기면 다시 좁아진다. 노트는 8분음표 칸에 놓이고(곡마다 bpm·밀도·동시 노트 확률),
+   *   시드로 정해져서 같은 씨앗이면 같은 채보다. 레인을 누르면 그 레인에서 가장 가까운 노트를 판정한다(perfect ±perfectMs, good ±goodMs). 노트가 없는 곳을 누르면 헛손질이고 콤보가 끊긴다.
+   *   곡 점수 비율 = (perfect × 1 + good × goodWeight − 헛손질 × strayPenalty) ÷ (노트 수 × goalRate), 0~1로 자른다. 열기 점수 = 곡별 waveScore × 비율의 합(최대 1000), 600 이상이 클리어.
+   *   비밀 공연장은 어둠속성만 입장하므로 일반 칸(persona.normal)은 어둠과 같은 값만 두고 쓰이지 않는다.
+   *   봇 시뮬레이션(시드 200개, 봇이 노트마다 오차(가우스)를 두고 친다. 놓치는 노트·엉뚱한 레인 누르기는 확률로 섞는다): 오차 35ms인 숙련 봇은 클리어 100%(열기 점수 평균 1000), 60ms는 100%(854), 72ms는 100%(718),
+   *     85ms는 31%(570), 110ms는 0%(337), 오차 60ms로 절반만 치면 0%(447), 무작위로 연타하면 0%(0점), 4레인을 전부 연타하면 0%(0점), 가만히 있으면 0점.
+   *   난이도 조정 이력: 처음에는 판정 폭이 perfect ±60ms·good ±120ms에 목표 비율 0.8이라 오차 85ms 봇도 97%가 클리어했다. 폭을 ±55·±110ms로 줄이고 헛손질 감점을 0.45, 목표 비율을 0.84로 올려 위 표로 맞췄다.
+   *     봇은 노트가 보이는지와 상관없이 치므로 어둠 속 시야(lookAhead)의 어려움은 반영되지 않았다. 사람의 실제 난이도는 이보다 높을 수 있다.
+   */
+  blackout: {
+    waves: [{ ms: 23_000 }, { ms: 23_000 }, { ms: 23_000 }, { ms: 23_000 }],
+    waveScore: 250,
+    lanes: 4,
+    /** 곡별 bpm과 8분음표 칸에 노트가 놓일 확률, 같은 칸에 두 레인이 동시에 나올 확률 */
+    bpm: [96, 104, 112, 120],
+    density: [0.5, 0.58, 0.66, 0.74],
+    doubleChance: [0, 0, 0.06, 0.12],
+    /** 곡이 시작하고 첫 노트까지, 곡이 끝나기 전 노트를 놓지 않는 마지막 구간 */
+    leadInMs: 1500,
+    tailMs: 1200,
+    /** 위에서 판정선까지 내려오는 데 걸리는 시간(화면 속도). 어둠에 가려서 보이는 거리는 lookAhead가 정한다. */
+    travelMs: 1400,
+    baseLookMs: 520,
+    lookPerCombo: 40,
+    comboCap: 12,
+    perfectMs: 55,
+    goodMs: 110,
+    goodWeight: 0.6,
+    strayPenalty: 0.45,
+    goalRate: 0.84,
+    persona: {
+      normal: { rewardMult: 2 },
+      dark: { rewardMult: 2 },
+    },
+  },
+  /**
+   * 후원 채팅 스와이프 (비밀 공연장 「다크웹 라이브공연」의 직접 공연, 사용자 요청으로 추가, 원안에 없음). 수치는 모두 제안값이다.
+   *   「Reigns」·「Papers, Please」처럼 카드를 좌우로 넘겨 받을지 막을지 정하는 게임. 방송 채팅에 올라오는 글을 오른쪽(수락)이나 왼쪽(차단)으로 넘긴다.
+   *   곡마다 검열 규칙이 하나씩 늘어난다: 1곡 악플 차단 → 2곡 + 링크가 든 글 차단 → 3곡 + 소액 후원(minDonation 미만) 차단 → 앙코르 + 미인증 공식 마크(사칭) 차단.
+   *   규칙에 걸리는 글(badRate)은 규칙 하나만 어기도록 만들고, 아직 적용되지 않은 규칙의 특징(링크·소액 후원·사칭 마크)은 일부러 멀쩡한 글(decoyRate)에 섞어 넣는다. 그래서 규칙을 읽지 않으면 틀린다.
+   *   글마다 제한 시간(limitMs)이 있고 넘기면 놓친 것이다. 맞게 넘기면 열기 +1(콤보 하나마다 +combo, comboCap까지), 틀리면 −wrong, 놓치면 −timeout(0 아래로는 안 내려간다).
+   *   곡 점수 비율 = 그 곡의 열기 ÷ goals[곡], 0~1. 열기 점수 = 곡별 waveScore × 비율의 합(최대 1000), 600 이상이 클리어. 글은 시드 난수 순서로만 만들어져서 같은 씨앗이면 같은 글이 같은 순서로 나온다.
+   *   비밀 공연장은 어둠속성만 입장하므로 일반 칸은 어둠과 같은 값만 두고 쓰이지 않는다.
+   *   봇 시뮬레이션(시드 200개, 봇은 글이 뜬 뒤 반응 시간(가우스)을 두고 규칙대로 판단하다 가끔 실수한다): 반응 0.65초·실수 3%인 숙련 봇은 클리어 100%(열기 점수 평균 994), 0.95초·8%는 97%(811),
+   *     1.2초·12%는 51%(593), 1.5초·15%는 3%(369), 악플만 보고 판단하고 나머지 규칙을 무시하면 3%(445), 전부 수락 0%(67)·전부 차단 0%(70)·무작위 0%(67), 가만히 있으면 0점.
+   *   난이도 조정 이력: 처음에는 목표가 14~22, 제한 시간이 2.8~1.9초, 규칙을 모르는 글(decoy) 확률이 0.35라 반응 1.5초 봇도 47%, 악플만 보는 봇도 33%가 클리어했다.
+   *     목표를 20~31로 올리고 제한 시간을 줄이고(2.6~1.75초) 오답 감점(2.5)·놓침 감점(1.5)·decoy 확률(0.5)을 높여 위 표로 맞췄다. 사람의 실제 난이도는 측정하지 못했다.
+   */
+  swipe: {
+    waves: [{ ms: 23_000 }, { ms: 23_000 }, { ms: 23_000 }, { ms: 23_000 }],
+    waveScore: 250,
+    /** 곡이 시작하고 첫 글이 나오기까지(규칙을 읽는 시간), 한 글을 넘긴 뒤 다음 글까지 */
+    introMs: 1400,
+    gapMs: 260,
+    limitMs: [2600, 2300, 2000, 1750],
+    badRate: 0.5,
+    decoyRate: 0.5,
+    minDonation: 5000,
+    rules: [['toxic'], ['toxic', 'link'], ['toxic', 'link', 'small'], ['toxic', 'link', 'small', 'fake']],
+    heat: { right: 1, combo: 0.1, comboCap: 10, wrong: 2.5, timeout: 1.5 },
+    goals: [20, 24, 28, 31],
+    persona: {
+      normal: { rewardMult: 2 },
+      dark: { rewardMult: 2 },
+    },
+  },
+  /**
+   * 삼도천 징검다리 (비밀 공연장 「저세상 공연페스티벌」의 직접 공연, 사용자 요청으로 추가, 원안에 없음). 수치는 모두 제안값이다.
+   *   「Crossy Road」·「Frogger」처럼 강을 건너는 게임을 박자에 맞췄다. 3칸 폭 강에 징검다리가 줄지어 있고, 탭한 칸으로 한 줄씩 앞으로 뛴다(한 번에 옆 칸까지만).
+   *   발 디딜 돌(🪨)이 있는 칸이면 앞으로 가고, 물이면 풍덩(하트 −1, swampStunMs 동안 못 움직임), 도깨비불(🔥)이 붙은 돌이면 건너가지만 하트 −1.
+   *   연꽃(🪷)은 보너스 돌이다. 줄은 시드로 만들고, 어느 돌에서든 다음 줄로 이어지는 돌이 있게 만든다(막다른 길 없음). 줄이 내려갈수록 돌이 적어지고 도깨비불이 늘어난다.
+   *   뒤에서 삼도천 물이 waterSpeed 줄/초로 쫓아온다. 물이 내 줄에 닿으면 하트 −1이고 물은 sweptGap줄 뒤로 물러난다. 하트가 0이 되면 거기서 끝난다(그때까지의 열기는 인정).
+   *   점수는 박자가 정한다: 한 박 길이 × beatWindow 안에 뛰면 perfect(2점), 그 두 배 안이면 good(1점), 벗어나면 삐끗(−1점, 곡 점수는 0 아래로 안 내려간다)이다. 삐끗해도 앞으로는 간다.
+   *   뛴 뒤에는 한 박 × hopLock 동안 다음 입력을 무시해서 마구 눌러 점수를 쌓을 수 없다. 연꽃은 +lotusBonus. 곡 점수 비율 = 그 곡에서 얻은 점수 ÷ goals[곡], 0~1.
+   *   열기 점수 = 곡별 waveScore × 비율의 합(최대 1000), 600 이상이 클리어. 비밀 공연장은 어둠속성만 입장하므로 일반 칸은 어둠과 같은 값만 두고 쓰이지 않는다.
+   *   봇 시뮬레이션(시드 200개, 봇이 앞 줄을 보고 갈 수 있는 돌을 고르며, 박자 봇은 박자마다 오차(가우스)를 두고 뛰고 일부 박을 쉰다): 오차 30ms인 숙련 봇은 클리어 100%(열기 점수 평균 999, 하트를 다 잃는 경우 1%),
+   *     오차 60ms에 25%를 쉬면 99%(931, 22%가 중간에 쓰러짐), 오차 90ms에 45%를 쉬면 45%(558), 박자를 무시하고 0.9초마다 뛰면 0%(249), 박자를 무시하고 가장 빨리(0.3초) 뛰면 0%(414)·0.5초마다 뛰면 8%(436),
+   *     숙련 봇이 25% 실수하면 6%(370, 모두 쓰러짐), 박자마다 무작위 칸을 누르면 0%(58), 가만히 있으면 0점(하트 5개를 물살에 잃는다).
+   *   난이도 조정 이력: 처음에는 뛸 때마다 1점에 박자 보너스 1점이라 박자를 무시하고 최대한 빨리 뛰는 봇이 85%, 0.9초마다 뛰는 봇이 92%까지 클리어했다. 박자 밖은 점수를 못 받게(0점) 하자 최대 속도 봇이 65%로 남아서
+   *     박자 밖 뛰기를 −1점으로 바꾸고 뛴 뒤 입력을 한 박 × 0.75 동안 막고 목표를 50~68로 올렸다. 사람의 실제 난이도는 측정하지 못했다.
+   */
+  stones: {
+    waves: [{ ms: 23_000 }, { ms: 23_000 }, { ms: 23_000 }, { ms: 23_000 }],
+    waveScore: 250,
+    hearts: 5,
+    bpm: [96, 108, 120, 132],
+    /** perfect 판정 폭 = 한 박 길이 × beatWindow (좌우 각각), good은 그 두 배 */
+    beatWindow: 0.14,
+    hopPoints: { perfect: 2, good: 1, off: -1 },
+    /** 뛴 뒤 다음 입력을 무시하는 시간 = 한 박 길이 × hopLock */
+    hopLock: 0.75,
+    /** 곡별 쫓아오는 물의 속도(줄/초), 처음 간격(줄), 쓸려 간 뒤 물러나는 간격(줄) */
+    waterSpeed: [0.65, 0.85, 1.05, 1.25],
+    startGap: 4,
+    sweptGap: 3,
+    swampStunMs: 700,
+    burnStunMs: 500,
+    sweptStunMs: 500,
+    lotusBonus: 2,
+    /** 줄 만들기: 돌이 한 개뿐인 줄의 확률 = min(singleMax, singleBase + 줄 번호 × singleStep) */
+    singleBase: 0.25,
+    singleStep: 0.008,
+    singleMax: 0.75,
+    lotusChance: 0.12,
+    /** 도깨비불은 fireFrom줄부터, 물 칸에 붙을 확률 = min(fireMax, (줄 번호 − fireFrom) × fireStep) */
+    fireFrom: 25,
+    fireStep: 0.006,
+    fireMax: 0.3,
+    /** 내 앞으로 미리 만들어 두는 줄 수 */
+    ahead: 10,
+    goals: [50, 56, 62, 68],
+    persona: {
+      normal: { rewardMult: 2 },
+      dark: { rewardMult: 2 },
+    },
+  },
+  /**
    * 콘텐츠 팩 2(사용자 요청으로 추가, 원안에 없음). 아래 수치는 모두 제안값이고 설계는 docs/pack2-design.md에 있다.
    * 영구 보너스는 전부 "1에 더하는 비율"이라 가진 것이 없으면 기존 수치 그대로다.
    */
@@ -1034,10 +1153,11 @@ export const STAGES: readonly StageDef[] = [
   { id: 'large', fans: 20000, firstClearCoins: 18000, firstClearDiamonds: 40, baseCoins: 1200 },
   { id: 'arena', fans: 50000, firstClearCoins: 45000, firstClearDiamonds: 50, baseCoins: 2500 },
   { id: 'world', fans: 150000, firstClearCoins: 120000, firstClearDiamonds: 80, baseCoins: 6000 },
-  // 월클 이후의 비밀 공연장(사용자 요청으로 추가). 어둠속성으로만 입장하고 수치는 월클에서 이어지게 잡은 제안값이다.
-  { id: 'rooftop', fans: 250000, firstClearCoins: 300000, firstClearDiamonds: 100, baseCoins: 15000, darkOnly: true },
-  { id: 'ruins', fans: 500000, firstClearCoins: 800000, firstClearDiamonds: 150, baseCoins: 40000, darkOnly: true },
-  { id: 'garage', fans: 1000000, firstClearCoins: 2000000, firstClearDiamonds: 200, baseCoins: 100000, darkOnly: true },
+  // 월클 이후의 비밀 공연장(사용자 요청으로 추가). 어둠속성으로만 입장한다. 팬 조건은 사용자 지정(100만·250만·500만)이고,
+  // 코인 보상은 처음 제안값(팬 25만·50만·100만)에서 팬 조건이 오른 배수(×4·×5·×5)만큼, 다이아는 ×2로 올렸다.
+  { id: 'rooftop', fans: 1000000, firstClearCoins: 1200000, firstClearDiamonds: 200, baseCoins: 60000, darkOnly: true },
+  { id: 'ruins', fans: 2500000, firstClearCoins: 4000000, firstClearDiamonds: 300, baseCoins: 200000, darkOnly: true },
+  { id: 'garage', fans: 5000000, firstClearCoins: 10000000, firstClearDiamonds: 400, baseCoins: 500000, darkOnly: true },
 ];
 
 export const STAGE_IDS: readonly StageId[] = STAGES.map((s) => s.id);
@@ -1051,8 +1171,8 @@ export const STAGE_IDS: readonly StageId[] = STAGES.map((s) => s.id);
 export const TEMP_OPEN_STAGES: readonly StageId[] = ['hall', 'solo', 'medium', 'large', 'arena', 'world'];
 
 /** 직접 공연 종류. 적혀 있지 않은 공연장은 마이크 타이밍이다. */
-export type ManualGame = 'timing' | 'run' | 'blocks' | 'merge' | 'bounce' | 'defense' | 'survivor' | 'prestige';
-const STAGE_GAMES: Partial<Record<StageId, ManualGame>> = { club: 'run', hall: 'blocks', solo: 'merge', medium: 'bounce', large: 'defense', arena: 'survivor', world: 'prestige', ruins: 'run' };
+export type ManualGame = 'timing' | 'run' | 'blocks' | 'merge' | 'bounce' | 'defense' | 'survivor' | 'prestige' | 'blackout' | 'swipe' | 'stones';
+const STAGE_GAMES: Partial<Record<StageId, ManualGame>> = { club: 'run', hall: 'blocks', solo: 'merge', medium: 'bounce', large: 'defense', arena: 'survivor', world: 'prestige', rooftop: 'blackout', ruins: 'swipe', garage: 'stones' };
 export const manualGameOf = (id: StageId): ManualGame => STAGE_GAMES[id] ?? 'timing';
 export const LAST_STAGE: StageId = STAGES[STAGES.length - 1].id;
 /** 일반 공연장의 마지막. 이걸 클리어하면 비밀 공연장이 열린다. */

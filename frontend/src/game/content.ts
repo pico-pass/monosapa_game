@@ -523,9 +523,9 @@ export const STAGE_TEXT: Record<StageId, { name: string; blurb: string }> = {
   large: { name: '중대형 공연장', blurb: '스태프가 오십 명이다. 실수도 오십 명 앞에서 한다.' },
   arena: { name: '대형 콘서트', blurb: '전광판에 내 얼굴이 뜬다. 숨을 곳이 없다.' },
   world: { name: '월클 콘서트', blurb: '세계가 같은 박자로 손을 흔든다. 여기가 끝이자 시작이다.' },
-  rooftop: { name: '심야 옥상', blurb: '비공개 공연. 난간 너머로 도시가 꺼지지 않는다. 어둠속성만 올라올 수 있다.' },
-  ruins: { name: '폐건물 지하', blurb: '전기가 끊긴 지 오래다. 박자만 살아 있다. 어둠속성만 들어올 수 있다.' },
-  garage: { name: '지하주차장 라이브', blurb: '울림이 전부 내 목소리로 돌아온다. 어둠속성만 설 수 있는 마지막 무대.' },
+  rooftop: { name: '폐건물 지하공연', blurb: '전기가 끊긴 지 오래다. 박자만 살아 있다. 어둠속성만 들어올 수 있다.' },
+  ruins: { name: '다크웹 라이브공연', blurb: '주소도 얼굴도 없는 접속자들이 화면 너머에서 지켜본다. 어둠속성만 접속할 수 있다.' },
+  garage: { name: '저세상 공연페스티벌', blurb: '이승의 불이 다 꺼진 뒤에야 열리는 축제. 어둠속성만 설 수 있는 마지막 무대.' },
 };
 
 export const EQUIPMENT_TEXT = {

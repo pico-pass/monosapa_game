@@ -34,7 +34,7 @@ describe('모노사파런 코스', () => {
     expect(buildCourse('dark', 1, 'club').goalM).toBe(697.4);
   });
 
-  it('폐건물 지하는 원래 코스(일반 2600m, 어둠 6900m) 그대로다', () => {
+  it('코스 설정이 없는 공연장(ruins)은 persona의 원래 코스(일반 2600m, 어둠 6900m) 그대로다', () => {
     expect(buildCourse('normal', 1, 'ruins').goalM).toBe(2600);
     expect(buildCourse('dark', 1, 'ruins').goalM).toBe(6900);
     expect(courseConfig('ruins', 'dark')).toBe(R.persona.dark);
@@ -53,7 +53,7 @@ describe('모노사파런 코스', () => {
     expect(courseConfig('club', 'dark').endSpeed).toBeGreaterThan(courseConfig('club', 'normal').endSpeed);
   });
 
-  it('지하 클럽은 짧아진 대신 끝에서 시작 속도의 2.4배 넘게 빨라진다 (폐건물 지하는 2배)', () => {
+  it('지하 클럽은 짧아진 대신 끝에서 시작 속도의 2.4배 넘게 빨라진다 (코스 설정이 없는 공연장은 2배)', () => {
     for (const p of ['normal', 'dark'] as Persona[]) {
       const club = courseConfig('club', p);
       const old = courseConfig('ruins', p);
@@ -146,7 +146,7 @@ describe('모노사파런 진행', () => {
     expect(g.distanceM).toBe(697.4);
   });
 
-  it('폐건물 지하 어둠: 6900m를 완주하는 원래 코스 (약 2분 반)', () => {
+  it('코스 설정이 없는 공연장 어둠: 6900m를 완주하는 원래 코스 (약 2분 반)', () => {
     const g = new RunGame('dark', 5, 'ruins');
     autopilot(g);
     expect(g.status).toBe('cleared');

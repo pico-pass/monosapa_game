@@ -540,7 +540,7 @@ describe('단콘 직접 공연 연결', () => {
     expect(manualGameOf('large')).toBe('defense');
     expect(manualGameOf('arena')).toBe('survivor');
     expect(manualGameOf('world')).toBe('prestige');
-    expect(manualGameOf('ruins')).toBe('run');
+    expect(manualGameOf('ruins')).toBe('swipe');
   });
 
   it('직접 공연을 시작하면 머지 웨이브로 쿨다운이 확정된다', () => {
