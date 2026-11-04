@@ -176,11 +176,16 @@ describe('새 화면 렌더링', () => {
     expect(await render('inquiry', g)).toContain('관리자');
   });
 
-  it('공연: 월클 전에는 ???, 클리어 후에는 비밀 공연장이 보이고 일반속성이면 안내', async () => {
+  it('공연: 유니버스 페스티벌 전에는 ???, 클리어 후에는 비밀 공연장이 보이고 일반속성이면 안내', async () => {
     const fresh = createInitialState(T0);
     const before = await render('concert', { ...fresh, fans: 1e7 });
     expect(before).toContain('???');
+    expect(before).toContain('유니버스 페스티벌');
     expect(before).not.toContain('폐건물 지하공연');
+    // 월클만 클리어해서는 비밀 공연장이 열리지 않는다
+    const worldOnly = await render('concert', { ...fresh, fans: 1e7, concerts: { ...fresh.concerts, world: { ...fresh.concerts.world, cleared: true } } });
+    expect(worldOnly).toContain('???');
+    expect(worldOnly).not.toContain('폐건물 지하공연');
     const after = await render('concert', richState());
     expect(after).toContain('폐건물 지하공연');
     expect(after).toContain('어둠속성으로만 입장해요');
@@ -583,6 +588,34 @@ describe('새 화면 렌더링', () => {
     expect(dead).toContain('물에 잠겼어요');
   });
 
+  it('은하 노선 잇기 전체화면과 결과 창', async () => {
+    const g = packState();
+    const loader = () => import('../ConcertStage');
+    const run = { id: 'u1', stageId: 'universe', persona: 'normal', game: 'galaxy', difficulty: 2.8, taskGrowth: 1.25, status: 'running' };
+    const html = await renderNamed(loader, 'ConcertStage', 'concert', g, {}, { run });
+    for (const t of ['유니버스 페스티벌', '은하 노선 잇기', '열기 점수', '1곡 1/4', '불만 0', `목표 ${BALANCE.galaxy.persona.normal.goals[0]}`, '노선 0/2 · 예비 셔틀 1대', '아직 노선이 없어요', '➕ 새 노선으로 잇기', '관객은 자기와 다른 모양의 정거장', '공연 포기']) expect(html).toContain(t);
+    expect(html).toContain('stage-normal');
+    expect((html.match(/data-station=/g) ?? []).length).toBe(3);
+
+    const galaxy = { delivered: 280, spawned: 407, complaints: 3, transfers: 46, stations: 9, lines: 5, shuttles: 3, waves: [100, 96, 88, 71], seconds: 92 };
+    const win = { stageId: 'universe', mode: 'manual', persona: 'normal', score: 889, coins: 80000, cleared: true, firstClear: true, firstClearCoins: 400000, diamonds: 120, galaxy };
+    const done = await renderNamed(loader, 'ConcertStage', 'concert', g, { concertResult: win }, { run: { ...run, status: 'finished' } });
+    for (const t of ['공연 성공!', '889', '도착한 관객 280/407명 · 갈아탄 횟수 46 · 불만 3번 · 정거장 9곳 · 노선 5개 · 셔틀 3대 추가 · 92초', '열기 목표 1곡 100% · 2곡 96% · 3곡 88% · 앙코르 71%', '첫 클리어 보너스', '💎 다이아']) expect(done).toContain(t);
+    expect(done).not.toContain('보상 50%');
+    const lost = await renderNamed(loader, 'ConcertStage', 'concert', g, { concertResult: { ...win, score: 300, cleared: false, firstClear: false, firstClearCoins: 0, diamonds: 0 } }, { run: { ...run, status: 'finished' } });
+    expect(lost).toContain('아쉬운 공연…');
+    expect(lost).toContain('600점 미만이라 보상 50%');
+  });
+
+  it('공연: 유니버스 페스티벌은 일반·어둠 모두 은하 노선 잇기로 직접 공연하고 어둠은 보상 ×2', async () => {
+    const g = richState();
+    const normal = await render('concert', { ...g, fans: 1e6 });
+    for (const t of ['유니버스 페스티벌', '직접 공연 · 은하 노선 잇기', '정거장(●▲■★)을 끌어서 이어 노선을 만들고', '팬 500K명']) expect(normal).toContain(t);
+    expect(normal).not.toContain('어둠은 정거장이 더 빨리 붐벼서');
+    const dark = await render('concert', { ...g, fans: 1e6, activePersona: 'dark' as const });
+    expect(dark).toContain('어둠은 정거장이 더 빨리 붐벼서 목표가 높은 대신 보상 ×2');
+  });
+
   it('장비·작업실·도감도 새 필드와 함께 그려진다', async () => {
     const g = richState();
     expect(await render('equip', g)).toContain('오프라인 정산 확장');
@@ -591,7 +624,7 @@ describe('새 화면 렌더링', () => {
     const dark = await render('studio', { ...g, activePersona: 'dark' });
     expect(dark).toContain('/assets/costume-king.webp'); // 어둠속성은 자기 칸의 옷을 입는다
     expect(dark).not.toContain('/assets/costume-bunny.webp');
-    // 도감도 비밀 공연장은 월클을 클리어한 뒤에만 보여 준다.
+    // 도감도 비밀 공연장은 유니버스 페스티벌을 클리어한 뒤에만 보여 준다.
     expect(await render('collection', g)).toContain('폐건물 지하공연');
     expect(await render('collection', createInitialState(T0))).not.toContain('폐건물 지하공연');
   });

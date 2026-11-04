@@ -1,4 +1,4 @@
-import { BALANCE, SECRET_STAGE_IDS, STAGES, STREAM_PLATFORMS, TEMP_OPEN_STAGES, TOUR_STAGE, WORLD_STAGE, type AchievementMetric, type MissionMetric } from './balance';
+import { BALANCE, LAST_NORMAL_STAGE, SECRET_STAGE_IDS, STAGES, STREAM_PLATFORMS, TEMP_OPEN_STAGES, TOUR_STAGE, WORLD_STAGE, type AchievementMetric, type MissionMetric } from './balance';
 import { albumSeries, singleTitle, type AlbumDef } from './content';
 import { bonuses, completedSets, mascotStage, photoDistinct, songCardOf, type BonusState } from './packdata';
 import type { Album, AlbumType, CostumeId, CounterKey, DiamondUpgradeKind, Equipment, EquipmentKind, GameState, Persona, StageId, Streaming } from './types';
@@ -539,7 +539,7 @@ export function stageStatus(s: GameState, id: StageId, at: number = s.lastSettle
   };
 }
 
-/** 직접 공연 난이도: baseDifficulty × stageDifficultyGrowth^(공연장 순번). 방구석 1.30 → 지하 클럽 1.43 → 소형 공연장 1.57 → … → 월클 콘서트 2.53 */
+/** 직접 공연 난이도: baseDifficulty × stageDifficultyGrowth^(공연장 순번). 방구석 1.30 → 지하 클럽 1.43 → 소형 공연장 1.57 → … → 월클 콘서트 2.53 → 유니버스 페스티벌 2.79 */
 export function stageDifficulty(id: StageId): number {
   const idx = Math.max(0, STAGES.findIndex((x) => x.id === id));
   return BALANCE.concert.baseDifficulty * BALANCE.concert.stageDifficultyGrowth ** idx;
@@ -550,9 +550,9 @@ export const stageTaskGrowth = (id: StageId): number => BALANCE.concert.stageTas
 
 export const isTourComplete = (s: GameState) => s.concerts[TOUR_STAGE].cleared;
 
-/** 아직 보이지 않는 첫 비밀 공연장 (월클을 클리어하면 사라진다). 목록에 "???" 안내를 띄울 때 쓴다. */
+/** 아직 보이지 않는 첫 비밀 공연장 (유니버스 페스티벌을 클리어하면 사라진다). 목록에 "???" 안내를 띄울 때 쓴다. */
 export const hiddenSecretStage = (s: GameState): StageId | null =>
-  s.concerts[WORLD_STAGE].cleared ? null : (SECRET_STAGE_IDS[0] ?? null);
+  s.concerts[LAST_NORMAL_STAGE].cleared ? null : (SECRET_STAGE_IDS[0] ?? null);
 
 /* ---------- 업적·미션 지표 ---------- */
 

@@ -231,7 +231,7 @@ describe('후원 채팅 스와이프: 공연장 연결', () => {
   it('어둠속성이 폐건물 지하공연을 클리어하고 팬 250만이면 시작할 수 있다', () => {
     const s = createInitialState(T0);
     const done = { cleared: true, bestScore: 0, cooldownUntil: 0 };
-    const open = { ...s, fans: 2_500_000, activePersona: 'dark' as const, concerts: { ...s.concerts, world: done, rooftop: done } };
+    const open = { ...s, fans: 2_500_000, activePersona: 'dark' as const, concerts: { ...s.concerts, universe: done, rooftop: done } };
     const r = beginManualConcert(open, 'ruins', 's1');
     expect(r.ok && r.run.game).toBe('swipe');
     const early = beginManualConcert({ ...open, concerts: { ...open.concerts, rooftop: { ...done, cleared: false } } }, 'ruins', 's2');
@@ -244,7 +244,7 @@ describe('후원 채팅 스와이프: 공연장 연결', () => {
     expect(manualConcertReward(200_000, 1000, 'dark', 'swipe')).toBe(200_000 * 2 * 2);
     const s = createInitialState(T0);
     const done = { cleared: true, bestScore: 0, cooldownUntil: 0 };
-    const open = { ...s, fans: 2_500_000, activePersona: 'dark' as const, concerts: { ...s.concerts, world: done, rooftop: done } };
+    const open = { ...s, fans: 2_500_000, activePersona: 'dark' as const, concerts: { ...s.concerts, universe: done, rooftop: done } };
     const begin = beginManualConcert(open, 'ruins', 's1');
     if (!begin.ok) throw new Error('begin failed');
     const fin = finishManualConcert(begin.state, begin.run, 800);

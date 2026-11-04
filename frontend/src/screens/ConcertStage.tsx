@@ -30,6 +30,7 @@ import { PERK_TEXT, SurvivorPlay } from './SurvivorStage';
 import { PRESTIGE_PERK_TEXT, PrestigePlay } from './PrestigeStage';
 import { BlackoutPlay } from './BlackoutStage';
 import { StonesPlay } from './StonesStage';
+import { GalaxyPlay } from './GalaxyStage';
 import { SwipePlay } from './SwipeStage';
 import { PERK_IDS as PRESTIGE_PERK_IDS } from '../game/prestige';
 import { PASSIVE_IDS, WEAPON_IDS } from '../game/survivor';
@@ -78,6 +79,8 @@ export function ConcertStage({ run }: { run: ConcertRun }) {
         <SwipePlay key={run.id} run={run} />
       ) : run.game === 'stones' ? (
         <StonesPlay key={run.id} run={run} />
+      ) : run.game === 'galaxy' ? (
+        <GalaxyPlay key={run.id} run={run} />
       ) : (
         <Play key={run.id} run={run} />
       )}
@@ -283,6 +286,7 @@ function ResultPanel({ result }: { result: ConcertResult }) {
   const bo = result.blackout;
   const sw = result.swipe;
   const st = result.stones;
+  const gx = result.galaxy;
   return (
     <div className="stage-result">
       <h2>{result.cleared ? (r ? '완주 성공!' : '공연 성공!') : r ? '아쉬운 질주…' : '아쉬운 공연…'}</h2>
@@ -407,6 +411,14 @@ function ResultPanel({ result }: { result: ConcertResult }) {
             풍덩 {st.splashes}번 · 도깨비불 {st.burns}번 · 물살에 쓸림 {st.swept}번
           </p>
           <p className="muted">열기 목표 {st.waves.map((w, i) => `${SET_NAMES[i]} ${w}%`).join(' · ')}</p>
+        </>
+      )}
+      {gx && (
+        <>
+          <p className="muted">
+            도착한 관객 {gx.delivered}/{gx.spawned}명 · 갈아탄 횟수 {gx.transfers} · 불만 {gx.complaints}번 · 정거장 {gx.stations}곳 · 노선 {gx.lines}개 · 셔틀 {gx.shuttles}대 추가 · {gx.seconds}초
+          </p>
+          <p className="muted">열기 목표 {gx.waves.map((w, i) => `${SET_NAMES[i]} ${w}%`).join(' · ')}</p>
         </>
       )}
       <ul className="reward-list">

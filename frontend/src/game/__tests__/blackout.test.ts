@@ -234,9 +234,9 @@ describe('정전 속 박자: 공연장 연결', () => {
     expect(manualGameOf('rooftop')).toBe('blackout');
   });
 
-  it('어둠속성이 월클을 클리어하고 팬 100만이면 시작할 수 있고, 일반속성은 막힌다', () => {
+  it('어둠속성이 유니버스 페스티벌을 클리어하고 팬 100만이면 시작할 수 있고, 일반속성은 막힌다', () => {
     const s = createInitialState(T0);
-    const open = { ...s, fans: 1_000_000, activePersona: 'dark' as const, concerts: { ...s.concerts, world: { ...s.concerts.world, cleared: true } } };
+    const open = { ...s, fans: 1_000_000, activePersona: 'dark' as const, concerts: { ...s.concerts, universe: { ...s.concerts.universe, cleared: true } } };
     const r = beginManualConcert(open, 'rooftop', 'b1');
     expect(r.ok).toBe(true);
     expect(r.ok && r.run.game).toBe('blackout');
@@ -251,7 +251,7 @@ describe('정전 속 박자: 공연장 연결', () => {
     expect(base).toBe(2);
     expect(manualConcertReward(60_000, 1000, 'dark', 'blackout')).toBe(60_000 * 2 * 2);
     const s = createInitialState(T0);
-    const open = { ...s, fans: 1_000_000, activePersona: 'dark' as const, concerts: { ...s.concerts, world: { ...s.concerts.world, cleared: true } } };
+    const open = { ...s, fans: 1_000_000, activePersona: 'dark' as const, concerts: { ...s.concerts, universe: { ...s.concerts.universe, cleared: true } } };
     const begin = beginManualConcert(open, 'rooftop', 'b1');
     if (!begin.ok) throw new Error('begin failed');
     const fin = finishManualConcert(begin.state, begin.run, 900);

@@ -11,7 +11,8 @@ export type StageId =
   | 'large'
   | 'arena'
   | 'world'
-  // 월클을 클리어하면 열리는 비밀 공연장. 어둠속성으로만 입장한다.
+  | 'universe'
+  // 유니버스 페스티벌을 클리어하면 열리는 비밀 공연장. 어둠속성으로만 입장한다.
   | 'rooftop'
   | 'ruins'
   | 'garage';

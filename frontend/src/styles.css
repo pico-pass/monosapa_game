@@ -4243,3 +4243,174 @@ span.rar {
   font-size: 12.5px;
   line-height: 1.5;
 }
+
+/* ---------- 은하 노선 잇기(유니버스 페스티벌의 직접 공연) ---------- */
+.galaxy-complaints {
+  color: #ff9db3;
+  font-weight: 700;
+}
+.galaxy-meter {
+  height: 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.16);
+  overflow: hidden;
+}
+.galaxy-meter i {
+  display: block;
+  height: 100%;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #8ccbff, #c7b0ff);
+}
+.galaxy-power {
+  margin-top: -6px;
+  font-size: 12px;
+  text-align: right;
+  color: #cfc8ee;
+}
+.galaxy-field {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  align-self: center;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #090716;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.galaxy-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 46dvh;
+  touch-action: none;
+}
+.galaxy-station {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: galaxy-pop 0.5s ease-out;
+}
+@keyframes galaxy-pop {
+  from {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.galaxy-warn {
+  animation: galaxy-blink 0.6s ease-in-out infinite alternate;
+}
+@keyframes galaxy-blink {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.galaxy-load {
+  font-size: 10px;
+  font-weight: 900;
+  fill: #170f2b;
+  pointer-events: none;
+}
+.galaxy-more {
+  font-size: 11px;
+  font-weight: 800;
+  fill: #ff9db3;
+  pointer-events: none;
+}
+.galaxy-banner {
+  position: absolute;
+  top: 2%;
+  left: 0;
+  right: 0;
+  padding: 0 8px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+  animation: judge-pop 1.5s ease-out forwards;
+}
+.galaxy-banner-good {
+  color: #5ad7a6;
+}
+.galaxy-banner-bad {
+  color: #ff8fa8;
+}
+.galaxy-countdown small {
+  display: block;
+  max-width: 260px;
+  margin: 6px auto 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.galaxy-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  max-width: 420px;
+  align-self: center;
+  font-size: 13px;
+}
+.galaxy-mode {
+  min-height: 36px;
+  padding: 4px 10px;
+  font-size: 12.5px;
+}
+.galaxy-mode-on {
+  outline: 2px solid #ffd24a;
+  background: rgba(255, 210, 74, 0.2);
+}
+.galaxy-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: 420px;
+  align-self: center;
+}
+.galaxy-empty {
+  margin: 0;
+  font-size: 12.5px;
+}
+.galaxy-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border: 2px solid;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 12.5px;
+}
+.galaxy-line i {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  border-radius: 50%;
+}
+.galaxy-line span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.galaxy-line .btn {
+  min-height: 34px;
+  padding: 2px 10px;
+  font-size: 12.5px;
+}
+.galaxy-hint {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+}

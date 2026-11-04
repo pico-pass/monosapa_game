@@ -848,6 +848,47 @@ export const BALANCE = {
     },
   },
   /**
+   * 은하 노선 잇기 (유니버스 페스티벌의 직접 공연, 사용자 요청으로 추가). 「Mini Metro」처럼 정거장(행성 무대)을 노선으로 이어 관객을 실어 나르는 게임이다.
+   *   지도(width × height)에 정거장이 stationAt 시각마다 하나씩 나타나고(모두 9곳, 모양은 ● ▲ ■, 6번째는 ★), 정거장마다 관객이 spawnMs[곡] 안팎 간격으로 생긴다.
+   *   관객은 자기 정거장과 다른 모양의 정거장으로 가고 싶어 한다. 정거장을 끌어서 이으면 노선이 생기고(끝 정거장에서 끌면 그 노선이 늘어난다) 셔틀이 오간다.
+   *   셔틀(속도 speed, 정거장마다 dwellMs 정차, 정원 shuttleCap)은 도착한 정거장의 모양이 목적지인 관객을 내려 주고(도착 = 열기 +1),
+   *   노선망으로 가는 가장 가까운 길에서 다음 정거장이 이 셔틀의 다음 정거장인 관객을 태운다. 길이 다르면 내려서 갈아탄다. 길이 없으면 정거장에서 기다린다.
+   *   정거장의 대기가 persona[].cap명을 넘은 채 overMs가 지나면 불만이 터져서 대기가 cap의 절반으로 줄고(불만 1) 그 곡 열기에서 complaintFans만큼 깎인다.
+   *   노선은 maxLines[곡]개까지 만들 수 있고, 곡이 시작할 때마다 spareShuttles[곡]대의 예비 셔틀이 생기며 노선에 붙인다(노선 하나에 maxShuttles대까지).
+   *   곡 점수 비율 = (그 곡에서 도착시킨 관객 − 불만 × complaintFans) ÷ goals[곡], 0~1. 열기 점수 = 곡별 waveScore × 비율의 합(최대 1000), 600 이상이 클리어.
+   *   정거장 자리·모양·관객은 시드 난수로 정해지고 고정 stepMs 걸음으로 흘러서 같은 씨앗이면 같은 지도·같은 관객이 같은 때 나온다(플레이어 조작과 상관없이).
+   *   어둠은 정거장이 더 빨리 붐벼서(cap 5, 관객이 spawnMult배 간격으로 생김) 목표가 높은 대신 보상 ×2다.
+   *   봇 시뮬레이션(시드 200개, 일반): 봇은 일정 간격(생각 시간)마다 한 가지를 한다 — 예비 셔틀을 붙이고, 이어지지 않은 정거장을 가까운 노선 끝(허브 봇은 가까운 정거장에서 새 노선)에 잇고, 무리가 나뉘면 가까운 쪽끼리 잇는다.
+   *     1.5초마다 하는 숙련 허브 봇은 클리어 100%(열기 점수 평균 910, 관객 321/407명 도착, 불만 3.2번), 3.5초마다 하는 보통 봇(한 줄로만 잇고 20%는 쉬고 8%는 엉뚱한 곳을 잇고 예비 셔틀은 60%만 붙임)은 73%(681),
+   *     6초마다 하는 서툰 봇은 16%(402), 보통 속도의 허브 봇은 98%(857), 숙련인데 셔틀을 안 늘리면 46%(587), 2초마다 무작위로 이으면 9%(414), 가만히 있으면 0점(불만 34번). 어둠은 숙련 99%(888)·보통 54%(600)·서툼 7%(340)·무작위 3%(361).
+   *   난이도 조정 이력: 처음에는 셔틀이 빠르고 관객이 적어서(간격 3.4초대, 속도 170, 정원 6) 목표 14~55로도 무작위로 이어도 94%가 클리어했다. 관객 간격을 2.0→1.2초, 셔틀 속도를 90, 정차를 0.5초, 정원을 5로 바꿔 노선 짜임새가 도착 수를 가르게 한 뒤
+   *     「보통 봇 클리어 70% 안팎」(사용자가 앞선 직접 공연들에 요청한 기준)에 맞춰 목표를 정했다. 봇은 지도를 보고 판단하는 사람보다 단순하고 사람의 실제 난이도는 측정하지 못했다.
+   */
+  galaxy: {
+    waves: [{ ms: 23_000 }, { ms: 23_000 }, { ms: 23_000 }, { ms: 23_000 }],
+    waveScore: 250,
+    stepMs: 50,
+    width: 400,
+    height: 520,
+    /** 정거장이 나타나는 시각(ms, 공연 시작부터). 길이가 정거장 수다. */
+    stationAt: [0, 0, 0, 9_000, 19_000, 30_000, 42_000, 56_000, 70_000],
+    /** 이 번째(0부터)부터 ★ 모양이 나온다 */
+    starAt: 5,
+    spawnMs: [2000, 1700, 1400, 1200],
+    speed: 90,
+    dwellMs: 500,
+    shuttleCap: 5,
+    maxShuttles: 4,
+    maxLines: [2, 3, 3, 4],
+    spareShuttles: [1, 1, 1, 1],
+    overMs: 9_000,
+    complaintFans: 4,
+    persona: {
+      normal: { cap: 6, spawnMult: 1, goals: [34, 62, 96, 134], rewardMult: 1 },
+      dark: { cap: 5, spawnMult: 0.85, goals: [38, 70, 108, 150], rewardMult: 2 },
+    },
+  },
+  /**
    * 콘텐츠 팩 2(사용자 요청으로 추가, 원안에 없음). 아래 수치는 모두 제안값이고 설계는 docs/pack2-design.md에 있다.
    * 영구 보너스는 전부 "1에 더하는 비율"이라 가진 것이 없으면 기존 수치 그대로다.
    */
@@ -1159,7 +1200,10 @@ export const STAGES: readonly StageDef[] = [
   { id: 'large', fans: 20000, firstClearCoins: 18000, firstClearDiamonds: 40, baseCoins: 1200 },
   { id: 'arena', fans: 50000, firstClearCoins: 45000, firstClearDiamonds: 50, baseCoins: 2500 },
   { id: 'world', fans: 150000, firstClearCoins: 120000, firstClearDiamonds: 80, baseCoins: 6000 },
-  // 월클 이후의 비밀 공연장(사용자 요청으로 추가). 어둠속성으로만 입장한다. 팬 조건은 사용자 지정(100만·250만·500만)이고,
+  // 월클 뒤의 마지막 일반 공연장(사용자 요청으로 추가). 팬 조건은 사용자 지정(50만)이고, 보상은 월클과 비밀 공연장 사이를 이은 값이다
+  // (첫 클리어 코인은 지금까지처럼 팬 조건의 약 0.8배, 다이아는 80→120, 기본 코인은 월클 6,000의 약 3.3배).
+  { id: 'universe', fans: 500000, firstClearCoins: 400000, firstClearDiamonds: 120, baseCoins: 20000 },
+  // 유니버스 페스티벌 이후의 비밀 공연장(사용자 요청으로 추가). 어둠속성으로만 입장한다. 팬 조건은 사용자 지정(100만·250만·500만)이고,
   // 코인 보상은 처음 제안값(팬 25만·50만·100만)에서 팬 조건이 오른 배수(×4·×5·×5)만큼, 다이아는 ×2로 올렸다.
   { id: 'rooftop', fans: 1000000, firstClearCoins: 1200000, firstClearDiamonds: 200, baseCoins: 60000, darkOnly: true },
   { id: 'ruins', fans: 2500000, firstClearCoins: 4000000, firstClearDiamonds: 300, baseCoins: 200000, darkOnly: true },
@@ -1172,17 +1216,20 @@ export const STAGE_IDS: readonly StageId[] = STAGES.map((s) => s.id);
  * 임시: 팬 수·앞 공연장 클리어 조건 없이 입장할 수 있는 공연장. 새 직접 공연(소형 공연장 무대 세팅 블록, 단콘 응원봉 머지 웨이브, 중형 음파 튕기기,
  * 중대형 돌발 사고 막기, 대형 무대 서바이버, 월클 월드투어 인크리멘탈)을 해 보려고 연다.
  * 되돌릴 때는 배열을 비운다. (원래 조건: 소형 공연장 팬 1,200명 + 지하 클럽 클리어, 단콘 팬 3,000명 + 소형 공연장 클리어, 중형 팬 8,000명,
- * 중대형 20,000명, 대형 50,000명, 월클 150,000명 + 각각 바로 앞 공연장 클리어, 쿨다운·속성 조건은 그대로. 월클 뒤의 비밀 공연장은 이 목록과 상관없이 월클 클리어가 필요하다)
+ * 중대형 20,000명, 대형 50,000명, 월클 150,000명 + 각각 바로 앞 공연장 클리어, 쿨다운·속성 조건은 그대로.
+ * 유니버스 페스티벌(팬 50만 + 월클 클리어)과 그 뒤의 비밀 공연장은 이 목록과 상관없이 팬·앞 공연장 클리어 조건이 필요하다)
  */
 export const TEMP_OPEN_STAGES: readonly StageId[] = ['hall', 'solo', 'medium', 'large', 'arena', 'world'];
 
 /** 직접 공연 종류. 적혀 있지 않은 공연장은 마이크 타이밍이다. */
-export type ManualGame = 'timing' | 'run' | 'blocks' | 'merge' | 'bounce' | 'defense' | 'survivor' | 'prestige' | 'blackout' | 'swipe' | 'stones';
-const STAGE_GAMES: Partial<Record<StageId, ManualGame>> = { club: 'run', hall: 'blocks', solo: 'merge', medium: 'bounce', large: 'defense', arena: 'survivor', world: 'prestige', rooftop: 'blackout', ruins: 'swipe', garage: 'stones' };
+export type ManualGame = 'timing' | 'run' | 'blocks' | 'merge' | 'bounce' | 'defense' | 'survivor' | 'prestige' | 'blackout' | 'swipe' | 'stones' | 'galaxy';
+const STAGE_GAMES: Partial<Record<StageId, ManualGame>> = { club: 'run', hall: 'blocks', solo: 'merge', medium: 'bounce', large: 'defense', arena: 'survivor', world: 'prestige', rooftop: 'blackout', ruins: 'swipe', garage: 'stones', universe: 'galaxy' };
 export const manualGameOf = (id: StageId): ManualGame => STAGE_GAMES[id] ?? 'timing';
 export const LAST_STAGE: StageId = STAGES[STAGES.length - 1].id;
-/** 일반 공연장의 마지막. 이걸 클리어하면 비밀 공연장이 열린다. */
+/** 월클 콘서트. 「월드 스타」 업적이 이걸 본다. */
 export const WORLD_STAGE: StageId = 'world';
+/** 일반 공연장의 마지막. 이걸 클리어하면 비밀 공연장이 열린다. */
+export const LAST_NORMAL_STAGE: StageId = 'universe';
 export const SECRET_STAGE_IDS: readonly StageId[] = STAGES.filter((s) => s.darkOnly).map((s) => s.id);
 /** 이 공연장을 처음 클리어하면 「첫 투어 완료」 카드가 뜬다. 이후 공연장은 그 너머의 확장 콘텐츠다. */
 export const TOUR_STAGE: StageId = 'hall';

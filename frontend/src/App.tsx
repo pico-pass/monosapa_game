@@ -338,7 +338,7 @@ function Overlays() {
             <li>싱글 {g.singles.length}곡 · 앨범 {g.albums.length}장</li>
             <li>팬 {fmt(Math.floor(g.fans))}명 · Lv.{playerLevel(g.fans)}</li>
           </ul>
-          <p className="muted">엔딩이지만 끝은 아니에요. 단콘부터 월클 콘서트까지 더 큰 무대가 기다려요.</p>
+          <p className="muted">엔딩이지만 끝은 아니에요. 단콘부터 유니버스 페스티벌까지 더 큰 무대가 기다려요.</p>
         </Modal>
       )}
       {!ui.arcadeRun && !ui.towerRun && !ui.offlineReport && !ui.concertRun && <GachaModal />}

@@ -129,6 +129,18 @@ describe('저장·검증', () => {
     expect(validateState({ ...sampleState(), diamondUpgrades: 'x' }).ok).toBe(false);
   });
 
+  it('공연장이 늘기 전 저장은 새 공연장(유니버스 페스티벌)을 미클리어로 읽고 나머지는 그대로 둔다', () => {
+    const base = sampleState();
+    const old = JSON.parse(JSON.stringify(base)) as { concerts: Record<string, unknown> };
+    old.concerts.room = { cleared: true, bestScore: 777, cooldownUntil: 0 };
+    delete old.concerts.universe;
+    const r = parseSave(JSON.stringify(old));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.state.concerts.universe).toEqual({ cleared: false, bestScore: 0, cooldownUntil: 0 });
+    expect(r.state.concerts.room).toMatchObject({ cleared: true, bestScore: 777 });
+  });
+
   it('스트리밍: 왕복 저장되고, 없던 예전 저장은 0에서 시작하며, 이상한 값은 거부·보정한다', () => {
     const st = memoryStorage();
     const streaming = {

@@ -317,7 +317,7 @@ describe('다이아', () => {
   });
 
   it('공연장마다 값이 다르고 모두 양수', () => {
-    expect(STAGES.map((d) => d.firstClearDiamonds)).toEqual([5, 10, 15, 20, 30, 40, 50, 80, 200, 300, 400]);
+    expect(STAGES.map((d) => d.firstClearDiamonds)).toEqual([5, 10, 15, 20, 30, 40, 50, 80, 120, 200, 300, 400]);
   });
 
   it('앨범 발매: 앨범별 다이아 (30, 60, 120)', () => {
@@ -721,10 +721,10 @@ describe('공연', () => {
     expect(fin.ok && fin.outcome.coins).toBe(manualConcertReward(40, 1000, 'dark') + 200);
   });
 
-  it('소형 공연장 이후 단콘→중형→중대형→대형→월클 순서로 열린다', () => {
-    const order = ['hall', 'solo', 'medium', 'large', 'arena', 'world'] as const;
+  it('소형 공연장 이후 단콘→중형→중대형→대형→월클→유니버스 페스티벌 순서로 열린다', () => {
+    const order = ['hall', 'solo', 'medium', 'large', 'arena', 'world', 'universe'] as const;
     expect(STAGES.filter((d) => !d.darkOnly).map((d) => d.id)).toEqual(['room', 'club', ...order]);
-    // 팬이 충분해도 앞 공연장을 클리어해야 열린다 (소형 공연장~월클은 TEMP_OPEN_STAGES 로 임시 개방 중이라 월클 뒤의 비밀 공연장으로 확인)
+    // 팬이 충분해도 앞 공연장을 클리어해야 열린다 (소형 공연장~월클은 TEMP_OPEN_STAGES 로 임시 개방 중이라 유니버스 페스티벌 뒤의 비밀 공연장으로 확인)
     let s = fanned(1e6);
     expect(stageStatus(s, 'rooftop').unlocked).toBe(false);
     for (const id of ['room', 'club', ...order] as const) {
@@ -734,11 +734,19 @@ describe('공연', () => {
       if (!r.ok) return;
       s = r.state;
     }
-    expect(s.concerts.world.cleared).toBe(true);
+    expect(s.concerts.universe.cleared).toBe(true);
+    // 유니버스 페스티벌: 월클을 클리어하고 팬 50만이어야 열린다
+    const worldDone = { cleared: true, bestScore: 0, cooldownUntil: 0 };
+    expect(stageStatus({ ...fanned(499999), concerts: { ...fanned(499999).concerts, world: worldDone } }, 'universe').unlocked).toBe(false);
+    expect(stageStatus({ ...fanned(500000), concerts: { ...fanned(500000).concerts, world: worldDone } }, 'universe').unlocked).toBe(true);
+    expect(stageStatus(fanned(500000), 'universe').unlocked).toBe(false);
+    // 비밀 공연장은 월클이 아니라 유니버스 페스티벌을 클리어해야 열린다
+    expect(stageStatus({ ...fanned(1e6), concerts: { ...fanned(1e6).concerts, world: worldDone } }, 'rooftop').unlocked).toBe(false);
     // 팬 조건: 팬이 모자라면 열리지 않는다
-    expect(stageStatus({ ...fanned(999999), concerts: { ...fanned(999999).concerts, world: { cleared: true, bestScore: 0, cooldownUntil: 0 } } }, 'rooftop').unlocked).toBe(false);
-    expect(stageStatus({ ...fanned(1000000), concerts: { ...fanned(1000000).concerts, world: { cleared: true, bestScore: 0, cooldownUntil: 0 } } }, 'rooftop').unlocked).toBe(true);
+    expect(stageStatus({ ...fanned(999999), concerts: { ...fanned(999999).concerts, universe: { cleared: true, bestScore: 0, cooldownUntil: 0 } } }, 'rooftop').unlocked).toBe(false);
+    expect(stageStatus({ ...fanned(1000000), concerts: { ...fanned(1000000).concerts, universe: { cleared: true, bestScore: 0, cooldownUntil: 0 } } }, 'rooftop').unlocked).toBe(true);
     expect(stageDifficulty('world')).toBeCloseTo(1.3 * 1.1 ** 7, 9);
+    expect(stageDifficulty('universe')).toBeCloseTo(1.3 * 1.1 ** 8, 9);
   });
 
   it('마지막 공연장 첫 클리어 → 첫 투어 완료, 자동 공연만으로도 가능', () => {

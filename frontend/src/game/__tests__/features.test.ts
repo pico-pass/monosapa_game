@@ -273,6 +273,7 @@ describe('비밀 공연장', () => {
     expect(secret.map((d) => d.fans)).toEqual([1_000_000, 2_500_000, 5_000_000]);
     expect(secret.map((d) => STAGE_TEXT[d.id].name)).toEqual(['폐건물 지하공연', '다크웹 라이브공연', '저세상 공연페스티벌']);
     expect(secret.map((d) => manualGameOf(d.id))).toEqual(['blackout', 'swipe', 'stones']);
+    expect(manualGameOf('universe')).toBe('galaxy');
   });
 });
 

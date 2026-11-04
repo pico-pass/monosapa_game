@@ -8,7 +8,7 @@ import type { StageId } from '../game/types';
 import { doAutoConcert, doSkipCooldown, setTourCardOpen, startManualConcert, useUi } from '../store/gameStore';
 
 /** 직접 공연 버튼에 붙는 게임 이름(마이크 타이밍은 따로 이름을 붙이지 않는다) */
-const GAME_LABEL: Partial<Record<ManualGame, string>> = { run: '모노사파런', blocks: '무대 세팅 블록', merge: '응원봉 머지 웨이브', bounce: '음파 튕기기', defense: '돌발 사고 막기', survivor: '무대 서바이버', prestige: '월드투어 인크리멘탈', blackout: '정전 속 박자', swipe: '후원 채팅 스와이프', stones: '삼도천 징검다리' };
+const GAME_LABEL: Partial<Record<ManualGame, string>> = { run: '모노사파런', blocks: '무대 세팅 블록', merge: '응원봉 머지 웨이브', bounce: '음파 튕기기', defense: '돌발 사고 막기', survivor: '무대 서바이버', prestige: '월드투어 인크리멘탈', blackout: '정전 속 박자', swipe: '후원 채팅 스와이프', stones: '삼도천 징검다리', galaxy: '은하 노선 잇기' };
 
 /** 무대 세팅 블록 안내 */
 function blocksNote(persona: 'normal' | 'dark'): string {
@@ -73,6 +73,12 @@ function stonesNote(): string {
   return `3칸 폭 강의 징검다리를 박자에 맞춰 한 줄씩 건너요. 링이 점에 닿는 순간 누르면 PERFECT, 박자를 놓치면 점수가 깎여요. 물은 풍덩, 도깨비불은 따끔(하트 −1)이고 뒤에서 삼도천 물이 쫓아와요. 하트 ${BALANCE.stones.hearts}개가 다 닳으면 거기서 끝나요. 곡마다 목표 점수를 채우면 250점씩, 열기 점수 600 이상이면 성공이에요. 어둠속성만 입장하는 공연장이라 보상 ×${BALANCE.stones.persona.dark.rewardMult}.`;
 }
 
+/** 은하 노선 잇기 안내 */
+function galaxyNote(persona: 'normal' | 'dark'): string {
+  const base = `정거장(●▲■★)을 끌어서 이어 노선을 만들고 셔틀로 관객을 실어 날라요. 관객은 자기와 다른 모양의 정거장으로 가고 싶어 하고, 길이 다르면 환승으로 갈아타요. 정거장이 정원을 넘은 채 오래 두면 불만이 터져 열기가 깎여요. 곡이 바뀔 때마다 노선 한도와 예비 셔틀이 늘어요. 곡마다 목표 열기를 채우면 250점씩, 열기 점수 600 이상이면 성공이에요.`;
+  return persona === 'dark' ? `${base} 어둠은 정거장이 더 빨리 붐벼서 목표가 높은 대신 보상 ×${BALANCE.galaxy.persona.dark.rewardMult}.` : base;
+}
+
 /** 모노사파런 안내: 공연장과 자아에 따라 목표 거리가 다르다 */
 function runNote(stage: StageId, persona: 'normal' | 'dark'): string {
   const goal = courseConfig(stage, persona).goalM.toLocaleString();
@@ -104,6 +110,8 @@ function manualNote(stage: StageId, persona: 'normal' | 'dark'): string {
       return swipeNote();
     case 'stones':
       return stonesNote();
+    case 'galaxy':
+      return galaxyNote(persona);
     default:
       return persona === 'dark' ? `어둠은 판정이 더 좁은 대신 보상 ×${BALANCE.concert.personaRewardMult.dark}.` : '';
   }
@@ -200,7 +208,7 @@ export function ConcertScreen() {
             <h3>🔒 ???</h3>
             <span className="muted">비밀 공연장</span>
           </div>
-          <p className="muted">월클 콘서트를 클리어하면 어둠속성만 설 수 있는 비밀 공연장이 열려요.</p>
+          <p className="muted">유니버스 페스티벌을 클리어하면 어둠속성만 설 수 있는 비밀 공연장이 열려요.</p>
         </div>
       )}
     </section>

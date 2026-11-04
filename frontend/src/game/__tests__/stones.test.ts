@@ -239,7 +239,7 @@ describe('삼도천 징검다리: 공연장 연결', () => {
   it('어둠속성이 다크웹 라이브공연을 클리어하고 팬 500만이면 시작할 수 있다', () => {
     const s = createInitialState(T0);
     const done = { cleared: true, bestScore: 0, cooldownUntil: 0 };
-    const open = { ...s, fans: 5_000_000, activePersona: 'dark' as const, concerts: { ...s.concerts, world: done, rooftop: done, ruins: done } };
+    const open = { ...s, fans: 5_000_000, activePersona: 'dark' as const, concerts: { ...s.concerts, universe: done, rooftop: done, ruins: done } };
     const r = beginManualConcert(open, 'garage', 't1');
     expect(r.ok && r.run.game).toBe('stones');
     const early = beginManualConcert({ ...open, concerts: { ...open.concerts, ruins: { ...done, cleared: false } } }, 'garage', 't2');
@@ -252,7 +252,7 @@ describe('삼도천 징검다리: 공연장 연결', () => {
     expect(manualConcertReward(500_000, 1000, 'dark', 'stones')).toBe(500_000 * 2 * 2);
     const s = createInitialState(T0);
     const done = { cleared: true, bestScore: 0, cooldownUntil: 0 };
-    const open = { ...s, fans: 5_000_000, activePersona: 'dark' as const, concerts: { ...s.concerts, world: done, rooftop: done, ruins: done } };
+    const open = { ...s, fans: 5_000_000, activePersona: 'dark' as const, concerts: { ...s.concerts, universe: done, rooftop: done, ruins: done } };
     const begin = beginManualConcert(open, 'garage', 't1');
     if (!begin.ok) throw new Error('begin failed');
     const fin = finishManualConcert(begin.state, begin.run, 700);
