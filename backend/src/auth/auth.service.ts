@@ -3,6 +3,7 @@ import { BadRequestException, Injectable, ServiceUnavailableException, Unauthori
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 import { AppConfig } from '../config/app.config.js';
+import { displayNameOf, mutedUntilMs } from '../users/profile.js';
 import type { UserDocument } from '../users/user.schema.js';
 import { UsersService } from '../users/users.service.js';
 import type { UserDto } from './dto/auth.dto.js';
@@ -19,6 +20,12 @@ export const toUserDto = (u: UserDocument, admins: readonly string[] = []): User
   email: u.email,
   name: u.name,
   picture: u.picture,
+  nickname: u.nickname ?? null,
+  bio: u.bio ?? null,
+  avatar: u.avatar ?? 'google',
+  displayName: displayNameOf(u),
+  friendCode: u.friendCode ?? null,
+  mutedUntil: mutedUntilMs(u),
   isAdmin: !!u.email && admins.includes(u.email.toLowerCase()),
 });
 

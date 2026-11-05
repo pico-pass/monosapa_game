@@ -3,7 +3,8 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Types, isValidObjectId, type Model } from 'mongoose';
 import type { UserDto } from '../auth/dto/auth.dto.js';
 import { cleanLine, textLength } from '../common/text.js';
-import { seenAgoMs } from '../users/presence.js';
+import { PERSON_FIELDS, toPerson } from '../users/person.js';
+import { assertNotMuted, type Avatar } from '../users/profile.js';
 import { User } from '../users/user.schema.js';
 import type { ChatListDto, ChatMessageDto, PostChatDto } from './dto/chat.dto.js';
 import { ChatMessage, type ChatMessageDocument } from './chat.schema.js';
@@ -18,13 +19,23 @@ const MAX_PER_MINUTE = 20;
 /** 같은 말을 반복해 보내지 못하는 시간 */
 const REPEAT_BLOCK_MS = 10_000;
 
-const toDto = (m: ChatMessageDocument, viewer: UserDto, seenAgo: number | null): ChatMessageDto => {
+/** 글쓴이의 지금 모습(프로필 설정이 바뀌면 옛 글에도 바뀐 이름이 보인다) */
+interface Author {
+  name: string;
+  picture: string | null;
+  avatar: Avatar;
+  seenAgoMs: number | null;
+}
+
+const toDto = (m: ChatMessageDocument, viewer: UserDto, author: Author): ChatMessageDto => {
   const mine = String(m.userId) === viewer.id;
   return {
     id: String(m._id),
-    name: m.name,
-    picture: m.picture,
-    seenAgoMs: mine ? 0 : seenAgo,
+    uid: String(m.userId),
+    name: author.name,
+    picture: author.picture,
+    avatar: author.avatar,
+    seenAgoMs: mine ? 0 : author.seenAgoMs,
     title: m.title,
     text: m.text,
     at: m.createdAt.getTime(),
@@ -45,14 +56,16 @@ export class ChatService {
 
   async list(viewer: UserDto): Promise<ChatListDto> {
     const docs = await this.messages.find().sort({ _id: -1 }).limit(CHAT_PAGE_SIZE).exec();
-    // 글쓴이의 마지막 접속 시각 (프로필의 접속 상태)
+    // 글쓴이의 지금 이름·사진과 마지막 접속 시각 (프로필 설정, 접속 상태)
     const ids = [...new Set(docs.map((d) => d.userId))];
     const now = Date.now();
-    const seen = new Map((await this.users.find({ _id: { $in: ids } }, 'lastSeenAt lastLoginAt').exec()).map((u) => [String(u._id), seenAgoMs(u, now)]));
-    return { messages: docs.reverse().map((d) => toDto(d, viewer, seen.get(String(d.userId)) ?? null)) };
+    const authors = new Map((await this.users.find({ _id: { $in: ids } }, PERSON_FIELDS).exec()).map((u) => [String(u._id), toPerson(u, now)]));
+    const authorOf = (d: ChatMessageDocument): Author => authors.get(String(d.userId)) ?? { name: d.name, picture: d.picture, avatar: 'google', seenAgoMs: null };
+    return { messages: docs.reverse().map((d) => toDto(d, viewer, authorOf(d))) };
   }
 
   async post(user: UserDto, body: PostChatDto | undefined): Promise<ChatMessageDto> {
+    assertNotMuted(user, '챗방에 글을 쓸');
     const text = cleanLine(body?.text);
     if (textLength(text) === 0) throw new BadRequestException('내용을 입력해 주세요.');
     if (textLength(text) > CHAT_MAX_LENGTH) throw new BadRequestException(`${CHAT_MAX_LENGTH}자까지 보낼 수 있어요.`);
@@ -61,12 +74,12 @@ export class ChatService {
 
     const doc = await this.messages.create({
       userId: new Types.ObjectId(user.id),
-      name: user.name?.trim() || '익명',
+      name: user.displayName,
       picture: user.picture,
       title: title && textLength(title) <= CHAT_TITLE_MAX_LENGTH ? title : null,
       text,
     });
-    return toDto(doc, user, 0);
+    return toDto(doc, user, { name: user.displayName, picture: user.picture, avatar: user.avatar, seenAgoMs: 0 });
   }
 
   /** 내 메시지이거나 관리자일 때만 지울 수 있다. */

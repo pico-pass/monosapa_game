@@ -20,7 +20,7 @@ function messageOf(data: unknown): string | null {
   return null;
 }
 
-export async function api<T = void>(path: string, opts: { method?: 'GET' | 'POST' | 'DELETE'; body?: unknown } = {}): Promise<T> {
+export async function api<T = void>(path: string, opts: { method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; body?: unknown } = {}): Promise<T> {
   const { method = 'GET', body } = opts;
   const send = () =>
     fetch(`/api/${path}`, {

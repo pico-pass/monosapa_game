@@ -47,6 +47,10 @@ async function render(tab: TabId, game: GameState): Promise<string> {
     stats: () => import('../StatsScreen'),
     release: () => import('../ReleaseScreen'),
     nurture: () => import('../NurtureScreen'),
+    friends: () => import('../FriendsScreen'),
+    dm: () => import('../DmScreen'),
+    postbox: () => import('../MailboxScreen'),
+    admin: () => import('../AdminScreen'),
   };
   const mod = await screens[tab]();
   const Screen = Object.values(mod).find((v) => typeof v === 'function') as () => React.ReactElement;
@@ -866,6 +870,72 @@ describe('콘텐츠 팩 2 화면', () => {
     const off = await renderNamed(loader, 'Presence', 'ranking', g, {}, { agoMs: 17 * 60_000 });
     expect(off).not.toContain('presence-on');
     expect(off).toContain('17분 전 접속');
+  });
+});
+
+describe('친구·우편함·프로필·관리자', () => {
+  it('친구: 내 친구 코드 카드와 코드로 찾기, 안내 문구', async () => {
+    box.user = { id: 'u1', email: 'a@b.c', name: '테스터', picture: null, isAdmin: false, friendCode: 'ABCD2345' };
+    const html = await render('friends', richState());
+    expect(html).toContain('ABCD2345');
+    expect(html).toContain('친구 코드로 찾기');
+    expect(html).toContain('하루에 한 번 서로에게');
+    expect(html).toContain('프로필 설정');
+    expect(html).toContain('불러오는 중');
+  });
+
+  it('우편함: 30일 보관과 받지 않은 다이아 안내', async () => {
+    const html = await render('postbox', richState());
+    expect(html).toContain('우편함');
+    expect(html).toContain('30일 동안 보관');
+    expect(html).toContain('불러오는 중');
+  });
+
+  it('개인 채팅: 상대를 고르지 않았으면 친구 목록으로 안내한다', async () => {
+    const html = await render('dm', richState());
+    expect(html).toContain('대화할 친구를 골라 주세요');
+    expect(html).toContain('친구 목록으로');
+  });
+
+  it('관리자 화면은 관리자 계정에만 보인다', async () => {
+    expect(await render('admin', richState())).toContain('관리자만 볼 수 있는 화면');
+    box.user = { id: 'u1', email: 'a@b.c', name: '관리', picture: null, isAdmin: true };
+    const html = await render('admin', richState());
+    for (const w of ['신고 처리', '우편 보내기', '제한 중']) expect(html, w).toContain(w);
+    expect(html).not.toContain('관리자만 볼 수 있는 화면');
+  });
+
+  it('더보기: 친구·우편함 메뉴가 있고 관리자 메뉴는 관리자에게만 보인다', async () => {
+    const normal = await render('more', richState());
+    for (const w of ['친구', '우편함']) expect(normal, w).toContain(w);
+    expect(normal).not.toContain('신고 처리');
+    box.user = { id: 'u1', email: 'a@b.c', name: '관리', picture: null, isAdmin: true };
+    expect(await render('more', richState())).toContain('신고 처리');
+  });
+
+  it('프로필 창: 불러오는 동안 제목이 나온다', async () => {
+    const loader = () => import('../ProfileSheet');
+    expect(await renderNamed(loader, 'ProfileSheet', 'ranking', richState(), {}, { uid: 'x', edit: false })).toContain('프로필');
+    expect(await renderNamed(loader, 'ProfileSheet', 'ranking', richState(), {}, { uid: 'x', edit: true })).toContain('프로필 설정');
+  });
+
+  it('신고창: 대상 이름과 사유 목록, 개인채팅 안내', async () => {
+    const loader = () => import('../../components/ReportDialog');
+    const chat = await renderNamed(loader, 'ReportDialog', 'chat', richState(), {}, { target: { kind: 'chat', refId: 'm1', label: '밤새는사람' } });
+    expect(chat).toContain('밤새는사람');
+    expect(chat).toContain('챗방 메시지');
+    for (const w of ['욕설·비방', '도배·광고', '음란·불쾌한 내용', '혐오·차별', '기타']) expect(chat, w).toContain(w);
+    expect(chat).not.toContain('앞선 대화');
+    const dm = await renderNamed(loader, 'ReportDialog', 'chat', richState(), {}, { target: { kind: 'dm', refId: 'm2', label: '친구' } });
+    expect(dm).toContain('개인채팅 메시지');
+    expect(dm).toContain('앞선 대화');
+  });
+
+  it('설정: 로그인했으면 프로필 설정 버튼이 있다', async () => {
+    box.user = { id: 'u1', email: 'a@b.c', name: '테스터', picture: null, isAdmin: false, displayName: '닉네임이다', avatar: 'google' };
+    const html = await renderNamed(() => import('../SettingsSheet'), 'SettingsSheet', 'studio', richState());
+    expect(html).toContain('프로필 설정');
+    expect(html).toContain('닉네임이다');
   });
 });
 

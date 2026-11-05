@@ -1,7 +1,9 @@
 import { moreAlerts } from '../game/alerts';
+import { useAuth } from '../store/authStore';
 import { setTab, useUi, type TabId } from '../store/gameStore';
+import { friendBadge, mailBadge, useSocial } from '../store/socialStore';
 
-const ITEMS: { id: TabId; icon: string; name: string; desc: string; alert?: 'missions' | 'mail' | 'monogram' | 'collect' | 'nurture' }[] = [
+const ITEMS: { id: TabId; icon: string; name: string; desc: string; alert?: 'missions' | 'mail' | 'monogram' | 'collect' | 'nurture'; social?: 'postbox' | 'friends' }[] = [
   { id: 'shop', icon: '🛒', name: '상점', desc: '간식·홍보 캠페인·테마' },
   { id: 'missions', icon: '📅', name: '미션·출석', desc: '일일·주간 미션 보상', alert: 'missions' },
   { id: 'achievements', icon: '🏅', name: '업적·칭호', desc: '달성하고 칭호를 달아요' },
@@ -15,6 +17,8 @@ const ITEMS: { id: TabId; icon: string; name: string; desc: string; alert?: 'mis
   { id: 'wrapped', icon: '🎁', name: '결산 Wrapped', desc: '내 기록을 카드로 공유' },
   { id: 'sampler', icon: '🎙️', name: '목소리 샘플러', desc: '내 목소리로 패드와 비트' },
   { id: 'chat', icon: '💬', name: '챗방', desc: '모두가 쓰는 자유 채팅' },
+  { id: 'friends', icon: '🤝', name: '친구', desc: '친구 추가·하루 한 번 💎 선물·개인 채팅', social: 'friends' },
+  { id: 'postbox', icon: '📬', name: '우편함', desc: '친구 선물과 운영 안내', social: 'postbox' },
   { id: 'inquiry', icon: '📮', name: '문의함', desc: '버그·제안·계정 문의' },
   { id: 'stats', icon: '📊', name: '통계', desc: '스트리밍 기록과 정산' },
   { id: 'ranking', icon: '🏆', name: '랭킹', desc: '계정 레벨·무한의 계단 순위' },
@@ -24,12 +28,15 @@ const ITEMS: { id: TabId; icon: string; name: string; desc: string; alert?: 'mis
 export function MoreScreen() {
   const { game: g } = useUi();
   const alerts = moreAlerts(g);
+  const { user } = useAuth();
+  const { summary } = useSocial();
+  const items = user?.isAdmin ? [...ITEMS, { id: 'admin' as TabId, icon: '🛡️', name: '관리자', desc: '신고 처리·우편 보내기·이용 제한' }] : ITEMS;
   return (
     <section className="screen" aria-label="더보기">
       <h2 className="section-title">더보기</h2>
       <div className="more-grid">
-        {ITEMS.map((it) => {
-          const n = it.alert ? alerts[it.alert] : 0;
+        {items.map((it) => {
+          const n = it.alert ? alerts[it.alert] : it.social === 'postbox' ? mailBadge(summary) : it.social === 'friends' ? friendBadge(summary) : 0;
           return (
             <button key={it.id} type="button" className="more-item" onClick={() => setTab(it.id)}>
               <span className="more-icon" aria-hidden>

@@ -3,8 +3,8 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Types, type Model } from 'mongoose';
 import { Save, type SaveDocument } from '../saves/save.schema.js';
 import { rankFieldsOf } from '../saves/saves.service.js';
+import { PERSON_FIELDS, toPerson, type PersonDto } from '../users/person.js';
 import { User } from '../users/user.schema.js';
-import { seenAgoMs } from '../users/presence.js';
 import type { NurtureRankingDto, NurtureRankingEntryDto, RankingDto, RankingEntryDto, TowerRankingDto, TowerRankingEntryDto } from './dto/ranking.dto.js';
 
 export const RANKING_SIZE = 20;
@@ -27,12 +27,18 @@ export class RankingService implements OnModuleInit {
     if (old.length > 0) this.log.log(`랭킹 필드 채움: ${old.length}개`);
   }
 
-  /** 구글 프로필(이름·사진)과 마지막 접속(몇 ms 전)을 계정 ID로 찾아 준다. 이메일은 읽지 않는다. */
-  private async profiles(ids: Types.ObjectId[]): Promise<Map<string, { name: string; picture: string | null; seenAgoMs: number | null }>> {
+  /** 계정 ID로 보여 줄 모습(프로필 설정의 이름·사진과 마지막 접속 몇 ms 전)을 찾아 준다. 이메일은 읽지 않는다. */
+  private async profiles(ids: Types.ObjectId[]): Promise<Map<string, PersonDto>> {
     const unique = [...new Set(ids.map(String))].map((i) => new Types.ObjectId(i));
-    const users = await this.users.find({ _id: { $in: unique } }, 'name picture lastSeenAt lastLoginAt').exec();
+    const users = await this.users.find({ _id: { $in: unique } }, PERSON_FIELDS).exec();
     const now = Date.now();
-    return new Map(users.map((u) => [String(u._id), { name: u.name?.trim() || '익명', picture: u.picture ?? null, seenAgoMs: seenAgoMs(u, now) }]));
+    return new Map(users.map((u) => [String(u._id), toPerson(u, now)]));
+  }
+
+  /** 랭킹 줄에 공통으로 들어가는 사람 정보 */
+  private who(d: SaveDocument, rank: number, profileOf: Map<string, PersonDto>, viewerId: string) {
+    const p = profileOf.get(String(d.userId));
+    return { rank, uid: String(d.userId), name: p?.name ?? '익명', picture: p?.picture ?? null, avatar: p?.avatar ?? ('google' as const), seenAgoMs: p?.seenAgoMs ?? null, me: String(d.userId) === viewerId };
   }
 
   async top(viewerId: string): Promise<RankingDto> {
@@ -44,10 +50,7 @@ export class RankingService implements OnModuleInit {
     ]);
     const profileOf = await this.profiles([...docs.map((d) => d.userId), ...(mine ? [mine.userId] : [])]);
 
-    const entry = (d: SaveDocument, rank: number): RankingEntryDto => {
-      const p = profileOf.get(String(d.userId));
-      return { rank, name: p?.name ?? '익명', picture: p?.picture ?? null, level: d.level, fans: d.fans, seenAgoMs: p?.seenAgoMs ?? null, me: String(d.userId) === viewerId };
-    };
+    const entry = (d: SaveDocument, rank: number): RankingEntryDto => ({ ...this.who(d, rank, profileOf, viewerId), level: d.level, fans: d.fans });
 
     let mineEntry: RankingEntryDto | null = null;
     if (mine) {
@@ -70,10 +73,7 @@ export class RankingService implements OnModuleInit {
     ]);
     const profileOf = await this.profiles([...docs.map((d) => d.userId), ...(mine ? [mine.userId] : [])]);
 
-    const entry = (d: SaveDocument, rank: number): TowerRankingEntryDto => {
-      const p = profileOf.get(String(d.userId));
-      return { rank, name: p?.name ?? '익명', picture: p?.picture ?? null, floor: d.towerBest, level: d.level, seenAgoMs: p?.seenAgoMs ?? null, me: String(d.userId) === viewerId };
-    };
+    const entry = (d: SaveDocument, rank: number): TowerRankingEntryDto => ({ ...this.who(d, rank, profileOf, viewerId), floor: d.towerBest, level: d.level });
 
     let mineEntry: TowerRankingEntryDto | null = null;
     if (mine && mine.towerBest > 0) {
@@ -94,19 +94,7 @@ export class RankingService implements OnModuleInit {
     ]);
     const profileOf = await this.profiles([...docs.map((d) => d.userId), ...(mine ? [mine.userId] : [])]);
 
-    const entry = (d: SaveDocument, rank: number): NurtureRankingEntryDto => {
-      const p = profileOf.get(String(d.userId));
-      return {
-        rank,
-        name: p?.name ?? '익명',
-        picture: p?.picture ?? null,
-        normal: d.nurtureNormal,
-        dark: d.nurtureDark,
-        total: d.nurtureTotal,
-        seenAgoMs: p?.seenAgoMs ?? null,
-        me: String(d.userId) === viewerId,
-      };
-    };
+    const entry = (d: SaveDocument, rank: number): NurtureRankingEntryDto => ({ ...this.who(d, rank, profileOf, viewerId), normal: d.nurtureNormal, dark: d.nurtureDark, total: d.nurtureTotal });
 
     let mineEntry: NurtureRankingEntryDto | null = null;
     if (mine && mine.nurtureXp > 0) {

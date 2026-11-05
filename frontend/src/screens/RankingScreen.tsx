@@ -1,14 +1,18 @@
 import { useEffect, useState } from 'react';
+import { Avatar, type AvatarKind } from '../components/Avatar';
 import { fmt } from '../components/format';
 import { Presence } from '../components/parts';
 import { nurtureLevel } from '../game/nurturedata';
 import { playerLevel } from '../game/selectors';
 import { useUi } from '../store/gameStore';
+import { openProfile } from '../store/socialStore';
 
 interface Entry {
   rank: number;
+  uid: string;
   name: string;
   picture: string | null;
+  avatar: AvatarKind;
   level: number;
   fans: number;
   seenAgoMs: number | null;
@@ -16,8 +20,10 @@ interface Entry {
 }
 interface NurtureEntry {
   rank: number;
+  uid: string;
   name: string;
   picture: string | null;
+  avatar: AvatarKind;
   normal: number;
   dark: number;
   total: number;
@@ -26,8 +32,10 @@ interface NurtureEntry {
 }
 interface TowerEntry {
   rank: number;
+  uid: string;
   name: string;
   picture: string | null;
+  avatar: AvatarKind;
   floor: number;
   level: number;
   seenAgoMs: number | null;
@@ -222,17 +230,21 @@ export function NurtureBoard({ normal, dark, trained }: { normal: number; dark: 
   );
 }
 
-function RankRow({ e, main, sub }: { e: { rank: number; name: string; picture: string | null; seenAgoMs: number | null; me: boolean }; main: React.ReactNode; sub: string }) {
+/** 랭킹 한 줄. 누르면 그 사람의 프로필 창이 열려요(친구 추가·신고도 거기서 해요). */
+function RankRow({ e, main, sub }: { e: { rank: number; uid: string; name: string; picture: string | null; avatar: AvatarKind; seenAgoMs: number | null; me: boolean }; main: React.ReactNode; sub: string }) {
+  const open = () => openProfile(e.uid);
   return (
-    <li className={`rank-row${e.me ? ' rank-me' : ''}${e.rank <= 3 ? ` rank-top rank-${e.rank}` : ''}`} value={e.rank}>
+    <li
+      className={`rank-row rank-clickable${e.me ? ' rank-me' : ''}${e.rank <= 3 ? ` rank-top rank-${e.rank}` : ''}`}
+      value={e.rank}
+      role="button"
+      tabIndex={0}
+      aria-label={`${e.name} 프로필 보기`}
+      onClick={open}
+      onKeyDown={(ev) => (ev.key === 'Enter' || ev.key === ' ') && (ev.preventDefault(), open())}
+    >
       <span className="rank-no">{e.rank <= 3 ? ['🥇', '🥈', '🥉'][e.rank - 1] : e.rank}</span>
-      {e.picture ? (
-        <img className="rank-avatar" src={e.picture} alt="" referrerPolicy="no-referrer" width={32} height={32} loading="lazy" />
-      ) : (
-        <span className="rank-avatar rank-avatar-none" aria-hidden>
-          {[...e.name][0]}
-        </span>
-      )}
+      <Avatar name={e.name} picture={e.picture} avatar={e.avatar} />
       <span className="rank-name">
         <span className="rank-name-line">
           {e.name}

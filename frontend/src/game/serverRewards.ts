@@ -24,6 +24,14 @@ export function applyChallengeClaim(state: GameState, diamonds: number, rank: nu
   return { ok: true, state: { ...state, diamonds: clampResource(state.diamonds + d), stats: { ...state.stats, notes } }, diamonds: d, noted };
 }
 
+/** 우편함에서 받은 다이아(친구 선물·운영 우편). 서버가 우편마다 한 번만 내주고, 한꺼번에 받을 수도 있어 상한이 넉넉하다. */
+const MAX_MAIL_DIAMONDS = 100_000;
+
+export function applyMailClaim(state: GameState, diamonds: number): CommandResult<{ diamonds: number }> {
+  const d = Math.max(0, Math.min(MAX_MAIL_DIAMONDS, Math.floor(Number.isFinite(diamonds) ? diamonds : 0)));
+  return { ok: true, state: { ...state, diamonds: clampResource(state.diamonds + d) }, diamonds: d };
+}
+
 /** 음원 차트 순위 보상 */
 export function applyChartClaim(state: GameState, diamonds: number, no1: boolean): CommandResult<{ diamonds: number }> {
   const d = cap(diamonds);

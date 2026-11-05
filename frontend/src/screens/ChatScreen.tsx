@@ -1,14 +1,19 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { Avatar, type AvatarKind } from '../components/Avatar';
 import { fmtClock } from '../components/format';
 import { Presence } from '../components/parts';
 import { titleText } from '../game/achievements';
 import { api, errorText } from '../platform/api';
 import { useUi } from '../store/gameStore';
+import { openProfile, openReport } from '../store/socialStore';
 
 interface ChatMessage {
   id: string;
+  /** 글쓴이의 계정 ID(프로필 보기) */
+  uid: string;
   name: string;
   picture: string | null;
+  avatar: AvatarKind;
   /** 글쓴이의 마지막 접속이 몇 ms 전인지 */
   seenAgoMs: number | null;
   title: string | null;
@@ -89,7 +94,7 @@ export function ChatScreen() {
   return (
     <section className="screen chat" aria-label="챗방">
       <h2 className="section-title">챗방</h2>
-      <p className="muted">로그인한 모든 사람이 함께 쓰는 공개 채팅이에요. 이름과 프로필 사진은 구글 계정 것이 그대로 보여요. 메시지는 14일 뒤 사라져요.</p>
+      <p className="muted">로그인한 모든 사람이 함께 쓰는 공개 채팅이에요. 이름이나 사진을 누르면 프로필을 볼 수 있고, 이름과 사진은 프로필 설정에서 바꿀 수 있어요. 메시지는 14일 뒤 사라져요.</p>
       {error && (
         <p className="chat-error" role="alert">
           {error}
@@ -100,19 +105,22 @@ export function ChatScreen() {
         {messages?.length === 0 && <li className="empty">아직 메시지가 없어요. 첫 마디를 남겨 봐요.</li>}
         {messages?.map((m) => (
           <li key={m.id} className={`chat-msg${m.mine ? ' chat-mine' : ''}`}>
-            {m.picture ? (
-              <img className="rank-avatar" src={m.picture} alt="" referrerPolicy="no-referrer" width={32} height={32} loading="lazy" />
-            ) : (
-              <span className="rank-avatar rank-avatar-none" aria-hidden>
-                {[...m.name][0]}
-              </span>
-            )}
+            <button type="button" className="chat-who" onClick={() => openProfile(m.uid)} aria-label={`${m.name} 프로필 보기`}>
+              <Avatar name={m.name} picture={m.picture} avatar={m.avatar} />
+            </button>
             <div className="chat-body">
               <div className="chat-meta">
-                <b>{m.name}</b>
+                <button type="button" className="chat-name" onClick={() => openProfile(m.uid)}>
+                  {m.name}
+                </button>
                 {m.title && <em>「{m.title}」</em>}
                 <small>{fmtClock(m.at)}</small>
                 <Presence agoMs={m.seenAgoMs} />
+                {!m.mine && (
+                  <button type="button" className="chat-del" aria-label="메시지 신고" onClick={() => openReport({ kind: 'chat', refId: m.id, label: m.name })}>
+                    🚩
+                  </button>
+                )}
                 {m.canDelete && (
                   <button type="button" className="chat-del" aria-label="메시지 삭제" onClick={() => void remove(m.id)}>
                     🗑️

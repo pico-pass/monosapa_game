@@ -32,7 +32,7 @@ import { addLyricCard, draftChoices, trimLyricCard } from '../game/lyricdeck';
 import { claimPresent, feedMascot, giftMascot, playMascot } from '../game/mascot';
 import { nurtureAct, nurtureWake } from '../game/nurture';
 import { buyTickets, craftPhoto, dismantlePhoto, giveCard, photoPull, takeCard, type PhotoPullResult } from '../game/photocards';
-import { applyChallengeClaim, applyChallengePosted, applyChartClaim } from '../game/serverRewards';
+import { applyChallengeClaim, applyChallengePosted, applyChartClaim, applyMailClaim } from '../game/serverRewards';
 import { remasterCard, toggleDeck } from '../game/songcards';
 import { abandonTower, beginTower, finishTower, rollTower, type TowerOutcome, type TowerRun } from '../game/tower';
 import { ACHIEVEMENT_TEXT, CAMPAIGN_TEXT, COSTUME_TEXT, SNACK_TEXT, STAGE_TEXT, THEME_TEXT, pickLine, type Situation } from '../game/content';
@@ -107,9 +107,13 @@ export type TabId =
   | 'chart'
   | 'wrapped'
   | 'sampler'
-  | 'nurture';
+  | 'nurture'
+  | 'friends'
+  | 'dm'
+  | 'postbox'
+  | 'admin';
 /** 하단 탭의 「더보기」 안에 있는 화면들 */
-export const MORE_TABS: readonly TabId[] = ['stats', 'ranking', 'collection', 'shop', 'missions', 'achievements', 'mail', 'monogram', 'chat', 'inquiry', 'collect', 'nurture', 'arcade', 'challenge', 'chart', 'wrapped', 'sampler'];
+export const MORE_TABS: readonly TabId[] = ['stats', 'ranking', 'collection', 'shop', 'missions', 'achievements', 'mail', 'monogram', 'chat', 'inquiry', 'collect', 'nurture', 'arcade', 'challenge', 'chart', 'wrapped', 'sampler', 'friends', 'dm', 'postbox', 'admin'];
 export type Phase = 'booting' | 'ready' | 'readonly' | 'corrupt';
 
 export interface Bubble {
@@ -1156,6 +1160,23 @@ export async function doClaimChallenge(): Promise<boolean> {
     if (r?.ok) {
       sfx.album();
       toast(`🏆 챌린지 ${res.rank}위! 💎 +${r.diamonds}${r.noted ? ' · 가사 노트에 남겼어요' : ''}`, 'good');
+      saveNow(true);
+    }
+    return true;
+  } catch (e) {
+    toast(errorText(e), 'warn');
+    return false;
+  }
+}
+
+/** 우편함의 다이아를 받는다. id 를 안 주면 받을 수 있는 것을 모두 받는다. 서버가 한 번만 내주고 반영은 여기서 한다. */
+export async function doClaimMail(id?: string): Promise<boolean> {
+  try {
+    const res = await api<{ diamonds: number; count: number }>(id ? `mailbox/${id}/claim` : 'mailbox/claim-all', { method: 'POST' });
+    const r = exec((s) => applyMailClaim(s, res.diamonds));
+    if (r?.ok) {
+      sfx.album();
+      toast(`📬 우편 ${res.count}통에서 💎 +${r.diamonds}`, 'good');
       saveNow(true);
     }
     return true;

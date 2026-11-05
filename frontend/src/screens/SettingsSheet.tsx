@@ -1,9 +1,11 @@
 import { useCallback, useState } from 'react';
 import { GoogleSignIn } from '../components/GoogleSignIn';
 import { Modal } from '../components/Modal';
+import { Avatar } from '../components/Avatar';
 import { Presence } from '../components/parts';
 import { signOut, useAuth } from '../store/authStore';
 import { setSettingsOpen, updateSettings, useUi } from '../store/gameStore';
+import { openProfile } from '../store/socialStore';
 
 export function SettingsSheet() {
   const { game } = useUi();
@@ -19,10 +21,11 @@ export function SettingsSheet() {
           <div className="setting-block account">
             <strong>계정</strong>
             {auth.user ? (
+              <>
               <div className="account-row">
-                {auth.user.picture && <img className="account-avatar" src={auth.user.picture} alt="" referrerPolicy="no-referrer" width={40} height={40} />}
+                <Avatar name={auth.user.displayName ?? auth.user.name ?? '?'} picture={auth.user.picture} avatar={auth.user.avatar ?? 'google'} className="account-avatar" />
                 <span>
-                  <b>{auth.user.name ?? '구글 계정'}</b>
+                  <b>{auth.user.displayName ?? auth.user.name ?? '구글 계정'}</b>
                   {auth.user.email && <small>{auth.user.email}</small>}
                   <Presence agoMs={0} />
                 </span>
@@ -30,6 +33,18 @@ export function SettingsSheet() {
                   로그아웃
                 </button>
               </div>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => {
+                  const id = auth.user?.id;
+                  setSettingsOpen(false);
+                  if (id) openProfile(id, true);
+                }}
+              >
+                ✏️ 프로필 설정 (닉네임·한 줄 소개·사진)
+              </button>
+              </>
             ) : (
               <>
                 <small>구글 계정으로 로그인하면 진행 데이터가 계정에 자동 저장돼요.</small>

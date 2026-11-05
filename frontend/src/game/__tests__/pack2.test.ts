@@ -16,7 +16,7 @@ import { buyTickets, craftPhoto, dismantlePhoto, giveCard, photoPull, rollPhoto,
 import { createInitialState, validateState } from '../persistence';
 import { buildChart, createRhythm, isRhythmFinished, pressLane, rhythmScore, tickTo } from '../rhythm';
 import { achievementValue, clickGain, offlineCapMs, previewSingle, rhymeRate } from '../selectors';
-import { applyChallengeClaim, applyChartClaim } from '../serverRewards';
+import { applyChallengeClaim, applyChartClaim, applyMailClaim } from '../serverRewards';
 import { advance, settleOffline } from '../simulation';
 import { remasterCard, toggleDeck } from '../songcards';
 import { TRACKS, slotMs, trackOfRun, trackOfSingle, trackSingles } from '../songcharts';
@@ -1115,6 +1115,16 @@ describe('서버 보상 반영', () => {
     expect(ok(applyChallengeClaim(s, 1, 7, '순위권 밖')).noted).toBe(false);
     expect(ok(applyChallengeClaim(s, 99999, 1, 'x')).diamonds).toBe(50); // 비정상 값은 잘라낸다
     expect(ok(applyChallengeClaim(s, Number.NaN, 1, 'y')).diamonds).toBe(0);
+  });
+
+  it('우편 보상은 다이아를 더하고, 비정상 값은 잘라내거나 0으로 본다', () => {
+    const s = { ...base(), diamonds: 7 };
+    expect(ok(applyMailClaim(s, 2)).state.diamonds).toBe(9);
+    expect(ok(applyMailClaim(s, 2.9)).diamonds).toBe(2); // 정수만
+    expect(ok(applyMailClaim(s, -5)).diamonds).toBe(0);
+    expect(ok(applyMailClaim(s, Number.NaN)).diamonds).toBe(0);
+    expect(ok(applyMailClaim(s, 1e12)).diamonds).toBe(100_000);
+    expect(ok(applyMailClaim(s, 0)).state).toEqual(s);
   });
 
   it('차트 보상은 카운터를 올린다', () => {

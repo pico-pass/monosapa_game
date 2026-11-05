@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { bgm } from './audio/bgm';
 import { Modal } from './components/Modal';
+import { ReportDialog } from './components/ReportDialog';
 import { PersonaBadge } from './components/parts';
 import { fmt, fmtDuration, fmtHave, fmtRate, fmtStreamRate, fmtStreams } from './components/format';
 import { BALANCE } from './game/balance';
@@ -22,6 +23,7 @@ import {
   streamRate,
 } from './game/selectors';
 import { AchievementScreen } from './screens/AchievementScreen';
+import { AdminScreen } from './screens/AdminScreen';
 import { ArcadeScreen } from './screens/ArcadeScreen';
 import { ArcadeStage } from './screens/ArcadeStage';
 import { ChallengeScreen } from './screens/ChallengeScreen';
@@ -31,14 +33,18 @@ import { ChatScreen } from './screens/ChatScreen';
 import { CollectionScreen } from './screens/CollectionScreen';
 import { ConcertScreen } from './screens/ConcertScreen';
 import { ConcertStage } from './screens/ConcertStage';
+import { DmScreen } from './screens/DmScreen';
 import { EquipScreen } from './screens/EquipScreen';
+import { FriendsScreen } from './screens/FriendsScreen';
 import { InquiryScreen } from './screens/InquiryScreen';
 import { LoginScreen } from './screens/LoginScreen';
 import { MailScreen } from './screens/MailScreen';
+import { MailboxScreen } from './screens/MailboxScreen';
 import { MissionScreen } from './screens/MissionScreen';
 import { MonogramScreen } from './screens/MonogramScreen';
 import { MoreScreen } from './screens/MoreScreen';
 import { NurtureScreen } from './screens/NurtureScreen';
+import { ProfileSheet } from './screens/ProfileSheet';
 import { RankingScreen } from './screens/RankingScreen';
 import { ReleaseScreen } from './screens/ReleaseScreen';
 import { GachaModal, TowerModal } from './screens/ResultModals';
@@ -68,6 +74,7 @@ import {
 } from './store/gameStore';
 import { initAuth, useAuth } from './store/authStore';
 import { startPresence } from './platform/presence';
+import { socialTotal, startSocial, useSocial } from './store/socialStore';
 
 const ALBUM_KIND = { normal: '일반', dark: '어둠' } as const;
 
@@ -97,6 +104,10 @@ const SUB_TITLE: Partial<Record<TabId, string>> = {
   chart: '음원 차트',
   wrapped: '결산',
   sampler: '목소리 샘플러',
+  friends: '친구',
+  dm: '개인 채팅',
+  postbox: '우편함',
+  admin: '관리자',
 };
 
 export function App() {
@@ -133,6 +144,8 @@ function Game() {
 
   // 프로필의 접속 상태: 게임 화면이 떠 있는 동안 접속 신호를 보낸다.
   useEffect(() => startPresence(), []);
+  // 우편·친구 요청·개인채팅의 새 소식 개수(알림 점)를 주기적으로 가져온다.
+  useEffect(() => startSocial(), []);
 
   // 배경음악: 자아가 바뀌면 곡이 교차 페이드되고, 직접 공연 중에는 작아진다.
   useEffect(() => {
@@ -142,6 +155,8 @@ function Game() {
   const inMore = MORE_TABS.includes(ui.tab);
   const navTab: TabId = inMore ? 'more' : ui.tab;
   const alerts = moreAlerts(g);
+  const { summary } = useSocial();
+  const moreDot = alerts.total + socialTotal(summary) > 0;
 
   return (
     <div className={`app${g.settings.reducedMotion ? ' reduce-motion' : ''}`} data-persona={persona} data-theme={g.cosmetics.theme}>
@@ -179,13 +194,17 @@ function Game() {
         {ui.tab === 'chart' && <ChartScreen />}
         {ui.tab === 'wrapped' && <WrappedScreen />}
         {ui.tab === 'sampler' && <SamplerScreen />}
+        {ui.tab === 'friends' && <FriendsScreen />}
+        {ui.tab === 'dm' && <DmScreen />}
+        {ui.tab === 'postbox' && <MailboxScreen />}
+        {ui.tab === 'admin' && <AdminScreen />}
       </main>
       <nav className="tabs" aria-label="메인 메뉴">
         {TABS.map((t) => (
           <button key={t.id} type="button" className={`tab ${navTab === t.id ? 'tab-on' : ''}`} aria-current={navTab === t.id ? 'page' : undefined} onClick={() => setTab(t.id)}>
             <span aria-hidden>{t.icon}</span>
             <span>{t.label}</span>
-            {t.id === 'more' && alerts.total > 0 && <i className="tab-dot" aria-label="할 일이 있어요" />}
+            {t.id === 'more' && moreDot && <i className="tab-dot" aria-label="할 일이 있어요" />}
           </button>
         ))}
       </nav>
@@ -352,6 +371,21 @@ function Overlays() {
       {!ui.arcadeRun && !ui.towerRun && !ui.offlineReport && !ui.concertRun && !ui.gachaResult && <TowerModal />}
       {ui.settingsOpen && <SettingsSheet />}
       {ui.basisOpen && <BasisModal />}
+      <SocialOverlays />
+    </>
+  );
+}
+
+/** 프로필 창과 신고창. 랭킹·챗방·친구 목록 어디서든 열린다. */
+function SocialOverlays() {
+  const { profile, report } = useSocial();
+  const ui = useUi();
+  // 게임 화면(공연·아케이드·계단)이나 오프라인 결과 위에는 띄우지 않는다.
+  if (ui.concertRun || ui.arcadeRun || ui.towerRun || ui.offlineReport) return null;
+  return (
+    <>
+      {profile && <ProfileSheet key={profile.uid} uid={profile.uid} edit={profile.edit} />}
+      {report && <ReportDialog key={`${report.kind}-${report.refId ?? report.uid}`} target={report} />}
     </>
   );
 }

@@ -8,8 +8,17 @@ export interface AuthUser {
   email: string | null;
   name: string | null;
   picture: string | null;
-  /** 관리자 계정(문의 답변·챗방 메시지 삭제). 서버가 정한다. */
+  /** 관리자 계정(문의 답변·챗방 메시지 삭제·신고 처리). 서버가 정한다. */
   isAdmin?: boolean;
+  /** 프로필 설정: 닉네임·한 줄 소개·프로필 사진 종류. displayName 은 다른 사람에게 보이는 이름이다. */
+  nickname?: string | null;
+  bio?: string | null;
+  avatar?: 'google' | 'normal' | 'dark';
+  displayName?: string;
+  /** 친구 코드 */
+  friendCode?: string | null;
+  /** 이용 제한이 풀리는 시각(ms). 제한 중이 아니면 null. */
+  mutedUntil?: number | null;
 }
 
 export interface AuthState {
@@ -59,6 +68,11 @@ export async function initAuth(): Promise<void> {
   } catch {
     set({ status: 'unavailable' });
   }
+}
+
+/** 프로필 설정을 저장한 뒤 내 계정 정보를 새 값으로 바꾼다. */
+export function patchAuthUser(patch: Partial<AuthUser>): void {
+  if (state.user) set({ user: { ...state.user, ...patch } });
 }
 
 /** 로그인 화면의 "다시 시도". 서버에 닿지 않았을 때 한 번 더 확인한다. */

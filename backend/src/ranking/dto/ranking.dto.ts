@@ -1,14 +1,24 @@
-export class RankingEntryDto {
+import type { Avatar } from '../../users/profile.js';
+
+/** 랭킹 줄에 공통으로 들어가는 사람 정보. 이메일은 내려주지 않는다. */
+export class RankingWhoDto {
   rank!: number;
-  /** 구글 계정 이름(없으면 '익명'). 이메일은 내려주지 않는다. */
+  /** 프로필을 열 때 쓰는 계정 ID */
+  uid!: string;
+  /** 닉네임이 있으면 닉네임, 없으면 구글 계정 이름(없으면 '익명') */
   name!: string;
   /** 구글 프로필 사진 주소(없으면 null) */
   picture!: string | null;
-  level!: number;
-  fans!: number;
+  /** 프로필 사진 종류: 구글 사진 또는 일반·어둠 모노사파 */
+  avatar!: Avatar;
   /** 마지막 접속이 몇 ms 전인지(모르면 null). 프로필의 접속 상태에 쓴다. */
   seenAgoMs!: number | null;
   me!: boolean;
+}
+
+export class RankingEntryDto extends RankingWhoDto {
+  level!: number;
+  fans!: number;
 }
 
 /** GET /api/ranking 응답. entries 는 상위 순위, mine 은 내 순위(저장이 없으면 null). */
@@ -19,16 +29,10 @@ export class RankingDto {
   total!: number;
 }
 
-export class TowerRankingEntryDto {
-  rank!: number;
-  /** 구글 계정 이름(없으면 '익명'). 이메일은 내려주지 않는다. */
-  name!: string;
-  picture!: string | null;
+export class TowerRankingEntryDto extends RankingWhoDto {
   /** 무한의 계단 역대 최고 클리어 층 */
   floor!: number;
   level!: number;
-  seenAgoMs!: number | null;
-  me!: boolean;
 }
 
 /** GET /api/ranking/tower 응답. 한 층이라도 깬 계정만 오른다. */
@@ -40,17 +44,11 @@ export class TowerRankingDto {
   total!: number;
 }
 
-export class NurtureRankingEntryDto {
-  rank!: number;
-  /** 구글 계정 이름(없으면 '익명'). 이메일은 내려주지 않는다. */
-  name!: string;
-  picture!: string | null;
+export class NurtureRankingEntryDto extends RankingWhoDto {
   /** 일반·어둠 육성 레벨과 그 합계(순위 기준) */
   normal!: number;
   dark!: number;
   total!: number;
-  seenAgoMs!: number | null;
-  me!: boolean;
 }
 
 /** GET /api/ranking/nurture 응답. 육성을 한 번이라도 한 계정만 오른다. */
