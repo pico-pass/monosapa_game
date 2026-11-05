@@ -3,6 +3,8 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Types, isValidObjectId, type Model } from 'mongoose';
 import type { UserDto } from '../auth/dto/auth.dto.js';
 import { cleanLine, textLength } from '../common/text.js';
+import { seenAgoMs } from '../users/presence.js';
+import { User } from '../users/user.schema.js';
 import type { ChatListDto, ChatMessageDto, PostChatDto } from './dto/chat.dto.js';
 import { ChatMessage, type ChatMessageDocument } from './chat.schema.js';
 
@@ -16,12 +18,13 @@ const MAX_PER_MINUTE = 20;
 /** 같은 말을 반복해 보내지 못하는 시간 */
 const REPEAT_BLOCK_MS = 10_000;
 
-const toDto = (m: ChatMessageDocument, viewer: UserDto): ChatMessageDto => {
+const toDto = (m: ChatMessageDocument, viewer: UserDto, seenAgo: number | null): ChatMessageDto => {
   const mine = String(m.userId) === viewer.id;
   return {
     id: String(m._id),
     name: m.name,
     picture: m.picture,
+    seenAgoMs: mine ? 0 : seenAgo,
     title: m.title,
     text: m.text,
     at: m.createdAt.getTime(),
@@ -35,11 +38,18 @@ export class ChatService {
   /** 사용자별 최근 전송 시각(서버 메모리). 서버를 다시 켜면 비워지지만 도배 방지에는 충분하다. */
   private readonly recent = new Map<string, { at: number; text: string }[]>();
 
-  constructor(@InjectModel(ChatMessage.name) private readonly messages: Model<ChatMessage>) {}
+  constructor(
+    @InjectModel(ChatMessage.name) private readonly messages: Model<ChatMessage>,
+    @InjectModel(User.name) private readonly users: Model<User>,
+  ) {}
 
   async list(viewer: UserDto): Promise<ChatListDto> {
     const docs = await this.messages.find().sort({ _id: -1 }).limit(CHAT_PAGE_SIZE).exec();
-    return { messages: docs.reverse().map((d) => toDto(d, viewer)) };
+    // 글쓴이의 마지막 접속 시각 (프로필의 접속 상태)
+    const ids = [...new Set(docs.map((d) => d.userId))];
+    const now = Date.now();
+    const seen = new Map((await this.users.find({ _id: { $in: ids } }, 'lastSeenAt lastLoginAt').exec()).map((u) => [String(u._id), seenAgoMs(u, now)]));
+    return { messages: docs.reverse().map((d) => toDto(d, viewer, seen.get(String(d.userId)) ?? null)) };
   }
 
   async post(user: UserDto, body: PostChatDto | undefined): Promise<ChatMessageDto> {
@@ -56,7 +66,7 @@ export class ChatService {
       title: title && textLength(title) <= CHAT_TITLE_MAX_LENGTH ? title : null,
       text,
     });
-    return toDto(doc, user);
+    return toDto(doc, user, 0);
   }
 
   /** 내 메시지이거나 관리자일 때만 지울 수 있다. */

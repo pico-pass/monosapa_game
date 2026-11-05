@@ -54,3 +54,17 @@ export const fmtDateTime = (ms: number) => {
   const d = new Date(ms);
   return `${d.getMonth() + 1}/${d.getDate()} ${fmtClock(ms)}`;
 };
+
+/** 이 시간 안에 접속 신호가 있었으면 「접속 중」이다. 화면이 보이는 동안 60초마다 신호를 보낸다(platform/presence.ts). */
+export const ONLINE_WITHIN_MS = 3 * 60_000;
+
+/** 프로필에 보여 줄 접속 상태: 3분 안이면 「접속 중」, 아니면 「n분 전 접속」(분 → 시간 → 일). 기록이 없으면 null을 받는다. */
+export function fmtSeen(agoMs: number | null | undefined): { online: boolean; text: string } {
+  if (agoMs === null || agoMs === undefined) return { online: false, text: '접속 기록 없음' };
+  if (agoMs < ONLINE_WITHIN_MS) return { online: true, text: '접속 중' };
+  const min = Math.floor(agoMs / 60_000);
+  if (min < 60) return { online: false, text: `${min}분 전 접속` };
+  const hour = Math.floor(min / 60);
+  if (hour < 24) return { online: false, text: `${hour}시간 전 접속` };
+  return { online: false, text: `${Math.floor(hour / 24)}일 전 접속` };
+}

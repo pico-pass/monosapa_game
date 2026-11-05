@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { fmtClock } from '../components/format';
+import { Presence } from '../components/parts';
 import { titleText } from '../game/achievements';
 import { api, errorText } from '../platform/api';
 import { useUi } from '../store/gameStore';
@@ -8,6 +9,8 @@ interface ChatMessage {
   id: string;
   name: string;
   picture: string | null;
+  /** 글쓴이의 마지막 접속이 몇 ms 전인지 */
+  seenAgoMs: number | null;
   title: string | null;
   text: string;
   at: number;
@@ -109,6 +112,7 @@ export function ChatScreen() {
                 <b>{m.name}</b>
                 {m.title && <em>「{m.title}」</em>}
                 <small>{fmtClock(m.at)}</small>
+                <Presence agoMs={m.seenAgoMs} />
                 {m.canDelete && (
                   <button type="button" className="chat-del" aria-label="메시지 삭제" onClick={() => void remove(m.id)}>
                     🗑️

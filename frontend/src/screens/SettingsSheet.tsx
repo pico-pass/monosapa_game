@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { GoogleSignIn } from '../components/GoogleSignIn';
 import { Modal } from '../components/Modal';
+import { Presence } from '../components/parts';
 import { signOut, useAuth } from '../store/authStore';
 import { setSettingsOpen, updateSettings, useUi } from '../store/gameStore';
 
@@ -23,6 +24,7 @@ export function SettingsSheet() {
                 <span>
                   <b>{auth.user.name ?? '구글 계정'}</b>
                   {auth.user.email && <small>{auth.user.email}</small>}
+                  <Presence agoMs={0} />
                 </span>
                 <button type="button" className="btn btn-ghost" disabled={auth.busy} onClick={() => void signOut()}>
                   로그아웃

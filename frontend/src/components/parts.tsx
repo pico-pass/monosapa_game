@@ -3,9 +3,20 @@ import { BALANCE } from '../game/balance';
 import { PERSONA_TEXT } from '../game/content';
 import type { Persona } from '../game/types';
 import { doWork } from '../store/gameStore';
+import { fmtSeen } from './format';
 
 export function PersonaBadge({ persona }: { persona: Persona }) {
   return <span className={`badge badge-${persona}`}>{PERSONA_TEXT[persona].short}</span>;
+}
+
+/** 프로필의 접속 상태: 초록 점 「접속 중」 또는 「n분 전 접속」 */
+export function Presence({ agoMs }: { agoMs: number | null | undefined }) {
+  const seen = fmtSeen(agoMs);
+  return (
+    <small className={`presence${seen.online ? ' presence-on' : ''}`}>
+      <i aria-hidden /> {seen.text}
+    </small>
+  );
 }
 
 export function Progress({ value, max, label }: { value: number; max: number; label: string }) {

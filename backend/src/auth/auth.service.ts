@@ -56,6 +56,11 @@ export class AuthService {
     return user ? toUserDto(user, this.config.adminEmails) : null;
   }
 
+  /** 접속 신호. 프런트가 화면이 보이는 동안 주기적으로 보낸다. */
+  ping(userId: string): Promise<void> {
+    return this.users.touch(userId);
+  }
+
   async logout(token: string | undefined): Promise<void> {
     if (!token) return;
     await this.sessions.deleteOne({ tokenHash: hashToken(token) }).exec();

@@ -1,8 +1,9 @@
-import { Body, Controller, Get, HttpCode, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Req, Res, UseGuards } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AppConfig } from '../config/app.config.js';
 import { AuthService } from './auth.service.js';
 import { readCookie } from './cookie.js';
+import { SessionGuard, type AuthedRequest } from './session.guard.js';
 import { AuthConfigDto, GoogleLoginDto, MeDto } from './dto/auth.dto.js';
 
 @Controller('auth')
@@ -28,7 +29,17 @@ export class AuthController {
   @Get('me')
   async me(@Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<MeDto> {
     res.setHeader('Cache-Control', 'no-store');
-    return { user: await this.auth.findUserByToken(readCookie(req, this.config.sessionCookieName)) };
+    const user = await this.auth.findUserByToken(readCookie(req, this.config.sessionCookieName));
+    if (user) await this.auth.ping(user.id);
+    return { user };
+  }
+
+  /** 접속 신호: 로그인한 사람이 화면을 보고 있다는 표시. 다른 사람의 프로필에 「접속 중」·「n분 전 접속」으로 보인다. */
+  @Post('ping')
+  @HttpCode(204)
+  @UseGuards(SessionGuard)
+  async ping(@Req() req: AuthedRequest): Promise<void> {
+    await this.auth.ping(req.user.id);
   }
 
   @Post('logout')

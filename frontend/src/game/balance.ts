@@ -981,18 +981,21 @@ export const BALANCE = {
    *   행동 한 번 = 코인(그 자아의 인세 costSecs초 분량, 최소 minCoins) 지불 + 게이지 변화 + 성장도(xp × 컨디션 배율).
    *   주 게이지(밥주기=포만감, 놀아주기·술·놀기=기분, 씻겨주기=청결도)가 needBelow보다 높으면 아직 필요 없어서 할 수 없고, 놀거나 마실 때 피로도가 tooTired보다 높으면 못 한다.
    *   어둠의 술·놀기는 단계마다 레벨로 열리고(unlockLevel), 이미 열린 더 센 단계가 있으면 낮은 단계의 쾌락·성장도가 내성만큼 줄어든다(tolerance).
-   *   레벨은 성장도 합계로 정한다: 레벨 L → L+1에 ceil(levelXp.base × levelXp.growth^(L−1)). 레벨 효과는 그 자아의 라임 생산 +perLevel.rhyme/레벨,
-   *   인세 +perLevel.coin/레벨이고, milestones의 레벨마다 일반은 팬 획득, 어둠은 공연·계단 전투력이 더 붙는다. diamonds.every레벨마다 다이아를 준다.
+   *   돌보기는 모든 행동이 자아마다 cooldownMs(1분)에 한 번만 된다. 일반·어둠은 대기 시간을 따로 세서 한쪽을 돌봐도 다른 쪽은 바로 할 수 있다(사용자 요청). 깨우기는 제외.
+   *   레벨은 성장도 합계로 정한다: 레벨 L → L+1에 ceil(levelXp.base × levelXp.growth^(L−1)). 최고 레벨은 없다(사용자 요청으로 40레벨 제한을 풀었다.
+   *   필요 성장도가 레벨마다 1.1배씩 늘어 높은 레벨일수록 느려진다). 레벨 효과는 그 자아의 라임 생산 +perLevel.rhyme/레벨, 인세 +perLevel.coin/레벨이고,
+   *   milestones의 레벨마다 일반은 팬 획득, 어둠은 공연·계단 전투력이 더 붙는다(steps를 지난 뒤에는 repeat.every레벨마다 repeat.value씩).
+   *   diamonds.every레벨마다 다이아를 준다.
    */
   nurture: {
     unlockFans: 80_000,
-    maxLevel: 40,
+    cooldownMs: 60_000,
     levelXp: { base: 40, growth: 1.1 },
     perLevel: { rhyme: 0.01, coin: 0.008 },
     milestones: {
-      normal: { vibe: 'fan', steps: [{ level: 10, value: 0.02 }, { level: 20, value: 0.02 }, { level: 30, value: 0.03 }, { level: 40, value: 0.03 }] },
-      dark: { vibe: 'power', steps: [{ level: 10, value: 0.02 }, { level: 20, value: 0.02 }, { level: 30, value: 0.03 }, { level: 40, value: 0.03 }] },
-    } as Record<Persona, { vibe: 'fan' | 'power'; steps: { level: number; value: number }[] }>,
+      normal: { vibe: 'fan', steps: [{ level: 10, value: 0.02 }, { level: 20, value: 0.02 }, { level: 30, value: 0.03 }, { level: 40, value: 0.03 }], repeat: { every: 10, value: 0.03 } },
+      dark: { vibe: 'power', steps: [{ level: 10, value: 0.02 }, { level: 20, value: 0.02 }, { level: 30, value: 0.03 }, { level: 40, value: 0.03 }], repeat: { every: 10, value: 0.03 } },
+    } as Record<Persona, { vibe: 'fan' | 'power'; steps: { level: number; value: number }[]; repeat: { every: number; value: number } }>,
     diamonds: { every: 5, amount: 3 },
     gauge: { max: 100, start: { full: 60, mood: 60, tired: 20, clean: 60 } },
     awake: {
@@ -1254,6 +1257,9 @@ export const STAGE_IDS: readonly StageId[] = STAGES.map((s) => s.id);
  * 유니버스 페스티벌(팬 50만 + 월클 클리어)과 그 뒤의 비밀 공연장은 이 목록과 상관없이 팬·앞 공연장 클리어 조건이 필요하다)
  */
 export const TEMP_OPEN_STAGES: readonly StageId[] = ['hall', 'solo', 'medium', 'large', 'arena', 'world'];
+
+/** true면 모노사파 육성을 팬 수와 무관하게 연다(사용자 요청의 임시 개방). 원래는 팬 `nurture.unlockFans`명부터이고, 되돌릴 때는 false로 바꾼다. */
+export const NURTURE_TEMP_OPEN = true;
 
 /** 직접 공연 종류. 적혀 있지 않은 공연장은 마이크 타이밍이다. */
 export type ManualGame = 'timing' | 'run' | 'blocks' | 'merge' | 'bounce' | 'defense' | 'survivor' | 'prestige' | 'blackout' | 'swipe' | 'stones' | 'galaxy';

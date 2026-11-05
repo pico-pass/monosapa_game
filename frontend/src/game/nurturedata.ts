@@ -1,4 +1,4 @@
-import { BALANCE, nurtureActionsOf, type NurtureActionDef } from './balance';
+import { BALANCE, NURTURE_TEMP_OPEN, nurtureActionsOf, type NurtureActionDef } from './balance';
 import type { NurtureGauge, NurtureSide, Persona } from './types';
 
 /*
@@ -12,23 +12,27 @@ const HOUR = 3600_000;
 export const NURTURE_GAUGES: readonly NurtureGauge[] = ['full', 'mood', 'tired', 'clean'];
 export type GaugeValues = Record<NurtureGauge, number>;
 
-export const emptyNurtureSide = (): NurtureSide => ({ xp: 0, ...N.gauge.start, at: 0, sleepUntil: 0, uses: {} });
+export const emptyNurtureSide = (): NurtureSide => ({ xp: 0, ...N.gauge.start, at: 0, sleepUntil: 0, readyAt: 0, uses: {} });
 
-export const nurtureUnlocked = (fans: number): boolean => fans >= N.unlockFans;
+/** 열려 있나: 팬이 unlockFans명 이상이거나 임시 개방 중(NURTURE_TEMP_OPEN)이다. */
+export const nurtureUnlocked = (fans: number, tempOpen: boolean = NURTURE_TEMP_OPEN): boolean => tempOpen || fans >= N.unlockFans;
 
 /* ---------- 레벨 ---------- */
 
 /** 레벨 L → L+1에 필요한 성장도 */
 export const levelStepXp = (level: number): number => Math.ceil(N.levelXp.base * N.levelXp.growth ** (level - 1));
 
-/** CUMULATIVE[L] = 레벨 L에 닿는 데 필요한 성장도 합계 (레벨 1은 0) */
+/** CUMULATIVE[L] = 레벨 L에 닿는 데 필요한 성장도 합계 (레벨 1은 0). 최고 레벨이 없어서 필요한 만큼 늘려 쓴다. */
 const CUMULATIVE: number[] = [0, 0];
-for (let L = 2; L <= N.maxLevel; L++) CUMULATIVE[L] = CUMULATIVE[L - 1] + levelStepXp(L - 1);
-export const xpForLevel = (level: number): number => CUMULATIVE[Math.min(Math.max(1, level), N.maxLevel)];
+function cumulative(level: number): number {
+  for (let L = CUMULATIVE.length; L <= level; L++) CUMULATIVE[L] = CUMULATIVE[L - 1] + levelStepXp(L - 1);
+  return CUMULATIVE[level];
+}
+export const xpForLevel = (level: number): number => cumulative(Math.max(1, Math.floor(level)));
 
 export function nurtureLevel(xp: number): number {
   let level = 1;
-  while (level < N.maxLevel && xp >= CUMULATIVE[level + 1]) level++;
+  while (xp >= cumulative(level + 1)) level++;
   return level;
 }
 
@@ -36,14 +40,13 @@ export interface LevelProgress {
   level: number;
   /** 이번 레벨에서 쌓은 성장도 */
   into: number;
-  /** 다음 레벨까지 필요한 성장도 (최고 레벨이면 null) */
-  need: number | null;
+  /** 다음 레벨까지 필요한 성장도 */
+  need: number;
 }
 
 export function levelProgress(xp: number): LevelProgress {
   const level = nurtureLevel(xp);
-  if (level >= N.maxLevel) return { level, into: 0, need: null };
-  return { level, into: xp - CUMULATIVE[level], need: levelStepXp(level) };
+  return { level, into: xp - xpForLevel(level), need: levelStepXp(level) };
 }
 
 /* ---------- 게이지 ---------- */
@@ -125,10 +128,26 @@ export interface NurtureBonus {
   vibe: 'fan' | 'power';
 }
 
-export function nurtureBonus(persona: Persona, xp: number): NurtureBonus {
-  const level = nurtureLevel(xp);
+/** 이정표 레벨에 오르면 붙는 보너스의 합 (steps를 지나면 repeat.every레벨마다 repeat.value씩) */
+export function milestoneBonus(persona: Persona, level: number): number {
   const m = N.milestones[persona];
   let extra = 0;
   for (const step of m.steps) if (level >= step.level) extra += step.value;
-  return { level, rhyme: N.perLevel.rhyme * (level - 1), coin: N.perLevel.coin * (level - 1), extra, vibe: m.vibe };
+  const last = m.steps[m.steps.length - 1].level;
+  if (level > last) extra += Math.floor((level - last) / m.repeat.every) * m.repeat.value;
+  return extra;
+}
+
+/** 다음 이정표 레벨과 그 보너스 */
+export function nextMilestone(persona: Persona, level: number): { level: number; value: number } {
+  const m = N.milestones[persona];
+  const step = m.steps.find((s) => level < s.level);
+  if (step) return step;
+  const last = m.steps[m.steps.length - 1].level;
+  return { level: last + (Math.floor((level - last) / m.repeat.every) + 1) * m.repeat.every, value: m.repeat.value };
+}
+
+export function nurtureBonus(persona: Persona, xp: number): NurtureBonus {
+  const level = nurtureLevel(xp);
+  return { level, rhyme: N.perLevel.rhyme * (level - 1), coin: N.perLevel.coin * (level - 1), extra: milestoneBonus(persona, level), vibe: N.milestones[persona].vibe };
 }

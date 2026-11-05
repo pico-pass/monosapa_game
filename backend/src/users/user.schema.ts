@@ -18,6 +18,10 @@ export class User {
 
   @Prop({ required: true })
   lastLoginAt!: Date;
+
+  /** 마지막으로 접속 신호(로그인·`POST /api/auth/ping`)를 받은 시각. 프로필의 접속 상태에 쓴다. 예전 계정은 비어 있다. */
+  @Prop({ type: Date, default: null })
+  lastSeenAt!: Date | null;
 }
 
 export type UserDocument = HydratedDocument<User>;

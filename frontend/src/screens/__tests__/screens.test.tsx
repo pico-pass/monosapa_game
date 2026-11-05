@@ -3,7 +3,7 @@ import { createElement } from 'react';
 import { renderToString } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PET_GROWN_STAGE, petImage, ASSETS } from '../../assets';
-import { BALANCE, STAGES } from '../../game/balance';
+import { BALANCE, NURTURE_TEMP_OPEN, STAGES } from '../../game/balance';
 import { albumDefById, albumSeries } from '../../game/content';
 import { createInitialState } from '../../game/persistence';
 import type { GameState, Mail, Single } from '../../game/types';
@@ -846,15 +846,44 @@ describe('콘텐츠 팩 2 화면', () => {
     const arcade = await renderNamed(() => import('../ArcadeScreen'), 'ArcadeScreen', 'arcade', g);
     expect(arcade).toContain('계단 랭킹 보러 가기');
   });
+
+  it('랭킹: 육성 탭과 내 육성 레벨 안내', async () => {
+    const g = packState();
+    const loader = () => import('../RankingScreen');
+    expect(await renderNamed(loader, 'RankingScreen', 'ranking', g)).toContain('육성');
+    const trained = await renderNamed(loader, 'NurtureBoard', 'ranking', g, {}, { normal: 12, dark: 7, trained: true });
+    expect(trained).toContain('일반 Lv.12 · 어둠 Lv.7');
+    expect(trained).toContain('불러오는 중');
+    expect(await renderNamed(loader, 'NurtureBoard', 'ranking', g, {}, { normal: 1, dark: 1, trained: false })).toContain('한 번이라도 돌보면 순위에 올라요');
+  });
+
+  it('프로필 접속 상태: 접속 중 또는 n분 전 접속', async () => {
+    const g = packState();
+    const loader = () => import('../../components/parts');
+    const on = await renderNamed(loader, 'Presence', 'ranking', g, {}, { agoMs: 30_000 });
+    expect(on).toContain('presence-on');
+    expect(on).toContain('접속 중');
+    const off = await renderNamed(loader, 'Presence', 'ranking', g, {}, { agoMs: 17 * 60_000 });
+    expect(off).not.toContain('presence-on');
+    expect(off).toContain('17분 전 접속');
+  });
 });
 
 describe('모노사파 육성 화면', () => {
   const open = (patch: Partial<GameState> = {}): GameState => ({ ...richState(), fans: BALANCE.nurture.unlockFans, ...patch });
 
-  it('팬이 모자라면 잠금 안내와 남은 조건을 보여 준다', async () => {
+  it.skipIf(NURTURE_TEMP_OPEN)('팬이 모자라면 잠금 안내와 남은 조건을 보여 준다', async () => {
     const html = await render('nurture', open({ fans: 5000 }));
     expect(html).toContain('팬 80.0K명부터 열려요');
     expect(html).not.toContain('밥주기');
+  });
+
+  it.runIf(NURTURE_TEMP_OPEN)('임시 개방 중에는 팬이 모자라도 열리고 안내 문구가 붙는다', async () => {
+    const html = await render('nurture', open({ fans: 5000 }));
+    expect(html).toContain('임시로 열려 있어요');
+    expect(html).toContain('팬 80.0K명부터예요');
+    expect(html).toContain('밥주기');
+    expect(await render('nurture', open())).not.toContain('임시로 열려 있어요');
   });
 
   it('일반: 게이지 네 가지와 행동 네 가지가 나온다', async () => {
@@ -869,6 +898,24 @@ describe('모노사파 육성 화면', () => {
       expect(html, w).toContain(w);
     }
     expect(html).not.toContain('밥주기');
+  });
+
+  it('일반·어둠 모노사파 그림이 각각 보이고, 입은 코스튬이 있으면 그 모습이다', async () => {
+    // richState는 코스튬을 입고 있어서 기본 옷 상태로 바꿔 본다
+    const plain = (persona: 'normal' | 'dark'): GameState => {
+      const g = open({ activePersona: persona });
+      return { ...g, cosmetics: { ...g.cosmetics, costume: null, darkCostume: null } };
+    };
+    const normal = await render('nurture', plain('normal'));
+    expect(normal).toContain('class="nurture-sapa-img" src="/assets/mono-normal.webp"');
+    // 위쪽 탭에는 두 자아의 얼굴이 모두 나온다
+    expect(normal).toContain('class="nurture-thumb" src="/assets/mono-dark.png"');
+    const dark = await render('nurture', plain('dark'));
+    expect(dark).toContain('class="nurture-sapa-img" src="/assets/mono-dark.png"');
+    expect(dark).toContain('class="nurture-thumb" src="/assets/mono-normal.webp"');
+    const g = plain('normal');
+    const dressed = await render('nurture', { ...g, cosmetics: { ...g.cosmetics, costumes: ['maid'], costume: 'maid' } });
+    expect(dressed).toContain('class="nurture-sapa-img" src="/assets/costume-maid.webp"');
   });
 
   it('자는 중에는 남은 시간과 깨우기가 보이고, 하단 더보기에 육성 항목이 있다', async () => {

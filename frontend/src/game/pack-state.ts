@@ -99,6 +99,8 @@ function parseNurtureSide(raw: unknown, who: Persona, label: string): NurtureSid
   const max = BALANCE.nurture.gauge.max;
   const at = num(raw, 'at', 0, MAX_TIME, `${label}.at`);
   const sleepUntil = num(raw, 'sleepUntil', 0, MAX_TIME, `${label}.sleepUntil`);
+  // 1분 제한은 나중에 생긴 필드라 없는 예전 저장은 바로 돌볼 수 있다
+  const readyAt = raw.readyAt === undefined ? 0 : num(raw, 'readyAt', 0, MAX_TIME, `${label}.readyAt`);
   return {
     xp: int(raw, 'xp', 0, BIG, `${label}.xp`),
     full: num(raw, 'full', 0, max, `${label}.full`),
@@ -108,6 +110,7 @@ function parseNurtureSide(raw: unknown, who: Persona, label: string): NurtureSid
     at,
     // 자는 시간은 한 번에 sleep.ms까지라, 기록 시각보다 그 이상 먼 값은 고쳐진 저장이다
     sleepUntil: at > 0 ? Math.min(sleepUntil, at + BALANCE.nurture.sleep.ms) : 0,
+    readyAt,
     uses: countMap(raw.uses, (id) => nurtureActionById(id)?.persona === who, BIG, `${label}.uses`),
   };
 }

@@ -1,6 +1,7 @@
 /**
  * 모노사파 육성 성장 속도 시뮬레이션. 실행: npm run sim:nurture (DAYS=120 으로 일수를 바꾼다)
- * 하루 N번 들러 허용되는 행동 중 성장도가 가장 큰 것부터 반복한다. 코인은 넉넉하다고 보고 쓴 인세 분량만 센다.
+ * 하루 N번 들러 10분쯤 머물며, 허용되는 행동 중 성장도가 가장 큰 것부터 한다. 돌보기는 1분에 한 번이라 행동마다 1분이 흐른다.
+ * 코인은 넉넉하다고 보고 쓴 인세 분량만 센다. 레벨 제한이 없어서 만렙 대신 5의 배수 레벨(5·10·…·60)에 닿는 날을 잰다.
  */
 import { nurtureActionsOf } from '../src/game/balance';
 import { createInitialState } from '../src/game/persistence';
@@ -11,6 +12,7 @@ const HOUR = 3600_000;
 const DAY = 24 * HOUR;
 const T0 = new Date(2026, 9, 28, 0, 0, 0).getTime();
 
+const VISIT_MIN = 10;
 const VISITS: Record<string, number[]> = {
   casual: [9, 15, 22], // 하루 3번
   active: [8, 11, 14, 17, 20, 23], // 하루 6번
@@ -34,8 +36,9 @@ function run(persona: Persona, who: string, totalDays: number): Out {
   const level = () => nurtureView(s, persona).progress.level;
   for (let d = 0; d < totalDays; d++) {
     for (const h of hours) {
-      s = { ...s, lastSettledAt: T0 + d * DAY + h * HOUR };
-      for (let guard = 0; guard < 60; guard++) {
+      const visit = T0 + d * DAY + h * HOUR;
+      for (let guard = 0; guard < VISIT_MIN; guard++) {
+        s = { ...s, lastSettledAt: visit + guard * 60_000 };
         const cand = defs
           .map((def) => previewNurture(s, persona, def))
           .filter((p) => p.blocked === null && p.def.kind !== 'sleep')
@@ -56,7 +59,7 @@ function run(persona: Persona, who: string, totalDays: number): Out {
         if (def.kind === 'sleep') break;
       }
       const L = level();
-      for (const t of [5, 10, 15, 20, 25, 30, 35, 40]) if (L >= t && days[t] === undefined) days[t] = d + h / 24;
+      for (const t of [5, 10, 20, 30, 40, 50, 60]) if (L >= t && days[t] === undefined) days[t] = d + h / 24;
     }
   }
   return { days, spendSecsPerDay: spent / totalDays, actionsPerDay: acts / totalDays, final: level() };

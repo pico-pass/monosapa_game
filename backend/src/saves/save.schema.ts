@@ -36,6 +36,21 @@ export class Save {
   @Prop({ type: Number, default: 0 })
   towerBest!: number;
 
+  /** 모노사파 육성 레벨. 랭킹용으로 state.nurture 의 성장도에서 계산해 둔 값이다. 아직 육성하지 않았으면 일반·어둠 모두 1레벨이다. */
+  @Prop({ type: Number, default: 1 })
+  nurtureNormal!: number;
+
+  @Prop({ type: Number, default: 1 })
+  nurtureDark!: number;
+
+  /** 육성 레벨 합계(일반 + 어둠). 육성 랭킹의 1차 순서다. */
+  @Prop({ type: Number, default: 2 })
+  nurtureTotal!: number;
+
+  /** 육성 성장도 합계. 레벨 합계가 같을 때의 순서이자 육성을 한 번이라도 했는지(0보다 큰지) 알려 준다. */
+  @Prop({ type: Number, default: 0 })
+  nurtureXp!: number;
+
   /** 마지막으로 쓴 클라이언트(페이지 로드) 식별자. 응답이 유실돼 같은 클라이언트가 재시도하는 경우를 충돌로 보지 않기 위한 값이다. */
   @Prop({ required: true })
   lastWriter!: string;
@@ -50,3 +65,5 @@ export const SaveSchema = SchemaFactory.createForClass(Save);
 SaveSchema.index({ level: -1, fans: -1 });
 // 계단 랭킹 조회: 최고 층 ↓
 SaveSchema.index({ towerBest: -1 });
+// 육성 랭킹 조회: 레벨 합계 ↓, 성장도 합계 ↓
+SaveSchema.index({ nurtureTotal: -1, nurtureXp: -1 });

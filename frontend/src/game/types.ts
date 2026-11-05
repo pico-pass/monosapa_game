@@ -198,6 +198,8 @@ export interface NurtureSide {
   at: number;
   /** 이 시각까지 자는 중이다(지났으면 깨어 있음). */
   sleepUntil: number;
+  /** 이 시각까지는 이 자아를 돌볼 수 없다(모든 행동 자아마다 1분에 한 번). */
+  readyAt: number;
   /** 행동별로 해 준 횟수 (행동 ID → 횟수) */
   uses: Record<string, number>;
 }
@@ -404,7 +406,8 @@ export type FailReason =
   | 'sleeping'
   | 'gauge_high'
   | 'too_tired'
-  | 'not_sleepy';
+  | 'not_sleepy'
+  | 'care_cooldown';
 
 export type Fail = { ok: false; reason: FailReason; state: GameState };
 export type Ok<T = object> = { ok: true; state: GameState } & T;

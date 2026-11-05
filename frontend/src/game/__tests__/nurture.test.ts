@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { nurtureAlerts, nurtureAct, nurtureCost, nurtureView, nurtureWake, previewNurture } from '../nurture';
-import { BALANCE, DRINK_IDS, FUN_IDS, NURTURE_ACTIONS, nurtureActionById, nurtureActionsOf } from '../balance';
+import { nurtureAlerts, nurtureAct, nurtureCost, nurtureView, nurtureWaitMs, nurtureWake, previewNurture } from '../nurture';
+import { BALANCE, DRINK_IDS, FUN_IDS, NURTURE_ACTIONS, NURTURE_TEMP_OPEN, nurtureActionById, nurtureActionsOf } from '../balance';
 import { NURTURE_ACTION_TEXT, nurtureFace } from '../content';
-import { conditionOf, efficiencyOf, emptyNurtureSide, gaugesAt, levelProgress, levelStepXp, nurtureBonus, nurtureLevel, toleranceFactor, topTier, xpForLevel } from '../nurturedata';
+import { conditionOf, efficiencyOf, emptyNurtureSide, gaugesAt, levelProgress, levelStepXp, nurtureBonus, nextMilestone, nurtureLevel, nurtureUnlocked, toleranceFactor, topTier, xpForLevel } from '../nurturedata';
 import { bonuses } from '../packdata';
 import { createInitialState, validateState } from '../persistence';
 import { clickGain, fanGainMult, rhymeRate, royaltyBreakdown } from '../selectors';
@@ -54,7 +54,7 @@ describe('모노사파 육성: 행동표', () => {
         expect(defs[i].tier).toBe(i + 1);
       }
       expect(defs[0].unlockLevel).toBe(1);
-      expect(defs[defs.length - 1].unlockLevel).toBeLessThanOrEqual(N.maxLevel);
+      expect(defs[defs.length - 1].unlockLevel).toBeGreaterThan(30);
     }
   });
 
@@ -64,15 +64,20 @@ describe('모노사파 육성: 행동표', () => {
 });
 
 describe('모노사파 육성: 레벨', () => {
-  it('성장도 합계로 레벨이 정해지고 최고 레벨을 넘지 않는다', () => {
+  it('성장도 합계로 레벨이 정해지고 최고 레벨이 없다', () => {
     expect(nurtureLevel(0)).toBe(1);
     expect(nurtureLevel(levelStepXp(1) - 1)).toBe(1);
     expect(nurtureLevel(levelStepXp(1))).toBe(2);
-    expect(nurtureLevel(xpForLevel(N.maxLevel))).toBe(N.maxLevel);
-    expect(nurtureLevel(1e12)).toBe(N.maxLevel);
-    expect(levelProgress(1e12).need).toBeNull();
+    expect(nurtureLevel(xpForLevel(40))).toBe(40);
+    // 40레벨 제한을 풀었다: 그 위로도 계속 오른다
+    expect(nurtureLevel(xpForLevel(41))).toBe(41);
+    expect(nurtureLevel(xpForLevel(100))).toBe(100);
+    expect(nurtureLevel(xpForLevel(100) - 1)).toBe(99);
     const p = levelProgress(xpForLevel(5) + 7);
     expect(p).toEqual({ level: 5, into: 7, need: levelStepXp(5) });
+    expect(levelProgress(xpForLevel(60)).need).toBe(levelStepXp(60));
+    // 필요 성장도는 레벨마다 늘어난다
+    expect(levelStepXp(60)).toBeGreaterThan(levelStepXp(40) * 5);
   });
 
   it('레벨 보너스: 1레벨은 0이고 레벨마다 라임·인세가 늘며 이정표에 팬(일반)·전투력(어둠)이 붙는다', () => {
@@ -81,9 +86,17 @@ describe('모노사파 육성: 레벨', () => {
     expect(n.rhyme).toBeCloseTo(10 * N.perLevel.rhyme);
     expect(n.coin).toBeCloseTo(10 * N.perLevel.coin);
     expect(n.extra).toBeCloseTo(0.02);
-    const d = nurtureBonus('dark', atLevel(N.maxLevel));
+    const d = nurtureBonus('dark', atLevel(40));
     expect(d.vibe).toBe('power');
     expect(d.extra).toBeCloseTo(N.milestones.dark.steps.reduce((a, x) => a + x.value, 0));
+    // 40레벨을 넘으면 10레벨마다 3%씩 더 붙고, 레벨당 라임·인세도 계속 늘어난다
+    expect(nurtureBonus('dark', atLevel(49)).extra).toBeCloseTo(d.extra);
+    expect(nurtureBonus('dark', atLevel(50)).extra).toBeCloseTo(d.extra + 0.03);
+    expect(nurtureBonus('normal', atLevel(80)).extra).toBeCloseTo(d.extra + 4 * 0.03);
+    expect(nurtureBonus('normal', atLevel(81)).rhyme).toBeCloseTo(80 * N.perLevel.rhyme);
+    expect(nextMilestone('normal', 5)).toEqual({ level: 10, value: 0.02 });
+    expect(nextMilestone('normal', 40)).toEqual({ level: 50, value: 0.03 });
+    expect(nextMilestone('dark', 57)).toEqual({ level: 60, value: 0.03 });
   });
 });
 
@@ -129,8 +142,23 @@ describe('모노사파 육성: 게이지', () => {
   });
 });
 
+describe('모노사파 육성: 임시 개방', () => {
+  it.runIf(NURTURE_TEMP_OPEN)('팬이 하나도 없어도 돌볼 수 있다', () => {
+    const s = base({ fans: 0 });
+    expect(nurtureView(s, 'normal').unlocked).toBe(true);
+    expect(ok(nurtureAct(withSide(s, 'normal', { full: 10 }), 'normal', 'n-feed')).ok).toBe(true);
+  });
+});
+
 describe('모노사파 육성: 일반 돌보기', () => {
-  it('팬이 8만 명 미만이면 열리지 않는다', () => {
+  it('열림 조건: 팬 8만 명 이상이거나 임시 개방 중일 때', () => {
+    expect(nurtureUnlocked(N.unlockFans - 1, false)).toBe(false);
+    expect(nurtureUnlocked(N.unlockFans, false)).toBe(true);
+    expect(nurtureUnlocked(0, true)).toBe(true);
+    expect(nurtureUnlocked(0)).toBe(NURTURE_TEMP_OPEN);
+  });
+
+  it.skipIf(NURTURE_TEMP_OPEN)('팬이 8만 명 미만이면 열리지 않는다', () => {
     const s = base({ fans: N.unlockFans - 1 });
     expect(reason(nurtureAct(s, 'normal', 'n-feed'))).toBe('nurture_locked');
     expect(nurtureAlerts(s)).toBe(0);
@@ -149,7 +177,7 @@ describe('모노사파 육성: 일반 돌보기', () => {
     expect(side.xp).toBe(r.xp);
     expect(r.xp).toBeGreaterThan(0);
     expect(side.uses['n-feed']).toBe(1);
-    // 다른 자아는 그대로
+    // 다른 자아는 게이지·성장도·대기 시간 모두 그대로다
     expect(r.state.nurture.dark).toEqual(s.nurture.dark);
   });
 
@@ -211,6 +239,54 @@ describe('모노사파 육성: 일반 돌보기', () => {
     expect(reason(nurtureAct(base(), 'normal', 'd-drink1'))).toBe('not_found');
     expect(reason(nurtureAct(base(), 'dark', 'n-feed'))).toBe('not_found');
     expect(reason(nurtureAct(base(), 'dark', 'zzz'))).toBe('not_found');
+  });
+});
+
+describe('모노사파 육성: 1분에 한 번', () => {
+  const needy = (): GameState => withSide(withSide(base(), 'normal', { full: 10, mood: 10, clean: 10 }), 'dark', { mood: 10, full: 10, clean: 10 });
+
+  it('돌보기를 하면 모든 행동이 1분 동안 막히고, 정확히 1분이 지나면 다시 된다', () => {
+    const s = ok(nurtureAct(needy(), 'normal', 'n-feed')).state;
+    expect(N.cooldownMs).toBe(60_000);
+    expect(nurtureWaitMs(s, 'normal')).toBe(60_000);
+    for (const id of ['n-feed', 'n-play', 'n-wash']) expect(reason(nurtureAct(s, 'normal', id)), id).toBe('care_cooldown');
+    expect(reason(nurtureAct(at(s, T0 + 59_999), 'normal', 'n-play'))).toBe('care_cooldown');
+    expect(nurtureWaitMs(at(s, T0 + 20_000), 'normal')).toBe(40_000);
+    expect(ok(nurtureAct(at(s, T0 + 60_000), 'normal', 'n-play')).ok).toBe(true);
+  });
+
+  it('일반·어둠은 대기 시간을 따로 센다', () => {
+    const s = ok(nurtureAct(needy(), 'normal', 'n-feed')).state;
+    // 일반을 돌봐도 어둠은 바로 할 수 있다
+    expect(nurtureView(s, 'dark').waitMs).toBe(0);
+    expect(nurtureView(s, 'normal').waitMs).toBe(60_000);
+    const d = ok(nurtureAct(at(s, T0 + 10_000), 'dark', 'd-drink1')).state;
+    // 어둠을 돌본 뒤에도 일반의 남은 시간은 그대로 흐르고, 어둠은 자기 1분을 기다린다
+    expect(nurtureView(d, 'normal').waitMs).toBe(50_000);
+    expect(nurtureView(d, 'dark').waitMs).toBe(60_000);
+    expect(reason(nurtureAct(d, 'normal', 'n-play'))).toBe('care_cooldown');
+    expect(reason(nurtureAct(d, 'dark', 'd-wash'))).toBe('care_cooldown');
+    // 일반은 자기 1분이 지나면 어둠이 아직 기다려도 할 수 있다
+    const later = at(d, T0 + 60_000);
+    expect(nurtureView(later, 'dark').waitMs).toBe(10_000);
+    expect(ok(nurtureAct(later, 'normal', 'n-play')).ok).toBe(true);
+  });
+
+  it('실패한 시도는 대기 시간을 쓰지 않고, 깨우기는 대기 중에도 된다', () => {
+    const s = needy();
+    expect(reason(nurtureAct(withSide(s, 'normal', { full: 95 }), 'normal', 'n-feed'))).toBe('gauge_high');
+    expect(nurtureWaitMs(s, 'normal')).toBe(0);
+    const slept = ok(nurtureAct(withSide(s, 'normal', { tired: 80 }), 'normal', 'n-sleep')).state;
+    expect(nurtureWaitMs(slept, 'normal')).toBe(60_000);
+    expect(ok(nurtureWake(at(slept, T0 + 10_000), 'normal')).ok).toBe(true);
+  });
+
+  it('다른 이유로 못 하는 행동은 그 이유가 먼저 보이고, 비정상으로 큰 대기 값도 1분을 넘지 않는다', () => {
+    const s = ok(nurtureAct(withSide(needy(), 'normal', { mood: 95 }), 'normal', 'n-feed')).state;
+    const def = nurtureActionById('n-play')!;
+    expect(previewNurture(s, 'normal', def).blocked).toBe('gauge_high');
+    const tampered = withSide(s, 'dark', { readyAt: T0 + 1e12 });
+    expect(nurtureWaitMs(tampered, 'dark')).toBe(60_000);
   });
 });
 
@@ -289,8 +365,8 @@ describe('모노사파 육성: 어둠 사다리', () => {
     expect(previewNurture(high, 'dark', def).xp).toBeLessThan(previewNurture(low, 'dark', def).xp);
     expect(ok(nurtureAct(high, 'dark', 'd-drink1')).state.nurture.dark.mood).toBeLessThan(ok(nurtureAct(low, 'dark', 'd-drink1')).state.nurture.dark.mood);
     // 아주 큰 격차에서도 바닥(tolerance.min) 밑으로 내려가지 않는다
-    expect(toleranceFactor(nurtureActionById('d-fun1')!, N.maxLevel)).toBeGreaterThanOrEqual(N.tolerance.min);
-    expect(toleranceFactor(nurtureActionById('d-fun11')!, N.maxLevel)).toBe(1);
+    expect(toleranceFactor(nurtureActionById('d-fun1')!, 60)).toBeGreaterThanOrEqual(N.tolerance.min);
+    expect(toleranceFactor(nurtureActionById('d-fun11')!, 60)).toBe(1);
   });
 
   it('쾌락이 높거나 너무 지쳤으면 술도 놀기도 못 한다', () => {
@@ -316,7 +392,7 @@ describe('모노사파 육성: 레벨업 보상', () => {
     expect(r.diamonds).toBe(N.diamonds.amount);
     expect(r.state.diamonds).toBe(N.diamonds.amount);
     // 같은 레벨 안에서는 주지 않는다
-    const again = ok(nurtureAct(withSide(r.state, 'normal', { full: 10 }), 'normal', 'n-feed'));
+    const again = ok(nurtureAct(at(withSide(r.state, 'normal', { full: 10 }), T0 + N.cooldownMs), 'normal', 'n-feed'));
     expect(again.diamonds).toBe(0);
   });
 });
@@ -372,7 +448,7 @@ describe('모노사파 육성: 저장', () => {
     let s = withSide(base(), 'normal', { full: 20 });
     s = ok(nurtureAct(s, 'normal', 'n-feed')).state;
     s = withSide(s, 'dark', { xp: atLevel(8), mood: 10 });
-    s = ok(nurtureAct(s, 'dark', 'd-drink3')).state;
+    s = ok(nurtureAct(at(s, T0 + N.cooldownMs), 'dark', 'd-drink3')).state;
     const back = roundTrip(s);
     expect(back.nurture).toEqual(s.nurture);
     expect(createInitialState(T0).nurture.normal).toEqual(emptyNurtureSide());
@@ -384,6 +460,15 @@ describe('모노사파 육성: 저장', () => {
     const v = validateState(raw);
     expect(v.ok).toBe(true);
     if (v.ok) expect(v.state.nurture.dark).toEqual(emptyNurtureSide());
+  });
+
+  it('1분 제한 시각이 없던 예전 저장은 바로 돌볼 수 있고, 음수 값은 거절한다', () => {
+    const raw = JSON.parse(JSON.stringify(createInitialState(T0))) as { nurture: Record<Persona, Record<string, unknown>> };
+    delete raw.nurture.normal.readyAt;
+    const v = validateState(raw);
+    expect(v.ok && v.state.nurture.normal.readyAt).toBe(0);
+    raw.nurture.dark.readyAt = -1;
+    expect(validateState(raw).ok).toBe(false);
   });
 
   it('범위를 벗어났거나 고쳐진 값은 거절한다', () => {
@@ -432,14 +517,16 @@ describe('모노사파 육성: 알림과 얼굴', () => {
 });
 
 /** 하루 세 번 들러 허용되는 행동 중 성장도가 큰 것부터 하는 봇으로 성장 속도를 잰다 */
-function casualDays(persona: Persona, days: number): { reached: Record<number, number> } {
+function casualDays(persona: Persona, days: number): { reached: Record<number, number>; final: number } {
   let s = base();
   const reached: Record<number, number> = {};
   const defs = nurtureActionsOf(persona);
   for (let d = 0; d < days; d++) {
     for (const h of [9, 15, 22]) {
-      s = at(s, T0 + d * 24 * HOUR + h * HOUR);
-      for (let guard = 0; guard < 60; guard++) {
+      const visit = T0 + d * 24 * HOUR + h * HOUR;
+      // 한 번 들르면 10분쯤 머물고, 행동은 1분에 한 번씩 할 수 있다
+      for (let k = 0; k < 10; k++) {
+        s = at(s, visit + k * 60_000);
         const v = nurtureView(s, persona);
         const sleep = defs.find((x) => x.kind === 'sleep')!;
         const canSleep = previewNurture(s, persona, sleep).blocked === null;
@@ -455,7 +542,7 @@ function casualDays(persona: Persona, days: number): { reached: Record<number, n
       for (const t of [10, 20, 30, 40]) if (L >= t && reached[t] === undefined) reached[t] = d + h / 24;
     }
   }
-  return { reached };
+  return { reached, final: nurtureView(s, persona).progress.level };
 }
 
 describe('모노사파 육성: 성장 속도', () => {

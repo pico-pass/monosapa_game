@@ -67,6 +67,7 @@ import {
   type TabId,
 } from './store/gameStore';
 import { initAuth, useAuth } from './store/authStore';
+import { startPresence } from './platform/presence';
 
 const ALBUM_KIND = { normal: '일반', dark: '어둠' } as const;
 
@@ -129,6 +130,9 @@ function Game() {
   const ducked = !!ui.concertRun || !!ui.arcadeRun || !!ui.towerRun;
   // 리듬 모드에서 음원 곡을 플레이하는 동안에는 배경음악이 겹치지 않게 끈다.
   const trackPlaying = !!trackOfRun(g.singles, ui.arcadeRun);
+
+  // 프로필의 접속 상태: 게임 화면이 떠 있는 동안 접속 신호를 보낸다.
+  useEffect(() => startPresence(), []);
 
   // 배경음악: 자아가 바뀌면 곡이 교차 페이드되고, 직접 공연 중에는 작아진다.
   useEffect(() => {

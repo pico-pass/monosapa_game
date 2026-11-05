@@ -9,6 +9,8 @@ export class ChatMessageDto {
   id!: string;
   name!: string;
   picture!: string | null;
+  /** 글쓴이가 마지막으로 접속한 지 몇 ms 지났는지(모르면 null) */
+  seenAgoMs!: number | null;
   title!: string | null;
   text!: string;
   /** 보낸 시각(ms) */

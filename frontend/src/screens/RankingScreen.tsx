@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fmt } from '../components/format';
+import { Presence } from '../components/parts';
+import { nurtureLevel } from '../game/nurturedata';
 import { playerLevel } from '../game/selectors';
 import { useUi } from '../store/gameStore';
 
@@ -9,6 +11,17 @@ interface Entry {
   picture: string | null;
   level: number;
   fans: number;
+  seenAgoMs: number | null;
+  me: boolean;
+}
+interface NurtureEntry {
+  rank: number;
+  name: string;
+  picture: string | null;
+  normal: number;
+  dark: number;
+  total: number;
+  seenAgoMs: number | null;
   me: boolean;
 }
 interface TowerEntry {
@@ -17,6 +30,7 @@ interface TowerEntry {
   picture: string | null;
   floor: number;
   level: number;
+  seenAgoMs: number | null;
   me: boolean;
 }
 interface Board<E> {
@@ -59,7 +73,7 @@ function useBoard<E>(path: string): { data: Board<E> | null; error: boolean } {
   return { data, error };
 }
 
-type Kind = 'level' | 'tower';
+type Kind = 'level' | 'tower' | 'nurture';
 
 /** 랭킹. 서버에 저장된 진행 데이터 기준이라 내 기록은 저장이 올라간 뒤(최대 10초) 반영돼요. */
 export function RankingScreen() {
@@ -75,8 +89,13 @@ export function RankingScreen() {
         <button type="button" aria-pressed={kind === 'tower'} onClick={() => setKind('tower')}>
           무한의 계단
         </button>
+        <button type="button" aria-pressed={kind === 'nurture'} onClick={() => setKind('nurture')}>
+          육성
+        </button>
       </div>
-      {kind === 'level' ? <LevelBoard level={playerLevel(g.fans)} /> : <TowerBoard best={g.arcade.tower.best} />}
+      {kind === 'level' && <LevelBoard level={playerLevel(g.fans)} />}
+      {kind === 'tower' && <TowerBoard best={g.arcade.tower.best} />}
+      {kind === 'nurture' && <NurtureBoard normal={nurtureLevel(g.nurture.normal.xp)} dark={nurtureLevel(g.nurture.dark.xp)} trained={g.nurture.normal.xp + g.nurture.dark.xp > 0} />}
     </section>
   );
 }
@@ -166,7 +185,44 @@ export function TowerBoard({ best }: { best: number }) {
   );
 }
 
-function RankRow({ e, main, sub }: { e: { rank: number; name: string; picture: string | null; me: boolean }; main: React.ReactNode; sub: string }) {
+export function NurtureBoard({ normal, dark, trained }: { normal: number; dark: number; trained: boolean }) {
+  const { data, error } = useBoard<NurtureEntry>('ranking/nurture');
+  const inList = data?.entries.some((e) => e.me) ?? false;
+  const row = (e: NurtureEntry) => <RankRow key={e.rank} e={e} main={<b>합계 Lv.{e.total}</b>} sub={`일반 Lv.${e.normal} · 어둠 Lv.${e.dark}`} />;
+  return (
+    <>
+      <p className="muted">
+        모노사파 육성 순위예요. 일반과 어둠 육성 레벨을 더한 값이 높은 순이고, 같으면 성장도가 많은 쪽이 앞서요.{' '}
+        {trained ? `지금 내 육성은 일반 Lv.${normal} · 어둠 Lv.${dark}이에요.` : '한 번이라도 돌보면 순위에 올라요.'}
+      </p>
+      <Status data={data} error={error} />
+      {data && (
+        <>
+          {data.entries.length === 0 ? (
+            <p className="muted">아직 육성을 시작한 계정이 없어요.</p>
+          ) : (
+            <ol className="rank-list" aria-label={`육성 상위 ${data.entries.length}명`}>
+              {data.entries.map(row)}
+            </ol>
+          )}
+          {data.mine && !inList && (
+            <>
+              <p className="rank-gap" aria-hidden>
+                ⋮
+              </p>
+              <ol className="rank-list" start={data.mine.rank}>
+                {row(data.mine)}
+              </ol>
+            </>
+          )}
+          <p className="fineprint">육성을 시작한 {fmt(data.total)}명 · 30초마다 새로 불러와요</p>
+        </>
+      )}
+    </>
+  );
+}
+
+function RankRow({ e, main, sub }: { e: { rank: number; name: string; picture: string | null; seenAgoMs: number | null; me: boolean }; main: React.ReactNode; sub: string }) {
   return (
     <li className={`rank-row${e.me ? ' rank-me' : ''}${e.rank <= 3 ? ` rank-top rank-${e.rank}` : ''}`} value={e.rank}>
       <span className="rank-no">{e.rank <= 3 ? ['🥇', '🥈', '🥉'][e.rank - 1] : e.rank}</span>
@@ -178,8 +234,11 @@ function RankRow({ e, main, sub }: { e: { rank: number; name: string; picture: s
         </span>
       )}
       <span className="rank-name">
-        {e.name}
-        {e.me && <em>나</em>}
+        <span className="rank-name-line">
+          {e.name}
+          {e.me && <em>나</em>}
+        </span>
+        <Presence agoMs={e.me ? 0 : e.seenAgoMs} />
       </span>
       <span className="rank-lv">
         {main}

@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { BALANCE, DRINK_IDS, FUN_IDS, nurtureActionById, type NurtureActionDef } from '../game/balance';
+import { ASSETS } from '../assets';
+import { BALANCE, DRINK_IDS, FUN_IDS, NURTURE_TEMP_OPEN, nurtureActionById, type NurtureActionDef } from '../game/balance';
 import { NURTURE_ACTION_TEXT, NURTURE_TEXT, nurtureFace, PERSONA_TEXT } from '../game/content';
 import { nurtureActions, nurtureView, previewNurture } from '../game/nurture';
-import { NURTURE_GAUGES, nurtureUnlocked, xpForLevel } from '../game/nurturedata';
+import { wornCostume } from '../game/selectors';
+import { NURTURE_GAUGES, nextMilestone, nurtureUnlocked, xpForLevel } from '../game/nurturedata';
 import type { FailReason, GameState, NurtureGauge, Persona } from '../game/types';
 import { Progress } from '../components/parts';
 import { fmt, fmtCountdown } from '../components/format';
@@ -21,6 +23,7 @@ const BLOCK_TEXT: Partial<Record<FailReason, string>> = {
   too_tired: '너무 지침',
   sleeping: '자는 중',
   not_sleepy: '졸리지 않아요',
+  care_cooldown: '잠깐 대기 중',
 };
 
 export function NurtureScreen() {
@@ -43,12 +46,18 @@ export function NurtureScreen() {
   return (
     <section className="screen" aria-label="모노사파 육성">
       <h2 className="section-title">모노사파 육성</h2>
+      {NURTURE_TEMP_OPEN && g.fans < N.unlockFans && (
+        <p className="buff-note" role="note">
+          🧪 임시로 열려 있어요. 원래는 팬 {fmt(N.unlockFans)}명부터예요.
+        </p>
+      )}
       <p className="muted">게이지는 시간이 지나면 변해요. 컨디션이 좋을수록 성장도가 많이 쌓이고, 레벨이 오르면 그 자아의 라임과 인세가 늘어요.</p>
       <div className="seg" role="group" aria-label="자아">
         {(['normal', 'dark'] as const).map((p) => {
           const v = nurtureView(g, p);
           return (
-            <button key={p} type="button" aria-pressed={who === p} onClick={() => setWho(p)}>
+            <button key={p} type="button" className="nurture-tab" aria-pressed={who === p} onClick={() => setWho(p)}>
+              <Portrait g={g} persona={p} className="nurture-thumb" />
               {PERSONA_TEXT[p].short} Lv {v.progress.level}
               {v.needsCare && <i className="nurture-dot" aria-label="돌봐 주세요" />}
             </button>
@@ -67,7 +76,7 @@ function NurtureCard({ persona }: { persona: Persona }) {
   const t = NURTURE_TEXT[persona];
   const acts = nurtureActions(persona);
   const level = v.progress.level;
-  const next = N.milestones[persona].steps.find((s) => level < s.level);
+  const next = nextMilestone(persona, level);
   const vibeName = v.bonus.vibe === 'fan' ? '팬 획득' : '공연·계단 전투력';
   return (
     <div className={`card nurture nurture-${persona}`}>
@@ -76,9 +85,12 @@ function NurtureCard({ persona }: { persona: Persona }) {
         <span className={`badge badge-${persona}`}>Lv {level}</span>
       </div>
       <div className="nurture-head">
-        <span className={`nurture-face${v.sleeping ? ' nurture-asleep' : ''}`} aria-hidden>
-          {face.icon}
-        </span>
+        <div className={`nurture-sapa${v.sleeping ? ' nurture-asleep' : v.condition < 30 ? ' nurture-weak' : ''}`}>
+          <Portrait g={g} persona={persona} className="nurture-sapa-img" fallback={face.icon} />
+          <span className="nurture-mood" aria-hidden>
+            {face.icon}
+          </span>
+        </div>
         <div>
           <p className="nurture-line">{face.line}</p>
           <small className="muted">
@@ -87,9 +99,9 @@ function NurtureCard({ persona }: { persona: Persona }) {
         </div>
       </div>
 
-      <Progress value={v.progress.need === null ? 1 : v.progress.into} max={v.progress.need === null ? 1 : v.progress.need} label={`${t.title} 성장`} />
+      <Progress value={v.progress.into} max={v.progress.need} label={`${t.title} 성장`} />
       <small className="fineprint">
-        {v.progress.need === null ? '최고 레벨이에요.' : `다음 레벨까지 성장도 ${fmt(v.progress.need - v.progress.into)} (누적 ${fmt(v.side.xp)}/${fmt(xpForLevel(level + 1))})`}
+        다음 레벨까지 성장도 {fmt(v.progress.need - v.progress.into)} (누적 {fmt(v.side.xp)}/{fmt(xpForLevel(level + 1))}) · 레벨 제한 없음
       </small>
       <div className="nurture-bonus">
         <span>✍️ 라임 +{pct(v.bonus.rhyme)}</span>
@@ -100,11 +112,9 @@ function NurtureCard({ persona }: { persona: Persona }) {
           </span>
         )}
       </div>
-      {next && (
-        <small className="fineprint">
-          Lv {next.level}에 {vibeName} +{pct(next.value)} · 레벨 {N.diamonds.every}마다 💎 {N.diamonds.amount}
-        </small>
-      )}
+      <small className="fineprint">
+        Lv {next.level}에 {vibeName} +{pct(next.value)} · 레벨 {N.diamonds.every}마다 💎 {N.diamonds.amount}
+      </small>
 
       <div className="nurture-gauges">
         {NURTURE_GAUGES.map((k) => (
@@ -118,6 +128,12 @@ function NurtureCard({ persona }: { persona: Persona }) {
           <button type="button" className="btn btn-ghost" onClick={() => doNurtureWake(persona)}>
             깨우기
           </button>
+        </div>
+      )}
+
+      {v.waitMs > 0 && (
+        <div className="nurture-wait" role="status">
+          ⏳ 다음 돌보기까지 {fmtCountdown(v.waitMs)} <small className="muted">(모든 돌보기는 자아마다 1분에 한 번)</small>
         </div>
       )}
 
@@ -146,6 +162,14 @@ function NurtureCard({ persona }: { persona: Persona }) {
       </small>
     </div>
   );
+}
+
+/** 그 자아의 모노사파 그림. 입고 있는 코스튬이 있으면 코스튬 모습이고, 이미지가 없으면 얼굴 이모지로 대신한다. */
+function Portrait({ g, persona, className, fallback }: { g: GameState; persona: Persona; className: string; fallback?: string }) {
+  const costume = wornCostume(g, persona);
+  const src = costume ? ASSETS.costumes[costume] : ASSETS.characters[persona];
+  if (!src) return <span className={`${className} nurture-portrait-fallback`}>{fallback ?? NURTURE_TEXT[persona].moodIcon}</span>;
+  return <img className={className} src={src} alt={NURTURE_TEXT[persona].title} draggable={false} />;
 }
 
 function Gauge({ persona, kind, value }: { persona: Persona; kind: NurtureGauge; value: number }) {

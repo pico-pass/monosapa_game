@@ -25,13 +25,53 @@ const FANS_PER_LEVEL_STEP = 20;
 /** 무한의 계단 최고 층의 상한(이상한 값이 랭킹을 차지하지 못하게 한다) */
 export const MAX_TOWER_FLOOR = 1_000_000;
 
-/** 저장된 state 에서 랭킹용 팬 수·레벨·계단 최고 층을 뽑는다. 이상한 값은 0명(레벨 1)·0층으로 본다. */
-export function rankFieldsOf(state: Record<string, unknown>): { fans: number; level: number; towerBest: number } {
+/** 모노사파 육성 성장도의 상한(고쳐진 값이 랭킹을 차지하지 못하게 한다). 프런트 저장 검증의 상한과 같다. */
+export const MAX_NURTURE_XP = 1e9;
+
+/**
+ * 육성 레벨: 레벨 L → L+1에 ceil(40 × 1.1^(L−1)) 성장도. 프런트 `levelStepXp`(BALANCE.nurture.levelXp)와 같은 식이고, 최고 레벨은 없다.
+ * BALANCE.nurture.levelXp 가 바뀌면 여기도 맞춘다.
+ */
+const NURTURE_XP_BASE = 40;
+const NURTURE_XP_GROWTH = 1.1;
+export function nurtureLevelOf(xp: number): number {
+  let level = 1;
+  let reach = Math.ceil(NURTURE_XP_BASE);
+  while (xp >= reach) {
+    level++;
+    reach += Math.ceil(NURTURE_XP_BASE * NURTURE_XP_GROWTH ** (level - 1));
+  }
+  return level;
+}
+
+const nurtureXpOf = (side: unknown): number => {
+  const xp = isObj(side) ? side.xp : 0;
+  return typeof xp === 'number' && Number.isInteger(xp) && xp > 0 ? Math.min(xp, MAX_NURTURE_XP) : 0;
+};
+
+export interface RankFields {
+  fans: number;
+  level: number;
+  towerBest: number;
+  /** 육성 레벨(일반·어둠)과 합계, 성장도 합계(합계가 같을 때의 순서) */
+  nurtureNormal: number;
+  nurtureDark: number;
+  nurtureTotal: number;
+  nurtureXp: number;
+}
+
+/** 저장된 state 에서 랭킹용 팬 수·레벨·계단 최고 층·육성 레벨을 뽑는다. 이상한 값은 0명(레벨 1)·0층·육성 1레벨로 본다. */
+export function rankFieldsOf(state: Record<string, unknown>): RankFields {
   const raw = state.fans;
   const fans = typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? Math.min(raw, 1e15) : 0;
   const tower = isObj(state.arcade) && isObj(state.arcade.tower) ? state.arcade.tower.best : 0;
   const towerBest = typeof tower === 'number' && Number.isInteger(tower) && tower > 0 ? Math.min(tower, MAX_TOWER_FLOOR) : 0;
-  return { fans, level: 1 + Math.floor(Math.sqrt(fans / FANS_PER_LEVEL_STEP)), towerBest };
+  const nurture = isObj(state.nurture) ? state.nurture : {};
+  const normalXp = nurtureXpOf(nurture.normal);
+  const darkXp = nurtureXpOf(nurture.dark);
+  const nurtureNormal = nurtureLevelOf(normalXp);
+  const nurtureDark = nurtureLevelOf(darkXp);
+  return { fans, level: 1 + Math.floor(Math.sqrt(fans / FANS_PER_LEVEL_STEP)), towerBest, nurtureNormal, nurtureDark, nurtureTotal: nurtureNormal + nurtureDark, nurtureXp: normalXp + darkXp };
 }
 
 const toDto = (d: SaveDocument): SaveDto => ({ state: d.state, version: d.version, savedAt: d.savedAt });

@@ -40,6 +40,13 @@ export interface NurtureView {
   sleeping: boolean;
   sleepLeftMs: number;
   needsCare: boolean;
+  /** 이 자아가 다음 돌보기까지 남은 시간(ms). 모든 행동이 자아마다 1분에 한 번이다. */
+  waitMs: number;
+}
+
+/** 그 자아가 다음 돌보기까지 남은 시간. 일반·어둠은 따로 센다. 값이 비정상적으로 커도 cooldownMs를 넘기지 않는다. */
+export function nurtureWaitMs(s: Pick<GameState, 'nurture' | 'lastSettledAt'>, persona: Persona): number {
+  return Math.min(N.cooldownMs, Math.max(0, s.nurture[persona].readyAt - s.lastSettledAt));
 }
 
 export function nurtureView(s: Pick<GameState, 'nurture' | 'lastSettledAt' | 'fans'>, persona: Persona): NurtureView {
@@ -59,6 +66,7 @@ export function nurtureView(s: Pick<GameState, 'nurture' | 'lastSettledAt' | 'fa
     sleeping,
     sleepLeftMs: sleeping ? side.sleepUntil - at : 0,
     needsCare: !sleeping && needsCare(gauges),
+    waitMs: nurtureWaitMs(s, persona),
   };
 }
 
@@ -87,14 +95,16 @@ export function previewNurture(s: GameState, persona: Persona, def: NurtureActio
   const xp = Math.max(1, Math.round(def.xp * v.efficiency * tolerance));
   let blocked: FailReason | null = null;
   if (!v.unlocked) blocked = 'nurture_locked';
-  else if (v.sleeping) blocked = 'sleeping';
   else if (level < def.unlockLevel) blocked = 'level_low';
+  else if (v.sleeping) blocked = 'sleeping';
   else if (def.kind === 'sleep') blocked = v.gauges.tired < N.sleep.minTired ? 'not_sleepy' : null;
   else {
     const main = MAIN_GAUGE[def.kind];
     if ((def.kind === 'play' || def.kind === 'drink' || def.kind === 'fun') && v.gauges.tired > N.tooTired) blocked = 'too_tired';
     else if (v.gauges[main] > N.needBelow) blocked = 'gauge_high';
   }
+  // 모든 행동은 자아마다 1분에 한 번: 다른 이유로 못 하는 게 아닐 때 남은 대기 시간을 알린다
+  if (!blocked && v.waitMs > 0) blocked = 'care_cooldown';
   return { def, cost: nurtureCost(s, def), xp, tolerance, blocked };
 }
 
@@ -123,6 +133,7 @@ export function nurtureAct(state: GameState, persona: Persona, actionId: string)
   const moodDelta = def.mood > 0 ? def.mood * p.tolerance : def.mood;
   const next: NurtureSide = {
     ...side,
+    readyAt: now + N.cooldownMs,
     xp: side.xp + p.xp,
     full: clampGauge(g.full + def.full),
     mood: clampGauge(g.mood + moodDelta),
