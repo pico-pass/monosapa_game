@@ -12,7 +12,7 @@ const HOUR = 3600_000;
 export const NURTURE_GAUGES: readonly NurtureGauge[] = ['full', 'mood', 'tired', 'clean'];
 export type GaugeValues = Record<NurtureGauge, number>;
 
-export const emptyNurtureSide = (): NurtureSide => ({ xp: 0, ...N.gauge.start, at: 0, sleepUntil: 0, readyAt: 0, uses: {} });
+export const emptyNurtureSide = (): NurtureSide => ({ xp: 0, ...N.gauge.start, at: 0, sleepUntil: 0, readyAt: {}, uses: {} });
 
 /** 열려 있나: 팬이 unlockFans명 이상이거나 임시 개방 중(NURTURE_TEMP_OPEN)이다. */
 export const nurtureUnlocked = (fans: number, tempOpen: boolean = NURTURE_TEMP_OPEN): boolean => tempOpen || fans >= N.unlockFans;

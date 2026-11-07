@@ -939,6 +939,7 @@ export const BALANCE = {
    * 10연의 마지막은 레어 이상이 확정이다. 등급 확률은 예전 3등급(R 85 · SR 13 · SSR 2)의 SR을 레어 8 + 에픽 5로 나눈 값이다.
    * 중복은 별이 오르고(최대 maxStar), 넘치면 dupRefund 다이아로 돌려받는다. 장착한 slots명의 패시브가 영구로 붙는다.
    *   패시브 = passive[등급] × (1 + starBonus × (별 − 1))
+   *   (별 상한은 처음 6이었다가 요청으로 10까지 늘렸다. 별마다 +10%라 별 10개 전설은 패시브 10% × 1.9 = 19%. 예전 저장의 별은 그대로 이어지고 상한만 늘어난다.)
    */
   feat: {
     pullCost: 10,
@@ -947,7 +948,7 @@ export const BALANCE = {
     pityAt: 50,
     pickupRate: 0.5,
     slots: 3,
-    maxStar: 6,
+    maxStar: 10,
     starBonus: 0.1,
     passive: { N: 0.03, R: 0.05, SR: 0.07, SSR: 0.1 },
     dupRefund: { N: 1, R: 2, SR: 4, SSR: 8 },
@@ -981,7 +982,7 @@ export const BALANCE = {
    *   행동 한 번 = 코인(그 자아의 인세 costSecs초 분량, 최소 minCoins) 지불 + 게이지 변화 + 성장도(xp × 컨디션 배율).
    *   주 게이지(밥주기=포만감, 놀아주기·술·놀기=기분, 씻겨주기=청결도)가 needBelow보다 높으면 아직 필요 없어서 할 수 없고, 놀거나 마실 때 피로도가 tooTired보다 높으면 못 한다.
    *   어둠의 술·놀기는 단계마다 레벨로 열리고(unlockLevel), 이미 열린 더 센 단계가 있으면 낮은 단계의 쾌락·성장도가 내성만큼 줄어든다(tolerance).
-   *   돌보기는 모든 행동이 자아마다 cooldownMs(1분)에 한 번만 된다. 일반·어둠은 대기 시간을 따로 세서 한쪽을 돌봐도 다른 쪽은 바로 할 수 있다(사용자 요청). 깨우기는 제외.
+   *   돌보기는 같은 행동을 cooldownMs(1분)에 한 번만 할 수 있다. 행동마다 대기 시간을 따로 세서(자아도 따로) 다른 행동은 바로 이어서 할 수 있다(사용자 요청). 깨우기는 제외.
    *   레벨은 성장도 합계로 정한다: 레벨 L → L+1에 ceil(levelXp.base × levelXp.growth^(L−1)). 최고 레벨은 없다(사용자 요청으로 40레벨 제한을 풀었다.
    *   필요 성장도가 레벨마다 1.1배씩 늘어 높은 레벨일수록 느려진다). 레벨 효과는 그 자아의 라임 생산 +perLevel.rhyme/레벨, 인세 +perLevel.coin/레벨이고,
    *   milestones의 레벨마다 일반은 팬 획득, 어둠은 공연·계단 전투력이 더 붙는다(steps를 지난 뒤에는 repeat.every레벨마다 repeat.value씩).
@@ -1250,16 +1251,13 @@ export const STAGES: readonly StageDef[] = [
 export const STAGE_IDS: readonly StageId[] = STAGES.map((s) => s.id);
 
 /**
- * 임시: 팬 수·앞 공연장 클리어 조건 없이 입장할 수 있는 공연장. 새 직접 공연(소형 공연장 무대 세팅 블록, 단콘 응원봉 머지 웨이브, 중형 음파 튕기기,
- * 중대형 돌발 사고 막기, 대형 무대 서바이버, 월클 월드투어 인크리멘탈)을 해 보려고 연다.
- * 되돌릴 때는 배열을 비운다. (원래 조건: 소형 공연장 팬 1,200명 + 지하 클럽 클리어, 단콘 팬 3,000명 + 소형 공연장 클리어, 중형 팬 8,000명,
- * 중대형 20,000명, 대형 50,000명, 월클 150,000명 + 각각 바로 앞 공연장 클리어, 쿨다운·속성 조건은 그대로.
- * 유니버스 페스티벌(팬 50만 + 월클 클리어)과 그 뒤의 비밀 공연장은 이 목록과 상관없이 팬·앞 공연장 클리어 조건이 필요하다)
+ * 임시 개방: 여기 적은 공연장은 팬 수·앞 공연장 클리어 조건 없이 입장할 수 있다(쿨다운·어둠속성 전용 조건은 그대로). 새 직접 공연을 해 보려고 사용자가 요청할 때만 채우고,
+ * 지금은 비어 있어 모든 공연장이 원래 조건대로 열린다. 원래 조건은 `STAGES`의 `fans`와 바로 앞 공연장 클리어(첫 비밀 공연장은 유니버스 페스티벌 클리어)이다.
  */
-export const TEMP_OPEN_STAGES: readonly StageId[] = ['hall', 'solo', 'medium', 'large', 'arena', 'world'];
+export const TEMP_OPEN_STAGES: readonly StageId[] = [];
 
-/** true면 모노사파 육성을 팬 수와 무관하게 연다(사용자 요청의 임시 개방). 원래는 팬 `nurture.unlockFans`명부터이고, 되돌릴 때는 false로 바꾼다. */
-export const NURTURE_TEMP_OPEN = true;
+/** true면 모노사파 육성을 팬 수와 무관하게 연다(사용자 요청의 임시 개방). 원래는 팬 `nurture.unlockFans`명부터이고, 지금은 꺼져 있다. */
+export const NURTURE_TEMP_OPEN = false;
 
 /** 직접 공연 종류. 적혀 있지 않은 공연장은 마이크 타이밍이다. */
 export type ManualGame = 'timing' | 'run' | 'blocks' | 'merge' | 'bounce' | 'defense' | 'survivor' | 'prestige' | 'blackout' | 'swipe' | 'stones' | 'galaxy';

@@ -40,13 +40,11 @@ export interface NurtureView {
   sleeping: boolean;
   sleepLeftMs: number;
   needsCare: boolean;
-  /** 이 자아가 다음 돌보기까지 남은 시간(ms). 모든 행동이 자아마다 1분에 한 번이다. */
-  waitMs: number;
 }
 
-/** 그 자아가 다음 돌보기까지 남은 시간. 일반·어둠은 따로 센다. 값이 비정상적으로 커도 cooldownMs를 넘기지 않는다. */
-export function nurtureWaitMs(s: Pick<GameState, 'nurture' | 'lastSettledAt'>, persona: Persona): number {
-  return Math.min(N.cooldownMs, Math.max(0, s.nurture[persona].readyAt - s.lastSettledAt));
+/** 그 행동을 다시 할 수 있을 때까지 남은 시간(ms). 행동마다 따로 센다(자아도 따로). 값이 비정상적으로 커도 cooldownMs를 넘기지 않는다. */
+export function nurtureWaitMs(s: Pick<GameState, 'nurture' | 'lastSettledAt'>, persona: Persona, actionId: string): number {
+  return Math.min(N.cooldownMs, Math.max(0, (s.nurture[persona].readyAt[actionId] ?? 0) - s.lastSettledAt));
 }
 
 export function nurtureView(s: Pick<GameState, 'nurture' | 'lastSettledAt' | 'fans'>, persona: Persona): NurtureView {
@@ -66,7 +64,6 @@ export function nurtureView(s: Pick<GameState, 'nurture' | 'lastSettledAt' | 'fa
     sleeping,
     sleepLeftMs: sleeping ? side.sleepUntil - at : 0,
     needsCare: !sleeping && needsCare(gauges),
-    waitMs: nurtureWaitMs(s, persona),
   };
 }
 
@@ -85,6 +82,8 @@ export interface NurturePreview {
   tolerance: number;
   /** 지금 할 수 없는 이유. 할 수 있으면 null (코인 부족은 따로 본다) */
   blocked: FailReason | null;
+  /** 이 행동을 다시 할 수 있을 때까지 남은 시간(ms). 행동마다 1분에 한 번이다. */
+  waitMs: number;
 }
 
 /** 지금 이 행동을 하면 어떻게 되는지. 코인 부족은 blocked에 넣지 않는다(UI가 따로 보여 준다). */
@@ -103,9 +102,10 @@ export function previewNurture(s: GameState, persona: Persona, def: NurtureActio
     if ((def.kind === 'play' || def.kind === 'drink' || def.kind === 'fun') && v.gauges.tired > N.tooTired) blocked = 'too_tired';
     else if (v.gauges[main] > N.needBelow) blocked = 'gauge_high';
   }
-  // 모든 행동은 자아마다 1분에 한 번: 다른 이유로 못 하는 게 아닐 때 남은 대기 시간을 알린다
-  if (!blocked && v.waitMs > 0) blocked = 'care_cooldown';
-  return { def, cost: nurtureCost(s, def), xp, tolerance, blocked };
+  // 행동마다 1분에 한 번: 다른 이유로 못 하는 게 아닐 때 남은 대기 시간을 알린다
+  const waitMs = nurtureWaitMs(s, persona, def.id);
+  if (!blocked && waitMs > 0) blocked = 'care_cooldown';
+  return { def, cost: nurtureCost(s, def), xp, tolerance, blocked, waitMs };
 }
 
 export interface NurtureResult {
@@ -131,9 +131,11 @@ export function nurtureAct(state: GameState, persona: Persona, actionId: string)
   const g = gaugesAt(side, persona, now);
   // 내성은 쾌락(기분)이 오르는 폭에도 걸린다
   const moodDelta = def.mood > 0 ? def.mood * p.tolerance : def.mood;
+  // 이미 지난 대기 기록은 버려서 저장이 커지지 않게 한다
+  const readyAt = Object.fromEntries(Object.entries(side.readyAt).filter(([, t]) => t > now));
   const next: NurtureSide = {
     ...side,
-    readyAt: now + N.cooldownMs,
+    readyAt: { ...readyAt, [def.id]: now + N.cooldownMs },
     xp: side.xp + p.xp,
     full: clampGauge(g.full + def.full),
     mood: clampGauge(g.mood + moodDelta),

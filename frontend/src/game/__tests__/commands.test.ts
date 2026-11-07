@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import { closeTempOpenStages, reopenTempOpenStages } from './tempOpen';
 import {
   abandonConcert,
   beginManualConcert,
@@ -47,6 +48,8 @@ import type { GameState } from '../types';
 const T0 = 1_700_000_000_000;
 const base = (over: Partial<GameState> = {}): GameState => ({ ...createInitialState(T0), ...over });
 const at = (s: GameState, ms: number): GameState => advance(s, ms, { efficiency: 0 }).state;
+
+afterEach(reopenTempOpenStages);
 
 describe('싱글 발매', () => {
   it('공식: 필요라임·코인·팬', () => {
@@ -722,10 +725,12 @@ describe('공연', () => {
   });
 
   it('소형 공연장 이후 단콘→중형→중대형→대형→월클→유니버스 페스티벌 순서로 열린다', () => {
+    closeTempOpenStages(); // 임시 개방과 상관없이 원래 조건을 본다
     const order = ['hall', 'solo', 'medium', 'large', 'arena', 'world', 'universe'] as const;
     expect(STAGES.filter((d) => !d.darkOnly).map((d) => d.id)).toEqual(['room', 'club', ...order]);
     // 팬이 충분해도 앞 공연장을 클리어해야 열린다 (소형 공연장~월클은 TEMP_OPEN_STAGES 로 임시 개방 중이라 유니버스 페스티벌 뒤의 비밀 공연장으로 확인)
     let s = fanned(1e6);
+    expect(stageStatus(s, 'hall').unlocked).toBe(false); // 지하 클럽을 클리어해야 한다
     expect(stageStatus(s, 'rooftop').unlocked).toBe(false);
     for (const id of ['room', 'club', ...order] as const) {
       expect(stageStatus(s, id).unlocked).toBe(true);

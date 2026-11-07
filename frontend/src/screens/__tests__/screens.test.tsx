@@ -1,12 +1,13 @@
 import { existsSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToString } from 'react-dom/server';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PET_GROWN_STAGE, petImage, ASSETS } from '../../assets';
 import { BALANCE, NURTURE_TEMP_OPEN, STAGES } from '../../game/balance';
 import { albumDefById, albumSeries } from '../../game/content';
 import { createInitialState } from '../../game/persistence';
 import type { GameState, Mail, Single } from '../../game/types';
+import { closeTempOpenStages, reopenTempOpenStages } from '../../game/__tests__/tempOpen';
 import type { TabId } from '../../store/gameStore';
 
 /*
@@ -89,6 +90,8 @@ function richState(): GameState {
     },
   };
 }
+
+afterEach(reopenTempOpenStages);
 
 beforeEach(() => {
   box.user = { id: 'u1', email: 'a@b.c', name: '테스터', picture: null, isAdmin: false };
@@ -182,6 +185,7 @@ describe('새 화면 렌더링', () => {
   });
 
   it('공연: 유니버스 페스티벌 전에는 ???, 클리어 후에는 비밀 공연장이 보이고 일반속성이면 안내', async () => {
+    closeTempOpenStages(); // 임시 개방과 상관없이 원래 조건을 본다
     const fresh = createInitialState(T0);
     const before = await render('concert', { ...fresh, fans: 1e7 });
     expect(before).toContain('???');
@@ -269,6 +273,7 @@ describe('새 화면 렌더링', () => {
   });
 
   it('공연: 비밀 공연장 3곳은 각각 정전 속 박자·후원 채팅 스와이프·삼도천 징검다리로 직접 공연한다', async () => {
+    closeTempOpenStages();
     const g = richState();
     const done = { cleared: true, bestScore: 0, cooldownUntil: 0 };
     const opened = { ...g, fans: 1e7, activePersona: 'dark' as const, concerts: { ...g.concerts, rooftop: done, ruins: done } };
@@ -622,6 +627,7 @@ describe('새 화면 렌더링', () => {
   });
 
   it('장비·작업실·도감도 새 필드와 함께 그려진다', async () => {
+    closeTempOpenStages();
     const g = richState();
     expect(await render('equip', g)).toContain('오프라인 정산 확장');
     expect(await render('studio', g)).toContain('「라임 기계」');

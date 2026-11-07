@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import { closeTempOpenStages, reopenTempOpenStages } from './tempOpen';
 import { BALANCE, manualGameOf } from '../balance';
 import { beginManualConcert, finishManualConcert, manualConcertReward } from '../commands';
 import { GalaxyGame, LINE_COLORS, SHAPE_COUNT, buildStations, type GalaxyEvent } from '../galaxy';
@@ -8,6 +9,8 @@ const B = BALANCE.galaxy;
 const T0 = 1_700_000_000_000;
 const evs = (g: GalaxyGame, type: GalaxyEvent['type']) => g.events.filter((e) => e.type === type);
 const WAVE_MS = B.waves[0].ms;
+
+afterEach(reopenTempOpenStages);
 
 describe('은하 노선 잇기: 지도', () => {
   it('정거장 9곳이 시드로 정해지고 같은 씨앗이면 같다', () => {
@@ -375,6 +378,7 @@ describe('은하 노선 잇기: 공연장 연결', () => {
   });
 
   it('월클을 클리어하고 팬 50만이면 일반·어둠 모두 시작할 수 있다', () => {
+    closeTempOpenStages(); // 임시 개방과 상관없이 원래 조건을 본다
     const s = createInitialState(T0);
     const open = { ...s, fans: 500_000, concerts: { ...s.concerts, world: { ...s.concerts.world, cleared: true } } };
     const r = beginManualConcert(open, 'universe', 'g1');

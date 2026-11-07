@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import { closeTempOpenStages, reopenTempOpenStages } from './tempOpen';
 import { BALANCE, manualGameOf } from '../balance';
 import { BlackoutGame, LANES, beatMsOf, buildWaveNotes, type BlackoutEvent } from '../blackout';
 import { beginManualConcert, finishManualConcert, manualConcertReward } from '../commands';
@@ -18,6 +19,8 @@ function playWave(g: BlackoutGame, jitter = 0): void {
   }
   g.advance(B.waves[wave].ms - g.waveMs + 1);
 }
+
+afterEach(reopenTempOpenStages);
 
 describe('정전 속 박자: 채보', () => {
   it('같은 씨앗·곡이면 같은 채보, 씨앗이 다르면 달라진다', () => {
@@ -235,6 +238,7 @@ describe('정전 속 박자: 공연장 연결', () => {
   });
 
   it('어둠속성이 유니버스 페스티벌을 클리어하고 팬 100만이면 시작할 수 있고, 일반속성은 막힌다', () => {
+    closeTempOpenStages(); // 임시 개방과 상관없이 원래 조건을 본다
     const s = createInitialState(T0);
     const open = { ...s, fans: 1_000_000, activePersona: 'dark' as const, concerts: { ...s.concerts, universe: { ...s.concerts.universe, cleared: true } } };
     const r = beginManualConcert(open, 'rooftop', 'b1');

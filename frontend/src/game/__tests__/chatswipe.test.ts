@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import { closeTempOpenStages, reopenTempOpenStages } from './tempOpen';
 import { BALANCE, manualGameOf } from '../balance';
 import { ChatSwipeGame, RULE_TEXT, makeMessage, rulesOf, type ChatMsg, type RuleId, type SwipeEvent } from '../chatswipe';
 import { beginManualConcert, finishManualConcert, manualConcertReward } from '../commands';
@@ -25,6 +26,8 @@ function nextMsg(g: ChatSwipeGame): ChatMsg {
   if (!g.msg) throw new Error('no message');
   return g.msg;
 }
+
+afterEach(reopenTempOpenStages);
 
 describe('후원 채팅 스와이프: 글 만들기', () => {
   it('곡마다 규칙이 하나씩 늘어난다', () => {
@@ -229,6 +232,7 @@ describe('후원 채팅 스와이프: 공연장 연결', () => {
   });
 
   it('어둠속성이 폐건물 지하공연을 클리어하고 팬 250만이면 시작할 수 있다', () => {
+    closeTempOpenStages(); // 임시 개방과 상관없이 원래 조건을 본다
     const s = createInitialState(T0);
     const done = { cleared: true, bestScore: 0, cooldownUntil: 0 };
     const open = { ...s, fans: 2_500_000, activePersona: 'dark' as const, concerts: { ...s.concerts, universe: done, rooftop: done } };

@@ -198,8 +198,8 @@ export interface NurtureSide {
   at: number;
   /** 이 시각까지 자는 중이다(지났으면 깨어 있음). */
   sleepUntil: number;
-  /** 이 시각까지는 이 자아를 돌볼 수 없다(모든 행동 자아마다 1분에 한 번). */
-  readyAt: number;
+  /** 행동별로 이 시각까지는 그 행동을 다시 할 수 없다(행동 ID → 시각). 행동마다 1분에 한 번이고 서로 따로 센다. */
+  readyAt: Record<string, number>;
   /** 행동별로 해 준 횟수 (행동 ID → 횟수) */
   uses: Record<string, number>;
 }

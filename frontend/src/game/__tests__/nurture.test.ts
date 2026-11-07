@@ -242,51 +242,67 @@ describe('모노사파 육성: 일반 돌보기', () => {
   });
 });
 
-describe('모노사파 육성: 1분에 한 번', () => {
+describe('모노사파 육성: 행동마다 1분에 한 번', () => {
   const needy = (): GameState => withSide(withSide(base(), 'normal', { full: 10, mood: 10, clean: 10 }), 'dark', { mood: 10, full: 10, clean: 10 });
 
-  it('돌보기를 하면 모든 행동이 1분 동안 막히고, 정확히 1분이 지나면 다시 된다', () => {
+  it('한 행동을 하면 그 행동만 1분 동안 막히고, 정확히 1분이 지나면 다시 된다', () => {
     const s = ok(nurtureAct(needy(), 'normal', 'n-feed')).state;
     expect(N.cooldownMs).toBe(60_000);
-    expect(nurtureWaitMs(s, 'normal')).toBe(60_000);
-    for (const id of ['n-feed', 'n-play', 'n-wash']) expect(reason(nurtureAct(s, 'normal', id)), id).toBe('care_cooldown');
-    expect(reason(nurtureAct(at(s, T0 + 59_999), 'normal', 'n-play'))).toBe('care_cooldown');
-    expect(nurtureWaitMs(at(s, T0 + 20_000), 'normal')).toBe(40_000);
-    expect(ok(nurtureAct(at(s, T0 + 60_000), 'normal', 'n-play')).ok).toBe(true);
+    expect(nurtureWaitMs(s, 'normal', 'n-feed')).toBe(60_000);
+    expect(reason(nurtureAct(s, 'normal', 'n-feed'))).toBe('care_cooldown');
+    expect(reason(nurtureAct(at(s, T0 + 59_999), 'normal', 'n-feed'))).toBe('care_cooldown');
+    expect(nurtureWaitMs(at(s, T0 + 20_000), 'normal', 'n-feed')).toBe(40_000);
+    expect(ok(nurtureAct(at(s, T0 + 60_000), 'normal', 'n-feed')).ok).toBe(true);
   });
 
-  it('일반·어둠은 대기 시간을 따로 센다', () => {
-    const s = ok(nurtureAct(needy(), 'normal', 'n-feed')).state;
-    // 일반을 돌봐도 어둠은 바로 할 수 있다
-    expect(nurtureView(s, 'dark').waitMs).toBe(0);
-    expect(nurtureView(s, 'normal').waitMs).toBe(60_000);
-    const d = ok(nurtureAct(at(s, T0 + 10_000), 'dark', 'd-drink1')).state;
-    // 어둠을 돌본 뒤에도 일반의 남은 시간은 그대로 흐르고, 어둠은 자기 1분을 기다린다
-    expect(nurtureView(d, 'normal').waitMs).toBe(50_000);
-    expect(nurtureView(d, 'dark').waitMs).toBe(60_000);
-    expect(reason(nurtureAct(d, 'normal', 'n-play'))).toBe('care_cooldown');
-    expect(reason(nurtureAct(d, 'dark', 'd-wash'))).toBe('care_cooldown');
-    // 일반은 자기 1분이 지나면 어둠이 아직 기다려도 할 수 있다
-    const later = at(d, T0 + 60_000);
-    expect(nurtureView(later, 'dark').waitMs).toBe(10_000);
-    expect(ok(nurtureAct(later, 'normal', 'n-play')).ok).toBe(true);
+  it('다른 행동은 바로 이어서 할 수 있고 대기 시간도 서로 따로 센다', () => {
+    let s = ok(nurtureAct(needy(), 'normal', 'n-feed')).state;
+    expect(nurtureWaitMs(s, 'normal', 'n-play')).toBe(0);
+    expect(nurtureWaitMs(s, 'normal', 'n-wash')).toBe(0);
+    expect(previewNurture(s, 'normal', nurtureActionById('n-play')!).blocked).toBeNull();
+    s = ok(nurtureAct(at(s, T0 + 10_000), 'normal', 'n-play')).state;
+    s = ok(nurtureAct(at(s, T0 + 20_000), 'normal', 'n-wash')).state;
+    // 먼저 한 행동부터 차례로 풀린다
+    expect(nurtureWaitMs(s, 'normal', 'n-feed')).toBe(40_000);
+    expect(nurtureWaitMs(s, 'normal', 'n-play')).toBe(50_000);
+    expect(nurtureWaitMs(s, 'normal', 'n-wash')).toBe(60_000);
+    expect(reason(nurtureAct(s, 'normal', 'n-feed'))).toBe('care_cooldown');
+    const later = withSide(at(s, T0 + 60_000), 'normal', { full: 10 });
+    expect(previewNurture(later, 'normal', nurtureActionById('n-feed')!).blocked).toBeNull();
+    expect(previewNurture(later, 'normal', nurtureActionById('n-play')!).waitMs).toBe(10_000);
+  });
+
+  it('어둠은 술 단계마다 대기 시간이 따로고 일반과도 섞이지 않는다', () => {
+    let s = ok(nurtureAct(needy(), 'dark', 'd-drink1')).state;
+    expect(reason(nurtureAct(s, 'dark', 'd-drink1'))).toBe('care_cooldown');
+    expect(nurtureWaitMs(s, 'dark', 'd-wash')).toBe(0);
+    expect(nurtureWaitMs(s, 'normal', 'n-feed')).toBe(0);
+    s = ok(nurtureAct(at(s, T0 + 5_000), 'dark', 'd-wash')).state;
+    expect(nurtureWaitMs(s, 'dark', 'd-drink1')).toBe(55_000);
+    expect(nurtureWaitMs(s, 'dark', 'd-wash')).toBe(60_000);
   });
 
   it('실패한 시도는 대기 시간을 쓰지 않고, 깨우기는 대기 중에도 된다', () => {
     const s = needy();
     expect(reason(nurtureAct(withSide(s, 'normal', { full: 95 }), 'normal', 'n-feed'))).toBe('gauge_high');
-    expect(nurtureWaitMs(s, 'normal')).toBe(0);
+    expect(nurtureWaitMs(s, 'normal', 'n-feed')).toBe(0);
     const slept = ok(nurtureAct(withSide(s, 'normal', { tired: 80 }), 'normal', 'n-sleep')).state;
-    expect(nurtureWaitMs(slept, 'normal')).toBe(60_000);
+    expect(nurtureWaitMs(slept, 'normal', 'n-sleep')).toBe(60_000);
     expect(ok(nurtureWake(at(slept, T0 + 10_000), 'normal')).ok).toBe(true);
   });
 
-  it('다른 이유로 못 하는 행동은 그 이유가 먼저 보이고, 비정상으로 큰 대기 값도 1분을 넘지 않는다', () => {
+  it('지난 대기 기록은 정리되고, 비정상으로 큰 대기 값도 1분을 넘지 않는다', () => {
+    let s = ok(nurtureAct(needy(), 'normal', 'n-feed')).state;
+    s = ok(nurtureAct(at(s, T0 + 70_000), 'normal', 'n-play')).state;
+    expect(Object.keys(s.nurture.normal.readyAt)).toEqual(['n-play']);
+    const tampered = withSide(s, 'dark', { readyAt: { 'd-wash': T0 + 1e12 } });
+    expect(nurtureWaitMs(tampered, 'dark', 'd-wash')).toBe(60_000);
+  });
+
+  it('다른 이유로 못 하는 행동은 그 이유가 먼저 보인다', () => {
     const s = ok(nurtureAct(withSide(needy(), 'normal', { mood: 95 }), 'normal', 'n-feed')).state;
-    const def = nurtureActionById('n-play')!;
-    expect(previewNurture(s, 'normal', def).blocked).toBe('gauge_high');
-    const tampered = withSide(s, 'dark', { readyAt: T0 + 1e12 });
-    expect(nurtureWaitMs(tampered, 'dark')).toBe(60_000);
+    expect(previewNurture(s, 'normal', nurtureActionById('n-play')!).blocked).toBe('gauge_high');
+    expect(previewNurture(withSide(s, 'normal', { sleepUntil: T0 + 1000, at: T0 }), 'normal', nurtureActionById('n-feed')!).blocked).toBe('sleeping');
   });
 });
 
@@ -462,12 +478,26 @@ describe('모노사파 육성: 저장', () => {
     if (v.ok) expect(v.state.nurture.dark).toEqual(emptyNurtureSide());
   });
 
-  it('1분 제한 시각이 없던 예전 저장은 바로 돌볼 수 있고, 음수 값은 거절한다', () => {
+  it('1분 제한 시각이 없던 예전 저장과 자아마다 숫자 하나이던 저장은 바로 돌볼 수 있다', () => {
     const raw = JSON.parse(JSON.stringify(createInitialState(T0))) as { nurture: Record<Persona, Record<string, unknown>> };
     delete raw.nurture.normal.readyAt;
     const v = validateState(raw);
-    expect(v.ok && v.state.nurture.normal.readyAt).toBe(0);
-    raw.nurture.dark.readyAt = -1;
+    expect(v.ok && v.state.nurture.normal.readyAt).toEqual({});
+    raw.nurture.dark.readyAt = T0 + 30_000;
+    const old = validateState(raw);
+    expect(old.ok && old.state.nurture.dark.readyAt).toEqual({});
+  });
+
+  it('행동별 대기 시각을 저장하고 읽으며, 모르는 행동은 버리고 음수·문자는 거절한다', () => {
+    const raw = JSON.parse(JSON.stringify(createInitialState(T0))) as { nurture: Record<Persona, Record<string, unknown>> };
+    raw.nurture.dark.readyAt = { 'd-wash': T0 + 30_000, 'n-feed': T0 + 1, zzz: T0 + 1 };
+    const v = validateState(raw);
+    expect(v.ok && v.state.nurture.dark.readyAt).toEqual({ 'd-wash': T0 + 30_000 });
+    raw.nurture.dark.readyAt = { 'd-wash': -1 };
+    expect(validateState(raw).ok).toBe(false);
+    raw.nurture.dark.readyAt = { 'd-wash': 'soon' };
+    expect(validateState(raw).ok).toBe(false);
+    raw.nurture.dark.readyAt = 'x';
     expect(validateState(raw).ok).toBe(false);
   });
 

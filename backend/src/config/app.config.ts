@@ -25,10 +25,4 @@ export class AppConfig {
   readonly sessionTtlDays: number = Number(process.env.SESSION_TTL_DAYS ?? 30);
 
   readonly sessionCookieName = 'monosapa_session';
-
-  /** 관리자 이메일(쉼표로 구분, 구글에서 확인된 이메일만 비교). 문의 답변과 챗방 메시지 삭제를 할 수 있다. 비어 있으면 관리자가 없다. */
-  readonly adminEmails: readonly string[] = (process.env.ADMIN_EMAILS ?? '')
-    .split(',')
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
 }

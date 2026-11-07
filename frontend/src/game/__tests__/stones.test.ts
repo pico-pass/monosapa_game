@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import { closeTempOpenStages, reopenTempOpenStages } from './tempOpen';
 import { BALANCE, manualGameOf } from '../balance';
 import { beginManualConcert, finishManualConcert, manualConcertReward } from '../commands';
 import { createInitialState } from '../persistence';
@@ -21,6 +22,8 @@ function toPhase(g: StonesGame, phase: number): void {
   const cur = g.waveMs % beat;
   g.advance(phase >= cur ? phase - cur : beat - cur + phase);
 }
+
+afterEach(reopenTempOpenStages);
 
 describe('삼도천 징검다리: 줄 만들기', () => {
   it('어느 설 수 있는 칸에서도 다음 줄의 발판으로 이어진다(막다른 길 없음)', () => {
@@ -237,6 +240,7 @@ describe('삼도천 징검다리: 공연장 연결', () => {
   });
 
   it('어둠속성이 다크웹 라이브공연을 클리어하고 팬 500만이면 시작할 수 있다', () => {
+    closeTempOpenStages(); // 임시 개방과 상관없이 원래 조건을 본다
     const s = createInitialState(T0);
     const done = { cleared: true, bestScore: 0, cooldownUntil: 0 };
     const open = { ...s, fans: 5_000_000, activePersona: 'dark' as const, concerts: { ...s.concerts, universe: done, rooftop: done, ruins: done } };

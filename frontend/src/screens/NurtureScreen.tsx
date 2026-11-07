@@ -23,7 +23,6 @@ const BLOCK_TEXT: Partial<Record<FailReason, string>> = {
   too_tired: '너무 지침',
   sleeping: '자는 중',
   not_sleepy: '졸리지 않아요',
-  care_cooldown: '잠깐 대기 중',
 };
 
 export function NurtureScreen() {
@@ -131,12 +130,6 @@ function NurtureCard({ persona }: { persona: Persona }) {
         </div>
       )}
 
-      {v.waitMs > 0 && (
-        <div className="nurture-wait" role="status">
-          ⏳ 다음 돌보기까지 {fmtCountdown(v.waitMs)} <small className="muted">(모든 돌보기는 자아마다 1분에 한 번)</small>
-        </div>
-      )}
-
       {persona === 'normal' ? (
         <div className="nurture-actions">
           {acts.map((a) => (
@@ -158,7 +151,7 @@ function NurtureCard({ persona }: { persona: Persona }) {
       )}
       <small className="fineprint">
         {persona === 'dark' ? '어둠속성은 술이 포만감을 조금 채워 줘요. 더 센 단계가 열리면 낮은 단계의 쾌락과 성장도가 내성으로 줄어요. ' : ''}
-        밥·놀이·씻기는 수치가 {N.needBelow} 이하일 때만 할 수 있어요. 코인은 그 자아의 인세 몇 초 분량이에요.
+        밥·놀이·씻기는 수치가 {N.needBelow} 이하일 때만 할 수 있어요. 같은 행동은 {N.cooldownMs / 1000}초에 한 번이고, 다른 행동은 바로 이어서 할 수 있어요. 코인은 그 자아의 인세 몇 초 분량이에요.
       </small>
     </div>
   );
@@ -206,7 +199,8 @@ function ActionButton({ g, persona, def, rung }: { g: GameState; persona: Person
   const text = NURTURE_ACTION_TEXT[def.id];
   const p = previewNurture(g, persona, def);
   const poor = p.blocked === null && g.coins < p.cost;
-  const status = p.blocked === 'level_low' ? `Lv ${def.unlockLevel}` : p.blocked ? (BLOCK_TEXT[p.blocked] ?? '') : poor ? '코인 부족' : '';
+  const status =
+    p.blocked === 'level_low' ? `Lv ${def.unlockLevel}` : p.blocked === 'care_cooldown' ? `⏳ ${fmtCountdown(p.waitMs)}` : p.blocked ? (BLOCK_TEXT[p.blocked] ?? '') : poor ? '코인 부족' : '';
   const worn = rung && p.tolerance < 1;
   return (
     <button

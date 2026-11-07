@@ -1,4 +1,4 @@
-import { BALANCE, LAST_NORMAL_STAGE, SECRET_STAGE_IDS, STAGES, STREAM_PLATFORMS, TEMP_OPEN_STAGES, TOUR_STAGE, WORLD_STAGE, type AchievementMetric, type MissionMetric } from './balance';
+import { BALANCE, SECRET_STAGE_IDS, STAGES, STREAM_PLATFORMS, TEMP_OPEN_STAGES, TOUR_STAGE, WORLD_STAGE, type AchievementMetric, type MissionMetric } from './balance';
 import { albumSeries, singleTitle, type AlbumDef } from './content';
 import { bonuses, completedSets, mascotStage, photoDistinct, songCardOf, type BonusState } from './packdata';
 import type { Album, AlbumType, CostumeId, CounterKey, DiamondUpgradeKind, Equipment, EquipmentKind, GameState, Persona, StageId, Streaming } from './types';
@@ -551,9 +551,11 @@ export const stageTaskGrowth = (id: StageId): number => BALANCE.concert.stageTas
 
 export const isTourComplete = (s: GameState) => s.concerts[TOUR_STAGE].cleared;
 
-/** 아직 보이지 않는 첫 비밀 공연장 (유니버스 페스티벌을 클리어하면 사라진다). 목록에 "???" 안내를 띄울 때 쓴다. */
-export const hiddenSecretStage = (s: GameState): StageId | null =>
-  s.concerts[LAST_NORMAL_STAGE].cleared ? null : (SECRET_STAGE_IDS[0] ?? null);
+/** 아직 보이지 않는 첫 비밀 공연장 (유니버스 페스티벌을 클리어하거나 임시 개방되면 사라진다). 목록에 "???" 안내를 띄울 때 쓴다. */
+export const hiddenSecretStage = (s: GameState): StageId | null => {
+  const first = SECRET_STAGE_IDS[0];
+  return first && !stageStatus(s, first).visible ? first : null;
+};
 
 /* ---------- 업적·미션 지표 ---------- */
 

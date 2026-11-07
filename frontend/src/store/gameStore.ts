@@ -253,7 +253,7 @@ const FAIL_TEXT: Record<FailReason, string> = {
   gauge_high: '아직 필요 없어요. 수치가 내려가면 다시 해 주세요.',
   too_tired: '너무 지쳐서 못 해요. 먼저 재워 주세요.',
   not_sleepy: '아직 졸리지 않아요.',
-  care_cooldown: '돌보기는 1분에 한 번만 할 수 있어요. 잠시 뒤에 해 주세요.',
+  care_cooldown: '이 행동은 1분에 한 번만 할 수 있어요. 잠시 뒤에 해 주세요.',
 };
 
 /* ---------- 런타임(저장하지 않는) 변수 ---------- */

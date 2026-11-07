@@ -93,14 +93,25 @@ export function parseMascots(raw: unknown): Mascots {
   return { normal: parseMascot(raw.normal, 'mascot.normal'), dark: parseMascot(raw.dark, 'mascot.dark') };
 }
 
+/** 행동별 대기 시각. 예전 저장은 자아마다 숫자 하나였는데, 행동별로 바뀌면서 그 값은 버린다(바로 돌볼 수 있다). */
+function parseReadyAt(raw: unknown, who: Persona, label: string): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (raw === undefined || typeof raw === 'number') return out;
+  if (!isObj(raw)) return bad(`${label}가 올바르지 않습니다.`);
+  for (const [id, v] of Object.entries(raw)) {
+    if (nurtureActionById(id)?.persona !== who) continue;
+    if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > MAX_TIME) return bad(`${label}.${id}: 허용 범위를 벗어났습니다.`);
+    if (v > 0) out[id] = v;
+  }
+  return out;
+}
+
 function parseNurtureSide(raw: unknown, who: Persona, label: string): NurtureSide {
   if (raw === undefined) return emptyNurtureSide();
   if (!isObj(raw)) return bad(`${label}이 올바르지 않습니다.`);
   const max = BALANCE.nurture.gauge.max;
   const at = num(raw, 'at', 0, MAX_TIME, `${label}.at`);
   const sleepUntil = num(raw, 'sleepUntil', 0, MAX_TIME, `${label}.sleepUntil`);
-  // 1분 제한은 나중에 생긴 필드라 없는 예전 저장은 바로 돌볼 수 있다
-  const readyAt = raw.readyAt === undefined ? 0 : num(raw, 'readyAt', 0, MAX_TIME, `${label}.readyAt`);
   return {
     xp: int(raw, 'xp', 0, BIG, `${label}.xp`),
     full: num(raw, 'full', 0, max, `${label}.full`),
@@ -110,7 +121,7 @@ function parseNurtureSide(raw: unknown, who: Persona, label: string): NurtureSid
     at,
     // 자는 시간은 한 번에 sleep.ms까지라, 기록 시각보다 그 이상 먼 값은 고쳐진 저장이다
     sleepUntil: at > 0 ? Math.min(sleepUntil, at + BALANCE.nurture.sleep.ms) : 0,
-    readyAt,
+    readyAt: parseReadyAt(raw.readyAt, who, `${label}.readyAt`),
     uses: countMap(raw.uses, (id) => nurtureActionById(id)?.persona === who, BIG, `${label}.uses`),
   };
 }

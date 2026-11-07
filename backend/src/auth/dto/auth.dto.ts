@@ -21,7 +21,7 @@ export class UserDto {
   friendCode!: string | null;
   /** 이용 제한(관리자 제재)이 풀리는 시각(ms). 제한 중이 아니면 null. */
   mutedUntil!: number | null;
-  /** 관리자 이메일 목록(ADMIN_EMAILS)에 든 계정이면 true */
+  /** 관리자 계정(`auth/admin.ts`의 ADMIN_EMAIL)이면 true */
   isAdmin!: boolean;
 }
 

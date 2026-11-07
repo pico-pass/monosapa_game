@@ -16,7 +16,7 @@ import { Friendship, type FriendshipDocument } from './friendship.schema.js';
 /** 친구 수 상한, 내가 보내 둔 요청 수 상한, 선물 한 번에 가는 다이아(서버가 정한다) */
 export const FRIEND_LIMIT = 30;
 export const REQUEST_LIMIT = 20;
-export const GIFT_DIAMONDS = 2;
+export const GIFT_DIAMONDS = 1;
 
 const isDuplicate = (e: unknown): boolean => (e as { code?: number }).code === 11000;
 

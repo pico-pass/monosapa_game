@@ -6,6 +6,7 @@ import { AppConfig } from '../config/app.config.js';
 import { displayNameOf, mutedUntilMs } from '../users/profile.js';
 import type { UserDocument } from '../users/user.schema.js';
 import { UsersService } from '../users/users.service.js';
+import { isAdminEmail } from './admin.js';
 import type { UserDto } from './dto/auth.dto.js';
 import { GoogleVerifierService } from './google-verifier.service.js';
 import { Session } from './session.schema.js';
@@ -15,7 +16,7 @@ const DAY_MS = 86_400_000;
 
 const hashToken = (token: string): string => createHash('sha256').update(token).digest('hex');
 
-export const toUserDto = (u: UserDocument, admins: readonly string[] = []): UserDto => ({
+export const toUserDto = (u: UserDocument): UserDto => ({
   id: String(u._id),
   email: u.email,
   name: u.name,
@@ -26,7 +27,7 @@ export const toUserDto = (u: UserDocument, admins: readonly string[] = []): User
   displayName: displayNameOf(u),
   friendCode: u.friendCode ?? null,
   mutedUntil: mutedUntilMs(u),
-  isAdmin: !!u.email && admins.includes(u.email.toLowerCase()),
+  isAdmin: isAdminEmail(u.email),
 });
 
 @Injectable()
@@ -51,7 +52,7 @@ export class AuthService {
     const token = randomBytes(32).toString('base64url');
     const maxAgeMs = this.config.sessionTtlDays * DAY_MS;
     await this.sessions.create({ tokenHash: hashToken(token), userId: user._id, expiresAt: new Date(Date.now() + maxAgeMs) });
-    return { token, maxAgeMs, user: toUserDto(user, this.config.adminEmails) };
+    return { token, maxAgeMs, user: toUserDto(user) };
   }
 
   /** 쿠키의 토큰으로 로그인한 사용자를 찾는다. 없거나 만료됐으면 null. (TTL 인덱스는 지연될 수 있어 만료 시각도 직접 본다) */
@@ -60,7 +61,7 @@ export class AuthService {
     const session = await this.sessions.findOne({ tokenHash: hashToken(token), expiresAt: { $gt: new Date() } }).exec();
     if (!session) return null;
     const user = await this.users.findById(String(session.userId));
-    return user ? toUserDto(user, this.config.adminEmails) : null;
+    return user ? toUserDto(user) : null;
   }
 
   /** 접속 신호. 프런트가 화면이 보이는 동안 주기적으로 보낸다. */

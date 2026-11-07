@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { BALANCE, manualGameOf } from '../balance';
+import { BALANCE, TEMP_OPEN_STAGES, manualGameOf } from '../balance';
 import { BROKEN, BlocksGame, PIECES, SET_STARTS, SIZE, TOTAL_MS, fits, fitsAnywhere, previewClears, setIndexAt, type BlockEvent, type Piece } from '../blocks';
 import { beginManualConcert, finishManualConcert, manualConcertReward } from '../commands';
 import { createInitialState } from '../persistence';
-import { stageStatus } from '../selectors';
+import { hiddenSecretStage, stageStatus } from '../selectors';
 
 const B = BALANCE.blocks;
 const T0 = 1_700_000_000_000;
@@ -490,17 +490,32 @@ describe('소형 공연장 직접 공연 연결', () => {
     expect(again.ok).toBe(false);
   });
 
-  it('임시로 열어 둔 동안은 팬·앞 공연장 조건 없이도 입장할 수 있다', () => {
+  it.runIf(TEMP_OPEN_STAGES.includes('hall'))('임시로 열어 둔 동안은 팬·앞 공연장 조건 없이도 입장할 수 있다', () => {
     const s = createInitialState(T0);
     const st = stageStatus(s, 'hall');
     expect(st.fansOk).toBe(true);
     expect(st.previousCleared).toBe(true);
     expect(st.canRun).toBe(true);
     expect(beginManualConcert(s, 'hall', 'h1').ok).toBe(true);
-    // 단콘~월클도 같이 열려 있고, 지하 클럽과 월클 뒤의 비밀 공연장은 원래 조건 그대로
-    for (const id of ['solo', 'medium', 'large', 'arena', 'world'] as const) expect(stageStatus(s, id).canRun).toBe(true);
+    // 단콘~유니버스 페스티벌도 같이 열려 있고, 지하 클럽은 원래 조건 그대로
+    for (const id of ['solo', 'medium', 'large', 'arena', 'world', 'universe'] as const) expect(stageStatus(s, id).canRun).toBe(true);
     expect(stageStatus(s, 'club').unlocked).toBe(false);
-    expect(stageStatus(s, 'rooftop').unlocked).toBe(false);
+  });
+
+  it.runIf(TEMP_OPEN_STAGES.includes('rooftop'))('비밀 공연장 셋도 임시로 열려 있어 목록에 보이고, 어둠속성일 때만 입장한다', () => {
+    const s = createInitialState(T0);
+    for (const id of ['rooftop', 'ruins', 'garage'] as const) {
+      const st = stageStatus(s, id);
+      expect(st.visible, id).toBe(true);
+      expect(st.unlocked, id).toBe(true);
+      expect(st.personaOk, id).toBe(false);
+      expect(beginManualConcert(s, id, 'x1')).toMatchObject({ ok: false, reason: 'dark_only' });
+      const dark = { ...s, activePersona: 'dark' as const };
+      expect(stageStatus(dark, id).canRun, id).toBe(true);
+      expect(beginManualConcert(dark, id, 'x2').ok, id).toBe(true);
+    }
+    // 첫 비밀 공연장이 이미 보이므로 「???」 안내는 나오지 않는다
+    expect(hiddenSecretStage(s)).toBeNull();
   });
 
   it('보상: 어둠은 2배, 클리어하지 못하면 절반', () => {

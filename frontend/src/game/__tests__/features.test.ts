@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import { closeTempOpenStages, reopenTempOpenStages } from './tempOpen';
 import { evaluateAchievements, setTitle, titleText } from '../achievements';
 import { moreAlerts } from '../alerts';
 import { ACHIEVEMENTS, BALANCE, COSTUME_IDS, COSTUME_IDS_OF, MISSIONS, STAGES, manualGameOf } from '../balance';
@@ -53,6 +54,8 @@ function clearedNormalStages(over: Partial<GameState> = {}): GameState {
   for (const d of STAGES) if (!d.darkOnly) concerts[d.id] = { ...concerts[d.id], cleared: true };
   return { ...s, concerts };
 }
+
+afterEach(reopenTempOpenStages);
 
 describe('상점: 간식·홍보 캠페인', () => {
   it('가격은 플레이어 레벨이 오를수록 오른다', () => {
@@ -237,6 +240,7 @@ describe('다이아: 오프라인 정산 확장', () => {
 
 describe('비밀 공연장', () => {
   it('월클을 클리어하기 전에는 목록에 보이지 않는다', () => {
+    closeTempOpenStages(); // 임시 개방과 상관없이 원래 조건을 본다
     const s = base({ fans: 1e7 });
     expect(stageStatus(s, 'rooftop').visible).toBe(false);
     expect(hiddenSecretStage(s)).toBe('rooftop');
