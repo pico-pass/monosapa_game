@@ -373,8 +373,8 @@ describe('피처링 가챠', () => {
     expect(bonuses(s).coin).toBeCloseTo(one * (1 + 3 * BALANCE.feat.starBonus));
   });
 
-  it('별은 10개까지 오르고 별마다 패시브가 같은 폭으로 커진다', () => {
-    expect(BALANCE.feat.maxStar).toBe(10);
+  it('별은 18개까지 오르고 별마다 패시브가 같은 폭으로 커진다', () => {
+    expect(BALANCE.feat.maxStar).toBe(18);
     const def = FEAT_NPCS.find((n) => n.rarity === 'SSR')!;
     let prev = featPassive(def, 1);
     expect(prev).toBeCloseTo(BALANCE.feat.passive.SSR);
@@ -383,17 +383,17 @@ describe('피처링 가챠', () => {
       expect(now - prev).toBeCloseTo(BALANCE.feat.passive.SSR * BALANCE.feat.starBonus);
       prev = now;
     }
-    expect(featPassive(def, BALANCE.feat.maxStar)).toBeCloseTo(BALANCE.feat.passive.SSR * 1.9);
+    expect(featPassive(def, BALANCE.feat.maxStar)).toBeCloseTo(BALANCE.feat.passive.SSR * 2.7);
   });
 
-  it('별 6개로 저장된 래퍼도 계속 별이 오르고, 환급은 10개가 찬 뒤부터다', () => {
+  it('별 6개·10개로 저장된 래퍼도 계속 별이 오르고, 환급은 18개가 찬 뒤부터다', () => {
     const id = 'f-alfrado';
     const withStars = (n: number): GameState => {
       const s = base({ diamonds: 100000 });
       return { ...s, feat: { ...s.feat, owned: { [id]: n } } };
     };
-    // 저장 검증: 상한(10)까지는 그대로 읽고 넘으면 거부한다
-    for (const n of [6, BALANCE.feat.maxStar]) {
+    // 저장 검증: 상한(18)까지는 그대로 읽고 넘으면 거부한다
+    for (const n of [6, 10, BALANCE.feat.maxStar]) {
       const v = validateState(JSON.parse(JSON.stringify(withStars(n))));
       expect(v.ok).toBe(true);
       if (v.ok) expect(v.state.feat.owned[id]).toBe(n);
