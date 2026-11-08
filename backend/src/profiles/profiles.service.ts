@@ -6,7 +6,7 @@ import { cleanLine, textLength } from '../common/text.js';
 import { FriendsService } from '../friends/friends.service.js';
 import { Save } from '../saves/save.schema.js';
 import { toPerson } from '../users/person.js';
-import { AVATARS, BIO_MAX, NICKNAME_MAX, NICKNAME_MIN, assertNotMuted, displayNameOf, mutedUntilMs, normalizeFriendCode } from '../users/profile.js';
+import { BIO_MAX, NICKNAME_MAX, NICKNAME_MIN, assertNotMuted, displayNameOf, isAvatar, mutedUntilMs, normalizeFriendCode } from '../users/profile.js';
 import { User, type UserDocument } from '../users/user.schema.js';
 import type { MyProfileDto, ProfileDto, UpdateProfileDto } from './dto/profiles.dto.js';
 
@@ -54,7 +54,7 @@ export class ProfilesService {
       set.bio = bio || null;
     }
     if (body?.avatar !== undefined) {
-      if (!AVATARS.includes(body.avatar)) throw new BadRequestException('프로필 사진 종류가 올바르지 않아요.');
+      if (!isAvatar(body.avatar)) throw new BadRequestException('프로필 사진 종류가 올바르지 않아요.');
       set.avatar = body.avatar;
     }
     if (Object.keys(set).length === 0) throw new BadRequestException('바꿀 내용이 없어요.');

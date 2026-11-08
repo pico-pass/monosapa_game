@@ -1,5 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { FRIEND_CODE_LENGTH, assertNotMuted, displayNameOf, mutedUntilMs, newFriendCode, normalizeFriendCode } from '../profile.js';
+import { AVATARS, COSTUME_IDS, FRIEND_CODE_LENGTH, assertNotMuted, displayNameOf, isAvatar, mutedUntilMs, newFriendCode, normalizeFriendCode } from '../profile.js';
+
+describe('프로필 사진 종류', () => {
+  it('구글·일반·어둠과 코스튬 21종(costume-ID)만 고를 수 있다', () => {
+    expect(COSTUME_IDS).toHaveLength(21);
+    expect(new Set(COSTUME_IDS).size).toBe(21);
+    expect(AVATARS).toHaveLength(3 + 21);
+    for (const ok of ['google', 'normal', 'dark', 'costume-maid', 'costume-dbride']) expect(isAvatar(ok)).toBe(true);
+    for (const id of COSTUME_IDS) expect(isAvatar(`costume-${id}`)).toBe(true);
+  });
+
+  it('없는 코스튬·다른 모양·문자열이 아닌 값은 거부한다', () => {
+    for (const bad of ['costume-nope', 'costume-', 'costume', 'maid', 'Costume-maid', 'costume-maid ', '', 'admin', null, undefined, 1, {}, ['dark']]) {
+      expect(isAvatar(bad)).toBe(false);
+    }
+  });
+});
 
 describe('프로필 규칙', () => {
   it('보여 줄 이름: 닉네임 → 구글 이름 → 익명', () => {

@@ -109,7 +109,7 @@ export function ShopScreen() {
       </div>
 
       <h3 className="sub-title">👗 코스튬 — 모양만 바뀌어요</h3>
-      <p className="muted">일반속성과 어둠속성이 따로 입어요. 작업실에서 그 속성일 때 입은 옷이 보여요.</p>
+      <p className="muted">일반속성과 어둠속성이 따로 입어요. 작업실에서 그 속성일 때 입은 옷이 보여요. 산 코스튬은 프로필 사진으로도 쓸 수 있어요(더보기 → 친구 → 프로필 설정).</p>
       <CostumeGrid g={g} persona="normal" />
       <CostumeGrid g={g} persona="dark" />
     </section>

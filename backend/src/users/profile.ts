@@ -5,9 +5,22 @@ import { ForbiddenException } from '@nestjs/common';
  * 프로필 설정과 표시에 쓰는 순수 규칙. 닉네임·소개의 길이, 보여 줄 이름, 친구 코드, 제재(채팅 제한) 확인.
  */
 
-export const AVATARS = ['google', 'normal', 'dark'] as const;
-/** 프로필 사진: 구글 계정 사진 또는 일반·어둠 모노사파 */
-export type Avatar = (typeof AVATARS)[number];
+/**
+ * 코스튬 ID. 프런트 `game/types.ts`의 `CostumeId`(= `balance.ts`의 `BALANCE.shop.costumes` 키)와 같아야 한다.
+ * 서버는 게임 저장을 검증하지 않으므로 산 코스튬인지는 확인하지 못하고(프런트가 가진 코스튬만 고르게 한다) 모양만 본다.
+ */
+export const COSTUME_IDS = [
+  'jirai', 'hype', 'angry', 'maid', 'bunny', 'fallen', 'bear', 'nun', 'vampire', 'butler', 'bride',
+  'dbunny', 'band', 'king', 'milk', 'dbear', 'postman', 'cultist', 'clown', 'dnurse', 'dbride',
+] as const;
+export type CostumeId = (typeof COSTUME_IDS)[number];
+
+const BASE_AVATARS = ['google', 'normal', 'dark'] as const;
+/** 프로필 사진: 구글 계정 사진, 일반·어둠 모노사파, 또는 `costume-{코스튬 ID}`(상점에서 산 코스튬) */
+export type Avatar = (typeof BASE_AVATARS)[number] | `costume-${CostumeId}`;
+/** 고를 수 있는 프로필 사진 값 전부 */
+export const AVATARS: readonly Avatar[] = [...BASE_AVATARS, ...COSTUME_IDS.map((id) => `costume-${id}` as const)];
+export const isAvatar = (v: unknown): v is Avatar => typeof v === 'string' && (AVATARS as readonly string[]).includes(v);
 
 export const NICKNAME_MIN = 2;
 export const NICKNAME_MAX = 12;

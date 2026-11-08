@@ -1,9 +1,11 @@
+import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToString } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { ASSETS } from '../../assets';
+import { COSTUME_IDS } from '../../game/balance';
 import { friendBadge, mailBadge, socialTotal, type SocialSummary } from '../../store/socialStore';
-import { Avatar } from '../Avatar';
+import { Avatar, costumeOfAvatar, type AvatarKind } from '../Avatar';
 
 const html = (props: Parameters<typeof Avatar>[0]) => renderToString(createElement(Avatar, props));
 
@@ -20,6 +22,31 @@ describe('프로필 사진', () => {
     expect(normal).toContain(ASSETS.characters.normal);
     expect(normal).not.toContain('https://x/y.png');
     expect(html({ name: '사파', picture: null, avatar: 'dark' })).toContain(ASSETS.characters.dark);
+  });
+
+  it('코스튬을 고르면 그 코스튬 그림을 쓴다(구글 사진이 있어도)', () => {
+    const maid = html({ name: '사파', picture: 'https://x/y.png', avatar: 'costume-maid' });
+    expect(maid).toContain(ASSETS.costumes.maid);
+    expect(maid).not.toContain('https://x/y.png');
+    expect(maid).toContain('avatar-char');
+    expect(html({ name: '사파', picture: null, avatar: 'costume-dbride' })).toContain(ASSETS.costumes.dbride);
+    for (const id of COSTUME_IDS) expect(html({ name: '사파', picture: null, avatar: `costume-${id}` })).toContain(ASSETS.costumes[id]);
+  });
+
+  it('서버가 더 새로워서 모르는 코스튬이면 이름 첫 글자·구글 사진으로 대신한다', () => {
+    const unknown = 'costume-future' as AvatarKind;
+    expect(costumeOfAvatar(unknown)).toBeNull();
+    expect(costumeOfAvatar('normal')).toBeNull();
+    expect(costumeOfAvatar('costume-maid')).toBe('maid');
+    expect(html({ name: '사파', picture: null, avatar: unknown })).toContain('rank-avatar-none');
+    expect(html({ name: '사파', picture: 'https://x/y.png', avatar: unknown })).toContain('https://x/y.png');
+  });
+
+  it('프런트 코스튬 목록은 서버가 받아 주는 코스튬 목록과 같다', () => {
+    const server = readFileSync(new URL('../../../../backend/src/users/profile.ts', import.meta.url), 'utf8');
+    const block = /export const COSTUME_IDS = \[([^\]]*)\]/.exec(server)?.[1] ?? '';
+    const ids = [...block.matchAll(/'([a-z]+)'/g)].map((m) => m[1]);
+    expect([...ids].sort()).toEqual([...COSTUME_IDS].sort());
   });
 
   it('크기 클래스를 바꿀 수 있다', () => {

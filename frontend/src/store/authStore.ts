@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import type { AvatarKind } from '../components/Avatar';
 import { syncBeforeLeave } from './gameStore';
 
 /* 구글 로그인 상태. 로그인해야 게임이 시작되고, 진행 데이터는 이 계정에 저장된다. */
@@ -13,7 +14,7 @@ export interface AuthUser {
   /** 프로필 설정: 닉네임·한 줄 소개·프로필 사진 종류. displayName 은 다른 사람에게 보이는 이름이다. */
   nickname?: string | null;
   bio?: string | null;
-  avatar?: 'google' | 'normal' | 'dark';
+  avatar?: AvatarKind;
   displayName?: string;
   /** 친구 코드 */
   friendCode?: string | null;

@@ -3,9 +3,12 @@ import { Avatar, type AvatarKind } from '../components/Avatar';
 import { fmt } from '../components/format';
 import { Modal } from '../components/Modal';
 import { Presence } from '../components/parts';
+import { COSTUME_IDS_OF } from '../game/balance';
+import { COSTUME_TEXT } from '../game/content';
+import type { CostumeId } from '../game/types';
 import { api, errorText } from '../platform/api';
 import { patchAuthUser } from '../store/authStore';
-import { toast } from '../store/gameStore';
+import { toast, useUi } from '../store/gameStore';
 import { closeProfile, openDm, openReport, refreshSummary } from '../store/socialStore';
 
 type Relation = 'self' | 'none' | 'friend' | 'outgoing' | 'incoming';
@@ -236,7 +239,33 @@ function ProfileView({ p, reload, onEdit }: { p: Profile; reload: () => Promise<
   );
 }
 
+/** 상점에서 산 코스튬만 프로필 사진으로 고를 수 있다(일반 → 어둠 순서). 서버는 산 코스튬인지 모르므로 여기서 걸러야 한다. */
+export function CostumePicker({ owned, value, onPick }: { owned: readonly CostumeId[]; value: AvatarKind; onPick: (kind: AvatarKind) => void }) {
+  const ids = [...COSTUME_IDS_OF.normal, ...COSTUME_IDS_OF.dark].filter((id) => owned.includes(id));
+  return (
+    <div className="field">
+      <span>코스튬 사진 — 상점에서 산 코스튬</span>
+      {ids.length > 0 ? (
+        <div className="pf-costumes" role="group" aria-label="코스튬 프로필 사진">
+          {ids.map((id) => {
+            const kind: AvatarKind = `costume-${id}`;
+            return (
+              <button key={id} type="button" className="pf-costume" aria-pressed={value === kind} aria-label={COSTUME_TEXT[id].name} onClick={() => onPick(kind)}>
+                <Avatar name={COSTUME_TEXT[id].name} picture={null} avatar={kind} className="avatar-pick" />
+                <small>{COSTUME_TEXT[id].name}</small>
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <small className="muted">아직 산 코스튬이 없어요. 상점에서 코스튬을 사면 여기서 프로필 사진으로 고를 수 있어요.</small>
+      )}
+    </div>
+  );
+}
+
 function ProfileEditor({ onDone }: { onDone: (saved: boolean) => void }) {
+  const { game } = useUi();
   const [mine, setMine] = useState<MyProfile | null>(null);
   const [nickname, setNickname] = useState('');
   const [bio, setBio] = useState('');
@@ -318,6 +347,7 @@ function ProfileEditor({ onDone }: { onDone: (saved: boolean) => void }) {
           ))}
         </div>
       </div>
+      <CostumePicker owned={game.cosmetics.costumes} value={avatar} onPick={setAvatar} />
       {error && (
         <p className="chat-error" role="alert">
           {error}
