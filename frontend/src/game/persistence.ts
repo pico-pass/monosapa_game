@@ -1,4 +1,5 @@
-import { ACHIEVEMENTS, BALANCE, CAMPAIGN_IDS, COSTUME_IDS, MISSION_METRICS, POST_KINDS, SCHEMA_VERSION, SNACK_IDS, STAGE_IDS, STREAM_PLATFORMS, THEME_IDS, costumePersona } from './balance';
+import { ACHIEVEMENTS, BALANCE, CAMPAIGN_IDS, COSTUME_IDS, ENDLESS, ENDLESS_MAX_TIER, EQUIPMENT_KINDS, MISSION_METRICS, POST_KINDS, SCHEMA_VERSION, SKILL_IDS, SNACK_IDS, STAGE_IDS, STREAM_PLATFORMS, THEME_IDS, costumePersona } from './balance';
+import { CERT_TIER_COUNT, emptyCerts } from './certs';
 import { albumDefById, albumSeries, mailTemplateById } from './content';
 import { emptyFanMail } from './fanmail';
 import { emptyMissions } from './missions';
@@ -6,6 +7,7 @@ import { emptyMonogram } from './monogram';
 import { Invalid, MAX_TIME, bad, bool, int, isObj, num, persona, str, type Obj } from './parse';
 import { emptyArcade, emptyCards, emptyFeat, emptyMascots, emptyNurtures, emptyPhoto, emptyStats, packSeeds, parseArcade, parseCards, parseFeat, parseMascots, parseNurtures, parsePhoto, parseStats } from './pack-state';
 import { retroactiveDiamonds } from './selectors';
+import { emptySkills } from './skills';
 import { streamSeedFrom, zeroTotals } from './streaming';
 import { COUNTER_KEYS, zeroCounters } from './tracking';
 import type {
@@ -18,6 +20,7 @@ import type {
   DarkCostumeId,
   Counters,
   DialogueTone,
+  EquipStars,
   FanMail,
   GameState,
   Mail,
@@ -27,6 +30,7 @@ import type {
   Persona,
   Post,
   SnackId,
+  Skills,
   StageId,
   Streaming,
   ThemeId,
@@ -67,6 +71,9 @@ export function createInitialState(now: number, reducedMotion = false): GameStat
     distributor: 0,
     diamonds: 0,
     diamondUpgrades: { production: 0, royalty: 0, offline: 0 },
+    equipStars: emptyEquipStars(),
+    skills: emptySkills(),
+    endless: {},
     buffs: { snack: null, campaign: null },
     cosmetics: { themes: ['default'], theme: 'default', costumes: [], costume: null, darkCostume: null, title: null },
     counters: zeroCounters(),
@@ -82,7 +89,7 @@ export function createInitialState(now: number, reducedMotion = false): GameStat
     arcade: emptyArcade(),
     stats: emptyStats(),
     // 첫 정산은 시작 후 정산 간격이 지나야 한다.
-    streaming: { totals: zeroTotals(), settled: 0, lastClaimAt: now, seed: streamSeedFrom(now) },
+    streaming: { totals: zeroTotals(), settled: 0, lastClaimAt: now, seed: streamSeedFrom(now), certs: emptyCerts() },
     singles: [],
     albums: [],
     concerts,
@@ -118,6 +125,49 @@ export function migrate(raw: Obj): Obj {
 }
 
 /* ---------- 나중에 추가된 필드의 검증 ---------- */
+
+const emptyEquipStars = (): EquipStars => ({ normal: { mic: 0, studio: 0, promotion: 0 }, dark: { mic: 0, studio: 0, promotion: 0 } });
+
+/** 장비 한계 돌파 ★. 나중에 생긴 필드라 없는 예전 저장은 0단계로 읽는다. */
+function parseEquipStars(raw: unknown): EquipStars {
+  const out = emptyEquipStars();
+  if (raw === undefined) return out;
+  if (!isObj(raw)) return bad('equipStars가 올바르지 않습니다.');
+  for (const who of ['normal', 'dark'] as const) {
+    const side = raw[who];
+    if (side === undefined) continue;
+    if (!isObj(side)) return bad(`equipStars.${who}가 올바르지 않습니다.`);
+    for (const kind of EQUIPMENT_KINDS) if (side[kind] !== undefined) out[who][kind] = int(side, kind, 0, BALANCE.equipStars.max, `equipStars.${who}.${kind}`);
+  }
+  return out;
+}
+
+/** 레벨 스킬. 없는 예전 저장은 아무것도 안 찍은 상태다. */
+function parseSkills(raw: unknown): Skills {
+  const out = emptySkills();
+  if (raw === undefined) return out;
+  if (!isObj(raw)) return bad('skills가 올바르지 않습니다.');
+  for (const id of SKILL_IDS) if (raw[id] !== undefined) out[id] = int(raw, id, 0, BALANCE.skills.maxLevel, `skills.${id}`);
+  return out;
+}
+
+/** 끝없는 업적 단계. 사라진 지표의 항목은 조용히 버린다. */
+function parseEndless(raw: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (raw === undefined) return out;
+  if (!isObj(raw)) return bad('endless가 올바르지 않습니다.');
+  for (const def of ENDLESS) if (raw[def.id] !== undefined) out[def.id] = int(raw, def.id, 0, ENDLESS_MAX_TIER, `endless.${def.id}`);
+  return out;
+}
+
+/** 스트리밍 인증을 받은 단계. 없는 예전 저장은 아직 아무것도 안 받은 상태다. */
+function parseCerts(raw: unknown): Streaming['certs'] {
+  const out = emptyCerts();
+  if (raw === undefined) return out;
+  if (!isObj(raw)) return bad('streaming.certs가 올바르지 않습니다.');
+  for (const p of STREAM_PLATFORMS) if (raw[p] !== undefined) out[p] = int(raw, p, 0, CERT_TIER_COUNT, `streaming.certs.${p}`);
+  return out;
+}
 
 /** 숫자는 엄격하게, 알 수 없는 ID나 사라진 항목은 조용히 버린다. */
 function parseBuffs(raw: unknown): Buffs {
@@ -284,6 +334,7 @@ export function validateState(input: unknown): Validation {
       settled: 0,
       lastClaimAt: num(o, 'lastSettledAt', 0, MAX_TIME),
       seed: streamSeedFrom(num(o, 'savedAt', 0, MAX_TIME)),
+      certs: emptyCerts(),
     };
     if (o.streaming !== undefined) {
       const stRaw = o.streaming;
@@ -300,6 +351,7 @@ export function validateState(input: unknown): Validation {
         settled: Math.min(num(stRaw, 'settled', 0, R * STREAM_PLATFORMS.length, 'streaming.settled'), sum),
         lastClaimAt: num(stRaw, 'lastClaimAt', 0, MAX_TIME, 'streaming.lastClaimAt'),
         seed: int(stRaw, 'seed', 0, 0xffffffff, 'streaming.seed'),
+        certs: parseCerts(stRaw.certs),
       };
     }
 
@@ -330,7 +382,9 @@ export function validateState(input: unknown): Validation {
       const releasedAt = num(x, 'releasedAt', 0, MAX_TIME, `albums[${i}].releasedAt`);
       if (!def) continue; // 카탈로그에 자리가 없는 앨범은 버린다
       taken.add(def.id);
-      albums.push({ id: def.id, title: def.title, type: def.type, releasedAt });
+      // 리마스터는 나중에 생긴 필드라 없는 예전 저장은 0단계다
+      const remaster = x.remaster === undefined ? 0 : int(x, 'remaster', 0, BALANCE.remaster.max, `albums[${i}].remaster`);
+      albums.push({ id: def.id, title: def.title, type: def.type, releasedAt, remaster });
     }
 
     const concertsRaw = isObj(o.concerts) ? o.concerts : {};
@@ -364,6 +418,9 @@ export function validateState(input: unknown): Validation {
 
     // 아래 필드는 모두 나중에 추가된 것이라 없는 예전 저장은 기본값으로 읽는다.
     const savedAtSeed = num(o, 'savedAt', 0, MAX_TIME);
+    const equipStars = parseEquipStars(o.equipStars);
+    const skills = parseSkills(o.skills);
+    const endless = parseEndless(o.endless);
     const buffs = parseBuffs(o.buffs);
     const cosmetics = parseCosmetics(o.cosmetics);
     const counters = parseCounters(o.counters);
@@ -402,6 +459,9 @@ export function validateState(input: unknown): Validation {
       distributor,
       diamonds: o.diamonds === undefined ? 0 : num(o, 'diamonds', 0, R),
       diamondUpgrades,
+      equipStars,
+      skills,
+      endless,
       buffs,
       cosmetics,
       counters,

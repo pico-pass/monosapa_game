@@ -425,9 +425,9 @@ describe('다이아', () => {
     const s = base({
       fans: 80, // Lv.3 → +4
       albums: [
-        { id: 'a1', title: 't', type: 'normal', releasedAt: 0 },
-        { id: 'a2', title: 't', type: 'normal', releasedAt: 0 },
-        { id: 'a3', title: 't', type: 'dark', releasedAt: 0 },
+        { id: 'a1', title: 't', type: 'normal', releasedAt: 0, remaster: 0 },
+        { id: 'a2', title: 't', type: 'normal', releasedAt: 0, remaster: 0 },
+        { id: 'a3', title: 't', type: 'dark', releasedAt: 0, remaster: 0 },
       ], // 일반 30 + 60, 어둠 100
       concerts: {
         ...createInitialState(T0).concerts,
@@ -442,7 +442,7 @@ describe('다이아', () => {
 
 describe('앨범', () => {
   const ready = (coins = 1e9) => base({ coins });
-  const owned = (ids: string[]) => ids.map((id) => ({ id, title: albumDefById(id)!.title, type: albumDefById(id)!.type, releasedAt: 0 }));
+  const owned = (ids: string[]) => ids.map((id) => ({ id, title: albumDefById(id)!.title, type: albumDefById(id)!.type, releasedAt: 0, remaster: 0 }));
   const normalIds = (n: number) => albumSeries('normal').slice(0, n).map((d) => d.id);
 
   it('카탈로그: 지정한 일반 6장·어둠 3장의 수록곡·속성', () => {

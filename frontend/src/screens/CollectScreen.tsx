@@ -5,7 +5,7 @@ import { fmt, fmtCountdown, fmtDuration } from '../components/format';
 import { BALANCE, FEAT_NPCS, PHOTO_CARD_IDS, PHOTO_GRADES, PHOTO_SETS, photoCardId } from '../game/balance';
 import { FEAT_RARITY_NAME, FEAT_TEXT, MASCOT_TEXT, MOOD_TEXT, PERSONA_TEXT, PHOTO_GRADE_NAMES, PHOTO_SET_TEXT, VIBE_TEXT, photoCardName } from '../game/content';
 import { feedCost, mascotView } from '../game/mascot';
-import { bonuses, featPassive, parsePhotoId, pickupOf, remasterCost, songCardOf } from '../game/packdata';
+import { FEAT_TRANS_MAX_TIER, bonuses, featPassive, featSlotCount, featStarTotal, featSynergies, featTransView, parsePhotoId, pickupOf, remasterCost, songCardOf, type FeatSynergy } from '../game/packdata';
 import { pullsToPity } from '../game/photocards';
 import { nextRemasterCost } from '../game/songcards';
 import type { Persona } from '../game/types';
@@ -358,11 +358,26 @@ export function TradePanel() {
 
 /* ---------- 피처링 ---------- */
 
+/** 시너지 한 줄: 무엇이 맞았는지와 얼마를 더하는지 */
+function synergyLine(s: FeatSynergy): { label: string; effect: string } {
+  if (s.kind === 'vibe' && s.vibe) {
+    const v = VIBE_TEXT[s.vibe];
+    return { label: `${v.icon} ${v.name} 래퍼 ${s.count}명`, effect: `${v.desc} +${pct(s.value)}` };
+  }
+  if (s.kind === 'rarity' && s.rarity) return { label: `${FEAT_RARITY_NAME[s.rarity]} 등급만 장착`, effect: `네 갈래 모두 +${pct(s.value)}` };
+  return { label: '🌈 네 갈래를 모두 장착', effect: `네 갈래 모두 +${pct(s.value)}` };
+}
+
 export function FeatTab() {
   const { game: g } = useUi();
   const f = g.feat;
   const pickup = pickupOf(g.lastSettledAt);
   const F = BALANCE.feat;
+  const S = F.synergy;
+  const starTotal = featStarTotal(f.owned);
+  const slotCount = featSlotCount(f.owned);
+  const nextSlotAt = F.extraSlotStars.find((need) => starTotal < need);
+  const synergies = featSynergies(f.slots);
   return (
     <>
       <div className="card">
@@ -381,15 +396,41 @@ export function FeatTab() {
           </button>
         </div>
         <p className="fineprint">
-          전설 {F.rates.SSR * 100}% · 에픽 {F.rates.SR * 100}% · 레어 {F.rates.R * 100}% · 일반 {F.rates.N * 100}% · 전설은 픽업이 {F.pickupRate * 100}%, 빗나가면 다음 전설은 픽업 확정. 10회의 마지막은 레어 이상. 같은 래퍼가 또 나오면 별이 올라요(최대 {F.maxStar}).
+          전설 {F.rates.SSR * 100}% · 에픽 {F.rates.SR * 100}% · 레어 {F.rates.R * 100}% · 일반 {F.rates.N * 100}% · 전설은 픽업이 {F.pickupRate * 100}%, 빗나가면 다음 전설은 픽업 확정. 10회의 마지막은 레어 이상. 같은 래퍼가 또 나오면 별이 올라요(최대 {F.maxStar}). 별이 가득 찬 래퍼가 또 나오면 초월 중복이 쌓여 초월 단계가 올라요(최대 {FEAT_TRANS_MAX_TIER}단계, 단계마다 패시브 별 {parseFloat((F.transBonus / F.starBonus).toFixed(2))}개분). 초월까지 끝난 래퍼의 중복은 다이아로 환급돼요.
         </p>
       </div>
-      <p className="muted">장착한 래퍼 {f.slots.length}/{F.slots}명의 패시브가 붙어요.</p>
+      <p className="muted">
+        장착한 래퍼 {f.slots.length}/{slotCount}명의 패시브가 붙어요. 가진 래퍼의 별 합계 {starTotal}
+        {nextSlotAt !== undefined ? ` — ${nextSlotAt}이 되면 장착 칸이 하나 늘어요.` : ' — 장착 칸이 모두 열렸어요.'}
+      </p>
+      <div className="card feat-synergy" aria-label="시너지">
+        <strong>🔗 시너지</strong>
+        {synergies.length === 0 ? (
+          <small className="muted">같은 갈래나 같은 등급의 래퍼를 함께 장착하면 보너스가 붙어요.</small>
+        ) : (
+          <ul className="feat-syn-list">
+            {synergies.map((s) => {
+              const line = synergyLine(s);
+              return (
+                <li key={`${s.kind}-${s.vibe ?? ''}`}>
+                  <span>{line.label}</span>
+                  <b>{line.effect}</b>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <p className="fineprint">
+          같은 갈래 2명 +{pct(S.sameVibe[2])} · 3명 +{pct(S.sameVibe[3])} · 4명 +{pct(S.sameVibe[4])} · 5명 +{pct(S.sameVibe[5])}. 모두 같은 등급(3명 이상)이면 네 갈래 모두에 일반 +{pct(S.sameRarity.N)} · 레어 +{pct(S.sameRarity.R)} · 에픽 +{pct(S.sameRarity.SR)} · 전설 +{pct(S.sameRarity.SSR)}. 네 갈래를 한 명씩 이상 장착하면(4칸부터) 네 갈래 모두 +{pct(S.rainbow)}.
+        </p>
+      </div>
       {FEAT_NPCS.map((def) => {
         const stars = f.owned[def.id] ?? 0;
         const t = FEAT_TEXT[def.id];
         const v = VIBE_TEXT[def.vibe];
         const on = f.slots.includes(def.id);
+        const trans = featTransView(f.trans[def.id] ?? 0);
+        const maxed = stars >= F.maxStar;
         return (
           <div key={def.id} className={`card feat-card rar-${def.rarity}${stars === 0 ? ' feat-locked' : ''}${on ? ' song-card-on' : ''}`}>
             <div className="card-row">
@@ -399,9 +440,14 @@ export function FeatTab() {
               <small className="muted">{stars > 0 ? '★'.repeat(stars) + '☆'.repeat(F.maxStar - stars) : '미계약'}</small>
             </div>
             <small className="muted">{stars > 0 ? t.blurb : '뽑기로 만날 수 있어요.'}</small>
+            {maxed && (
+              <small className="feat-trans" aria-label="초월">
+                ✦ 초월 {trans.tier}/{FEAT_TRANS_MAX_TIER}단계{trans.need > 0 ? ` · 다음 단계까지 ${trans.into}/${trans.need}` : ' · 최대'}
+              </small>
+            )}
             <div className="card-row">
               <small className="muted">
-                {v.icon} {v.desc} +{pct(featPassive(def, Math.max(1, stars)))}
+                {v.icon} {v.desc} +{pct(featPassive(def, Math.max(1, stars), trans.tier))}
               </small>
               {stars > 0 && (
                 <button type="button" className="btn btn-ghost" onClick={() => doToggleFeat(def.id)}>

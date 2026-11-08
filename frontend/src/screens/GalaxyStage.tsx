@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { PointerEvent as ReactPointerEvent } from 'react';
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import { sfx } from '../audio/sfx';
 import { PersonaBadge } from '../components/parts';
 import { BALANCE } from '../game/balance';
@@ -174,9 +174,18 @@ export function GalaxyPlay({ run }: { run: ConcertRun }) {
     [game, handleEvents, newMode, refresh, say],
   );
 
-  /** 화면 좌표를 그림 좌표로 */
+  /** 화면 좌표를 그림 좌표로. 그림이 칸에 어떻게 놓였든(여백·축소) 맞도록 SVG 자신의 변환을 쓴다. */
   const toSvg = (e: ReactPointerEvent<SVGSVGElement>): { x: number; y: number } => {
-    const rect = svgRef.current?.getBoundingClientRect();
+    const svg = svgRef.current;
+    const ctm = svg?.getScreenCTM?.();
+    if (svg && ctm) {
+      const p = svg.createSVGPoint();
+      p.x = e.clientX;
+      p.y = e.clientY;
+      const q = p.matrixTransform(ctm.inverse());
+      return { x: q.x, y: q.y };
+    }
+    const rect = svg?.getBoundingClientRect();
     if (!rect || rect.width === 0) return { x: 0, y: 0 };
     return { x: ((e.clientX - rect.left) * B.width) / rect.width, y: ((e.clientY - rect.top) * B.height) / rect.height };
   };
@@ -271,7 +280,7 @@ export function GalaxyPlay({ run }: { run: ConcertRun }) {
         이번 곡 열기 {game.heat} / 목표 {game.goal} · 도착 {game.delivered}명
       </div>
 
-      <div className="galaxy-field">
+      <div className="galaxy-field" style={{ '--galaxy-ratio': B.width / B.height } as CSSProperties}>
         <svg
           ref={svgRef}
           viewBox={`0 0 ${B.width} ${B.height}`}

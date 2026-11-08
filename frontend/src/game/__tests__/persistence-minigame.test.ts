@@ -50,7 +50,7 @@ const sampleState = (): GameState => ({
     { id: 'single-1', persona: 'normal', title: 'a', releasedAt: T0 },
     { id: 'single-2', persona: 'dark', title: 'b', releasedAt: T0 },
   ],
-  albums: [{ id: 'album-1', title: 'SAPA', type: 'normal', releasedAt: T0 }],
+  albums: [{ id: 'album-1', title: 'SAPA', type: 'normal', releasedAt: T0, remaster: 0 }],
 });
 
 describe('저장·검증', () => {
@@ -148,6 +148,7 @@ describe('저장·검증', () => {
       settled: 90,
       lastClaimAt: T0 + 5,
       seed: 4000000000,
+      certs: { spotify: 2, ytmusic: 0, melon: 1, applemusic: 0 },
     };
     saveGame(st, { ...sampleState(), streaming }, T0 + 10);
     const loaded = loadGame(st);
@@ -204,8 +205,8 @@ describe('저장·검증', () => {
 
   it('앨범은 카탈로그에서 읽는다: 저장된 제목·속성은 무시하고, 예전 저장도 앞 앨범으로 옮겨 읽는다', () => {
     const good = sampleState();
-    const tampered = validateState({ ...good, albums: [{ id: 'x', title: '아무거나', type: 'dark', releasedAt: T0 }] });
-    expect(tampered.ok && tampered.state.albums[0]).toMatchObject({ id: 'album-1', title: 'SAPA', type: 'normal', releasedAt: T0 });
+    const tampered = validateState({ ...good, albums: [{ id: 'x', title: '아무거나', type: 'dark', releasedAt: T0, remaster: 0 }] });
+    expect(tampered.ok && tampered.state.albums[0]).toMatchObject({ id: 'album-1', title: 'SAPA', type: 'normal', releasedAt: T0, remaster: 0 });
     // 예전 형식(싱글 2개로 만든 앨범 5장, 싱글의 albumId 필드)
     const legacy = {
       ...good,
@@ -220,12 +221,12 @@ describe('저장·검증', () => {
     // 어둠 앨범은 id로 찾아서 속성과 제목을 카탈로그에서 가져오고, 순서는 저장된 대로 둔다
     const dark = validateState({
       ...good,
-      albums: [{ id: 'album-dark-2', title: '아무거나', type: 'normal', releasedAt: T0 }, { id: 'album-1', releasedAt: T0 + 1 }, { id: 'album-dark-1', releasedAt: T0 + 2 }],
+      albums: [{ id: 'album-dark-2', title: '아무거나', type: 'normal', releasedAt: T0, remaster: 0 }, { id: 'album-1', releasedAt: T0 + 1 }, { id: 'album-dark-1', releasedAt: T0 + 2 }],
     });
     expect(dark.ok && dark.state.albums).toEqual([
-      { id: 'album-dark-2', title: '니엄마는...', type: 'dark', releasedAt: T0 },
-      { id: 'album-1', title: 'SAPA', type: 'normal', releasedAt: T0 + 1 },
-      { id: 'album-dark-1', title: '...정병러브...', type: 'dark', releasedAt: T0 + 2 },
+      { id: 'album-dark-2', title: '니엄마는...', type: 'dark', releasedAt: T0, remaster: 0 },
+      { id: 'album-1', title: 'SAPA', type: 'normal', releasedAt: T0 + 1, remaster: 0 },
+      { id: 'album-dark-1', title: '...정병러브...', type: 'dark', releasedAt: T0 + 2, remaster: 0 },
     ]);
     // 같은 앨범이 두 번 있으면 겹친 것은 아직 안 낸 일반 앨범으로 옮겨 읽는다
     const dup = validateState({ ...good, albums: [{ id: 'album-dark-1', releasedAt: T0 }, { id: 'album-dark-1', releasedAt: T0 + 1 }] });

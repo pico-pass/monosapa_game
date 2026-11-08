@@ -1,7 +1,7 @@
 import { BALANCE, FEAT_IDS, FEAT_LEGACY_IDS, LYRIC_CARD_IDS, PHOTO_SETS, lyricCardById, nurtureActionById } from './balance';
 import { bool, countMap, int, isObj, num, MAX_TIME, bad, type Obj } from './parse';
 import { emptyNurtureSide } from './nurturedata';
-import { isPhotoCard } from './packdata';
+import { FEAT_TRANS_TOTAL, featSlotCount, isPhotoCard } from './packdata';
 import { streamSeedFrom } from './streaming';
 import type { Arcade, ArcadeRecord, Featuring, Mascot, Mascots, NurtureSide, Nurtures, Persona, PhotoBook, SongCards, Stats } from './types';
 
@@ -9,7 +9,7 @@ import type { Arcade, ArcadeRecord, Featuring, Mascot, Mascots, NurtureSide, Nur
 
 export const emptyCards = (seed: number): SongCards => ({ seed, deck: [], remaster: {} });
 export const emptyPhoto = (seed: number): PhotoBook => ({ seed, pulls: 0, pity: 0, tickets: 0, owned: {}, shards: 0, claimedSets: [] });
-export const emptyFeat = (seed: number): Featuring => ({ seed, pulls: 0, pity: 0, guaranteed: false, owned: {}, slots: [] });
+export const emptyFeat = (seed: number): Featuring => ({ seed, pulls: 0, pity: 0, guaranteed: false, owned: {}, trans: {}, slots: [] });
 export const emptyMascot = (): Mascot => ({ xp: 0, fullUntil: 0, playReadyAt: 0, giftReadyAt: 0, fed: 0 });
 export const emptyMascots = (): Mascots => ({ normal: emptyMascot(), dark: emptyMascot() });
 export const emptyNurtures = (): Nurtures => ({ normal: emptyNurtureSide(), dark: emptyNurtureSide() });
@@ -64,13 +64,16 @@ export function parseFeat(raw: unknown, seed: number): Featuring {
   const upgraded = isObj(raw.owned) ? Object.fromEntries(Object.entries(raw.owned).map(([id, v]) => [FEAT_LEGACY_IDS[id] ?? id, v])) : raw.owned;
   const owned = countMap(upgraded, (id) => FEAT_IDS.includes(id), BALANCE.feat.maxStar, 'feat.owned');
   const slotIds = Array.isArray(raw.slots) ? raw.slots.map((id) => (typeof id === 'string' ? (FEAT_LEGACY_IDS[id] ?? id) : id)) : raw.slots;
+  // 초월은 나중에 생긴 필드라 없는 예전 저장은 비어 있다. 별이 가득 찬 래퍼만 초월할 수 있다.
+  const trans = countMap(raw.trans, (id) => (owned[id] ?? 0) >= BALANCE.feat.maxStar, FEAT_TRANS_TOTAL, 'feat.trans');
   return {
     seed: int(raw, 'seed', 0, 0xffffffff, 'feat.seed'),
     pulls: int(raw, 'pulls', 0, BIG, 'feat.pulls'),
     pity: int(raw, 'pity', 0, BALANCE.feat.pityAt, 'feat.pity'),
     guaranteed: bool(raw, 'guaranteed', 'feat.guaranteed'),
     owned,
-    slots: idList(slotIds, (id) => (owned[id] ?? 0) > 0, BALANCE.feat.slots),
+    trans,
+    slots: idList(slotIds, (id) => (owned[id] ?? 0) > 0, featSlotCount(owned)),
   };
 }
 

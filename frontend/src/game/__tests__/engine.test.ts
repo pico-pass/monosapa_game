@@ -120,10 +120,10 @@ describe('기획서 14장 검증 1~3: 자동 생산·과열 구간', () => {
   });
 
   it('인세 공식과 자아 배율', () => {
-    const s = base({ fans: 100, albums: [{ id: 'a', title: 't', type: 'normal', releasedAt: 0 }] });
+    const s = base({ fans: 100, albums: [{ id: 'a', title: 't', type: 'normal', releasedAt: 0, remaster: 0 }] });
     const withPromo = { ...s, equipment: { mic: 0, studio: 0, promotion: 5 }, darkEquipment: { mic: 0, studio: 0, promotion: 0 } };
     // 앨범 3장: 인세 배율 +8% → +10% → +12%가 누적(1.08, 1.18, 1.30)
-    const alb = (n: number) => ({ ...withPromo, albums: Array.from({ length: n }, (_, i) => ({ id: `a${i}`, title: 't', type: 'normal' as const, releasedAt: 0 })) });
+    const alb = (n: number) => ({ ...withPromo, albums: Array.from({ length: n }, (_, i) => ({ id: `a${i}`, title: 't', type: 'normal' as const, releasedAt: 0, remaster: 0 })) });
     // 일반 홍보(×2)는 어둠 인세에 곱해지지 않는다. 어둠 인세에는 어둠 홍보만 곱해진다.
     expect(royaltyRate(alb(2), 'dark')).toBeCloseTo(100 * 0.02 * 1.18, 9);
     expect(royaltyRate(alb(3), 'dark')).toBeCloseTo(100 * 0.02 * 1.3, 9);
@@ -134,8 +134,8 @@ describe('기획서 14장 검증 1~3: 자동 생산·과열 구간', () => {
     const mixed = (normal: number, dark: number) => ({
       ...withPromo,
       albums: [
-        ...Array.from({ length: normal }, (_, i) => ({ id: `n${i}`, title: 't', type: 'normal' as const, releasedAt: 0 })),
-        ...Array.from({ length: dark }, (_, i) => ({ id: `d${i}`, title: 't', type: 'dark' as const, releasedAt: 0 })),
+        ...Array.from({ length: normal }, (_, i) => ({ id: `n${i}`, title: 't', type: 'normal' as const, releasedAt: 0, remaster: 0 })),
+        ...Array.from({ length: dark }, (_, i) => ({ id: `d${i}`, title: 't', type: 'dark' as const, releasedAt: 0, remaster: 0 })),
       ],
     });
     expect(royaltyRate(mixed(0, 1), 'dark')).toBeCloseTo(100 * 0.02 * 1.12, 9);

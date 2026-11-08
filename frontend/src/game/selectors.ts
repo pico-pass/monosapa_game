@@ -25,10 +25,16 @@ export const clickPowerOf = (s: Pick<GameState, 'musicPower' | 'dripPower'>, per
 export const equipmentDef = (persona: Persona) => (persona === 'normal' ? BALANCE.equipment : BALANCE.darkEquipment);
 const clickDef = (persona: Persona) => (persona === 'normal' ? BALANCE.musicPower : BALANCE.dripPower);
 
+/** 한계 돌파(★)까지 친 장비의 실효 레벨 = 레벨 + ★가 올려 주는 레벨. ★는 최대 레벨일 때만 올릴 수 있어서 그때만 더해진다. */
+export function effectiveEquipLevel(s: Pick<GameState, 'equipment' | 'darkEquipment' | 'equipStars'>, persona: Persona, kind: EquipmentKind): number {
+  const level = equipmentOf(s, persona)[kind];
+  const stars = Math.min(s.equipStars?.[persona]?.[kind] ?? 0, BALANCE.equipStars.max);
+  return level >= equipmentDef(persona).maxLevel && stars > 0 ? level + BALANCE.equipStars.extraLevels[stars - 1] : level;
+}
+
 /** 그 속성 장비(마이크·작업실)가 주는 생산배율 */
-export function productionMultiplier(s: Pick<GameState, 'equipment' | 'darkEquipment'>, persona: Persona): number {
-  const e = equipmentOf(s, persona);
-  return 1 + BALANCE.production.micPerLevel * e.mic + BALANCE.production.studioPerLevel * e.studio;
+export function productionMultiplier(s: Pick<GameState, 'equipment' | 'darkEquipment' | 'equipStars'>, persona: Persona): number {
+  return 1 + BALANCE.production.micPerLevel * effectiveEquipLevel(s, persona, 'mic') + BALANCE.production.studioPerLevel * effectiveEquipLevel(s, persona, 'studio');
 }
 
 /** 다이아 전용 업그레이드가 주는 배율. 두 자아 모두, 자동 생산과 작업하기 라임 모두에 곱해진다. */
@@ -59,7 +65,7 @@ export function shopPrice(base: number, fans: number): number {
 /** 오프라인 정산으로 인정하는 최대 시간(ms). 기본 2시간 + 다이아 업그레이드. */
 export function offlineCapMs(s: Pick<GameState, 'diamondUpgrades'> & Partial<BonusState>): number {
   const u = BALANCE.diamond.upgrade.offline;
-  const extra = s.cards && s.photo && s.feat && s.mascot && s.nurture && s.singles ? bonuses(s as BonusState).offlineMs : 0;
+  const extra = s.cards && s.photo && s.feat && s.mascot && s.nurture && s.singles && s.skills && s.streaming && s.cosmetics ? bonuses(s as BonusState).offlineMs : 0;
   return BALANCE.offline.capMs + u.perLevelMs * s.diamondUpgrades.offline + extra;
 }
 
@@ -71,7 +77,7 @@ export const fanGainMult = (s: Pick<GameState, 'buffs' | 'lastSettledAt'> & Bonu
 
 type ClickState = Pick<
   GameState,
-  'equipment' | 'darkEquipment' | 'musicPower' | 'dripPower' | 'activePersona' | 'diamondUpgrades' | 'buffs' | 'lastSettledAt'
+  'equipment' | 'darkEquipment' | 'equipStars' | 'musicPower' | 'dripPower' | 'activePersona' | 'diamondUpgrades' | 'buffs' | 'lastSettledAt'
 > &
   BonusState;
 
@@ -122,7 +128,7 @@ export interface RoyaltyBreakdown {
 }
 
 export function royaltyBreakdown(s: GameState, persona: Persona = s.activePersona): RoyaltyBreakdown {
-  const promotionMult = 1 + BALANCE.royalty.promotionPerLevel * equipmentOf(s, persona).promotion;
+  const promotionMult = 1 + BALANCE.royalty.promotionPerLevel * effectiveEquipLevel(s, persona, 'promotion');
   const albumMult = 1 + albumRoyaltyBonus(s.albums);
   const personaMult = persona === 'normal' ? P.normalRoyaltyMult : P.darkRoyaltyMult;
   const diamondMult = diamondRoyaltyMult(s);
@@ -257,10 +263,16 @@ export function previewSingle(s: GameState, persona: Persona = s.activePersona):
 const ALBUM_TYPES = ['normal', 'dark'] as const;
 
 /** 앨범을 냈을 때 인세 배율에 더해지는 누적 값. 속성마다 낸 장수만큼 앞에서부터 합산한다 (일반 8% → +10% → +12% …) */
-export const albumRoyaltyBonus = (albums: readonly Pick<Album, 'type'>[]): number =>
-  ALBUM_TYPES.reduce((sum, t) => sum + BALANCE.royalty.perAlbum[t].slice(0, albums.filter((a) => a.type === t).length).reduce((a, b) => a + b, 0), 0);
-/** 그 속성의 i번째(0부터) 앨범 하나가 더하는 값 */
-export const albumRoyaltyOf = (type: AlbumType, i: number): number => BALANCE.royalty.perAlbum[type][i] ?? 0;
+export const albumRoyaltyBonus = (albums: readonly (Pick<Album, 'type'> & { remaster?: number })[]): number => {
+  const seen: Record<AlbumType, number> = { normal: 0, dark: 0 };
+  let sum = 0;
+  for (const a of albums) sum += albumRoyaltyOf(a.type, seen[a.type]++, a.remaster ?? 0);
+  return sum;
+};
+/** 리마스터 단계가 앨범의 인세 배율에 곱하는 값 = 1 + boost[단계−1] */
+export const remasterBoost = (remaster: number): number => 1 + (BALANCE.remaster.boost[Math.min(Math.max(0, remaster), BALANCE.remaster.max) - 1] ?? 0);
+/** 그 속성의 i번째(0부터) 앨범 하나가 더하는 값 (리마스터 단계를 주면 그만큼 커진다) */
+export const albumRoyaltyOf = (type: AlbumType, i: number, remaster = 0): number => (BALANCE.royalty.perAlbum[type][i] ?? 0) * remasterBoost(remaster);
 export const albumCost = (type: AlbumType, a: number): number => BALANCE.album[type].costs[a];
 export const albumFans = (type: AlbumType, a: number): number => BALANCE.album[type].fans[a];
 
@@ -283,6 +295,45 @@ export function previewAlbum(s: GameState, type: AlbumType): AlbumPreview | null
   if (index < 0) return null;
   const cost = albumCost(type, index);
   return { type, index, def: series[index], cost, fans: albumFans(type, index), affordable: s.coins >= cost };
+}
+
+/** 그 앨범을 다음 단계로 리마스터하는 비용(코인) = 발매 비용 × 배수. remaster: 지금 단계 */
+export function albumRemasterCost(type: AlbumType, index: number, remaster: number): number {
+  return Math.ceil(albumCost(type, index) * BALANCE.remaster.costMult[Math.min(remaster, BALANCE.remaster.max - 1)]);
+}
+
+export interface RemasterPreview {
+  album: Album;
+  /** 그 속성 안에서 이 앨범의 순번(0부터) */
+  index: number;
+  remaster: number;
+  maxed: boolean;
+  cost: number;
+  affordable: boolean;
+  /** 이 앨범 하나가 주는 인세 배율(더해지는 값)의 올리기 전/후 */
+  before: number;
+  after: number;
+}
+
+/** 낸 앨범의 리마스터 상태. 낸 적 없는 앨범이면 null. */
+export function previewRemaster(s: Pick<GameState, 'albums' | 'coins'>, albumId: string): RemasterPreview | null {
+  const album = s.albums.find((a) => a.id === albumId);
+  if (!album) return null;
+  const index = albumSeries(album.type).findIndex((d) => d.id === album.id);
+  if (index < 0) return null;
+  const remaster = Math.min(album.remaster, BALANCE.remaster.max);
+  const maxed = remaster >= BALANCE.remaster.max;
+  const cost = maxed ? Infinity : albumRemasterCost(album.type, index, remaster);
+  return {
+    album,
+    index,
+    remaster,
+    maxed,
+    cost,
+    affordable: !maxed && s.coins >= cost,
+    before: albumRoyaltyOf(album.type, index, remaster),
+    after: albumRoyaltyOf(album.type, index, Math.min(remaster + 1, BALANCE.remaster.max)),
+  };
 }
 
 /* ---------- 장비 ---------- */
@@ -344,6 +395,58 @@ export function previewEquipment(s: GameState, kind: EquipmentKind, persona: Per
     rateBefore: rhymeRate(s, persona),
     rateAfter: rhymeRate(next, persona),
     rateLabel: '라임/초',
+  };
+}
+
+/* ---------- 장비 한계 돌파 (★) ---------- */
+
+/** 지금 ★ 단계에서 다음 ★로 올리는 비용(코인) = 그 장비의 최대 레벨 가격 × 배수 */
+export function equipStarCost(kind: EquipmentKind, persona: Persona, stars: number): number {
+  const mult = BALANCE.equipStars.costMult[persona][Math.min(stars, BALANCE.equipStars.max - 1)];
+  return Math.ceil(equipmentCost(kind, equipmentDef(persona).maxLevel, persona) * mult);
+}
+
+export interface EquipStarPreview {
+  kind: EquipmentKind;
+  persona: Persona;
+  stars: number;
+  maxStars: number;
+  /** 장비가 최대 레벨이라 ★를 올릴 수 있는 상태 */
+  open: boolean;
+  /** ★가 가득 찼다 */
+  maxed: boolean;
+  cost: number;
+  affordable: boolean;
+  /** 이 ★가 더해 주는 실효 레벨의 올리기 전/후 */
+  extraBefore: number;
+  extraAfter: number;
+  /** 생산배율(또는 인세의 홍보 배율)의 올리기 전/후 */
+  before: number;
+  after: number;
+}
+
+export function previewEquipStar(s: GameState, kind: EquipmentKind, persona: Persona = 'normal'): EquipStarPreview {
+  const E = BALANCE.equipStars;
+  const stars = Math.min(s.equipStars[persona][kind], E.max);
+  const open = equipmentOf(s, persona)[kind] >= equipmentDef(persona).maxLevel;
+  const maxed = stars >= E.max;
+  const cost = maxed ? Infinity : equipStarCost(kind, persona, stars);
+  const next: GameState = { ...s, equipStars: { ...s.equipStars, [persona]: { ...s.equipStars[persona], [kind]: Math.min(stars + 1, E.max) } } };
+  const value = (state: GameState) =>
+    kind === 'promotion' ? 1 + BALANCE.royalty.promotionPerLevel * effectiveEquipLevel(state, persona, kind) : productionMultiplier(state, persona);
+  return {
+    kind,
+    persona,
+    stars,
+    maxStars: E.max,
+    open,
+    maxed,
+    cost,
+    affordable: open && !maxed && s.coins >= cost,
+    extraBefore: stars > 0 ? E.extraLevels[stars - 1] : 0,
+    extraAfter: E.extraLevels[Math.min(stars + 1, E.max) - 1],
+    before: value(s),
+    after: value(next),
   };
 }
 

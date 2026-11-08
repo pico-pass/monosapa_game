@@ -12,6 +12,7 @@ const sec = (n: number) => n * 1000;
 const min = (n: number) => n * 60_000;
 const HOUR = 3_600_000;
 const S = BALANCE.streaming;
+const zeroCerts = { spotify: 0, ytmusic: 0, melon: 0, applemusic: 0 };
 
 function base(over: Partial<GameState> = {}): GameState {
   return { ...createInitialState(T0), ...over };
@@ -162,6 +163,7 @@ describe('스트리밍: 정산', () => {
         settled: 0,
         lastClaimAt: T0 - HOUR,
         seed: 1,
+        certs: zeroCerts,
       },
     });
     expect(streamClaimStatus(s)).toMatchObject({ coins: 3, waitMs: 0, ready: true });
@@ -178,7 +180,7 @@ describe('스트리밍: 정산', () => {
     expect(r.state.streaming.lastClaimAt).toBe(T0 - HOUR);
     // 1코인 몫(streamsPerCoin)에 하나 모자라면 아직 정산할 코인이 없다
     const short = base({
-      streaming: { totals: { ...zeroTotals(), melon: S.streamsPerCoin - 1 }, settled: 0, lastClaimAt: T0 - HOUR, seed: 1 },
+      streaming: { totals: { ...zeroTotals(), melon: S.streamsPerCoin - 1 }, settled: 0, lastClaimAt: T0 - HOUR, seed: 1, certs: zeroCerts },
     });
     expect(claimStreaming(short)).toMatchObject({ ok: false, reason: 'nothing_to_claim' });
   });
@@ -254,7 +256,7 @@ describe('스트리밍: 유통사 호감도', () => {
     // 1.05배: 코인 1개 = per/1.05 스트리밍. per × 2.5 스트리밍이면 floor(2.625) = 2코인을 받고 나머지는 남는다.
     const s = base({
       distributor: 1,
-      streaming: { totals: { spotify: per * 2.5, ytmusic: 0, melon: 0, applemusic: 0 }, settled: 0, lastClaimAt: T0 - HOUR, seed: 1 },
+      streaming: { totals: { spotify: per * 2.5, ytmusic: 0, melon: 0, applemusic: 0 }, settled: 0, lastClaimAt: T0 - HOUR, seed: 1, certs: zeroCerts },
     });
     const r = claimStreaming(s);
     expect(r.ok && r.coins).toBe(2);

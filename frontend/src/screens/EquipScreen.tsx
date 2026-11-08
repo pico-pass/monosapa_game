@@ -3,9 +3,9 @@ import { fmt, fmtRate } from '../components/format';
 import { Progress } from '../components/parts';
 import { BALANCE, DIAMOND_UPGRADE_KINDS, EQUIPMENT_KINDS } from '../game/balance';
 import { CLICK_POWER_TEXT, EQUIPMENT_TEXT, PERSONA_TEXT } from '../game/content';
-import { equipmentDef, previewDiamondUpgrade, previewEquipment, previewMusicPower, roomTier } from '../game/selectors';
+import { equipmentDef, previewDiamondUpgrade, previewEquipStar, previewEquipment, previewMusicPower, roomTier } from '../game/selectors';
 import type { DiamondUpgradeKind, EquipmentKind, GameState, Persona } from '../game/types';
-import { doBuy, doBuyDiamondUpgrade, doBuyMusicPower, useUi } from '../store/gameStore';
+import { doBuy, doBuyDiamondUpgrade, doBuyEquipStar, doBuyMusicPower, useUi } from '../store/gameStore';
 
 export function EquipScreen() {
   const ui = useUi();
@@ -16,7 +16,7 @@ export function EquipScreen() {
     <section className="screen" aria-label="장비">
       <h2 className="section-title">장비</h2>
       <p className="muted">
-        전투 능력치는 없어요. 장비는 생산과 인세만 올려줘요. 장비는 속성마다 따로 있고, 그 속성일 때만 효과가 나요. 최대 레벨 {BALANCE.equipment.maxLevel}.
+        전투 능력치는 없어요. 장비는 생산과 인세만 올려줘요. 장비는 속성마다 따로 있고, 그 속성일 때만 효과가 나요. 최대 레벨 {BALANCE.equipment.maxLevel}, 그 뒤에는 코인으로 ★ 한계 돌파를 {BALANCE.equipStars.max}단계까지 할 수 있어요.
       </p>
       <div className="seg" role="group" aria-label="장비 속성">
         {(['normal', 'dark'] as const).map((p) => (
@@ -104,7 +104,7 @@ function EquipCard({ g, kind, persona }: { g: GameState; kind: EquipmentKind; pe
       <Progress value={pv.level} max={equipmentDef(persona).maxLevel} label={`${t.name} 레벨`} />
       <p className="muted">{t.effect}</p>
       {pv.maxed ? (
-        <p className="maxed">최대 레벨 도달 ✨</p>
+        <StarSection g={g} kind={kind} persona={persona} />
       ) : (
         <>
           <dl className="before-after">
@@ -129,6 +129,36 @@ function EquipCard({ g, kind, persona }: { g: GameState; kind: EquipmentKind; pe
         </>
       )}
     </div>
+  );
+}
+
+/** 최대 레벨에 닿은 장비의 한계 돌파(★). ★n은 레벨을 몇 개 더 올린 것처럼 계산된다. */
+function StarSection({ g, kind, persona }: { g: GameState; kind: EquipmentKind; persona: Persona }) {
+  const sp = previewEquipStar(g, kind, persona);
+  const isProm = kind === 'promotion';
+  return (
+    <>
+      <p className="maxed">
+        최대 레벨 도달 ✨ <span className="star-row" aria-label={`한계 돌파 ${sp.stars}/${sp.maxStars}단계`}>{'★'.repeat(sp.stars)}{'☆'.repeat(sp.maxStars - sp.stars)}</span>
+      </p>
+      {sp.maxed ? (
+        <p className="muted">한계 돌파를 모두 마쳤어요. (레벨 +{sp.extraBefore}만큼의 효과)</p>
+      ) : (
+        <>
+          <dl className="before-after">
+            <div>
+              <dt>{isProm ? '인세 배율' : '생산배율'} (레벨 +{sp.extraBefore} → +{sp.extraAfter})</dt>
+              <dd>
+                ×{sp.before.toFixed(2)} → <b>×{sp.after.toFixed(2)}</b>
+              </dd>
+            </div>
+          </dl>
+          <button type="button" className="btn btn-primary btn-wide" disabled={!sp.affordable} onClick={() => doBuyEquipStar(kind, persona)}>
+            {sp.affordable ? `★ 한계 돌파 🪙 ${fmt(sp.cost)}` : `🪙 ${fmt(sp.cost)} 필요 (보유 ${fmt(Math.floor(g.coins))})`}
+          </button>
+        </>
+      )}
+    </>
   );
 }
 

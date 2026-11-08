@@ -1,9 +1,10 @@
+import { fmt } from '../components/format';
 import { PersonaBadge } from '../components/parts';
-import { STAGES } from '../game/balance';
+import { BALANCE, STAGES } from '../game/balance';
 import { ALBUM_CATALOG, PERSONA_TEXT, STAGE_TEXT, albumSeries } from '../game/content';
-import { isTourComplete, stageStatus } from '../game/selectors';
+import { isTourComplete, previewRemaster, stageStatus } from '../game/selectors';
 import type { Persona, Single } from '../game/types';
-import { useUi } from '../store/gameStore';
+import { doRemasterAlbum, useUi } from '../store/gameStore';
 
 /* 싱글 번호는 자아별로 따로 센다. 앨범은 카탈로그 순서대로 낸다. */
 
@@ -139,6 +140,7 @@ function AlbumList() {
                           </li>
                         ))}
                       </ol>
+                      <RemasterRow albumId={def.id} />
                     </div>
                     <span className="muted">{i + 1}번째</span>
                   </li>
@@ -149,5 +151,29 @@ function AlbumList() {
         );
       })}
     </>
+  );
+}
+
+/** 낸 앨범의 리마스터. 단계마다 이 앨범이 주던 인세 배율이 커진다. */
+function RemasterRow({ albumId }: { albumId: string }) {
+  const { game: g } = useUi();
+  const pv = previewRemaster(g, albumId);
+  if (!pv) return null;
+  const pct = (v: number) => Math.round(v * 1000) / 10;
+  return (
+    <div className="remaster-row">
+      <small>
+        🎚️ 리마스터 {'★'.repeat(pv.remaster)}
+        {'☆'.repeat(BALANCE.remaster.max - pv.remaster)} · 이 앨범 인세 +{pct(pv.before)}%
+        {!pv.maxed && <> → +{pct(pv.after)}%</>}
+      </small>
+      {pv.maxed ? (
+        <small className="muted"> 최대</small>
+      ) : (
+        <button type="button" className="btn btn-ghost" disabled={!pv.affordable} onClick={() => doRemasterAlbum(albumId)}>
+          {pv.affordable ? `리마스터 🪙 ${fmt(pv.cost)}` : `🪙 ${fmt(pv.cost)} 필요`}
+        </button>
+      )}
+    </div>
   );
 }

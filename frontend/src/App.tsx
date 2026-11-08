@@ -51,6 +51,7 @@ import { GachaModal, TowerModal } from './screens/ResultModals';
 import { SamplerScreen } from './screens/SamplerScreen';
 import { SettingsSheet } from './screens/SettingsSheet';
 import { ShopScreen } from './screens/ShopScreen';
+import { SkillScreen } from './screens/SkillScreen';
 import { StatsScreen } from './screens/StatsScreen';
 import { TowerStage } from './screens/TowerStage';
 import { StudioScreen } from './screens/StudioScreen';
@@ -107,6 +108,7 @@ const SUB_TITLE: Partial<Record<TabId, string>> = {
   friends: '친구',
   dm: '개인 채팅',
   postbox: '우편함',
+  skills: '레벨 스킬',
   admin: '관리자',
 };
 
@@ -197,6 +199,7 @@ function Game() {
         {ui.tab === 'friends' && <FriendsScreen />}
         {ui.tab === 'dm' && <DmScreen />}
         {ui.tab === 'postbox' && <MailboxScreen />}
+        {ui.tab === 'skills' && <SkillScreen />}
         {ui.tab === 'admin' && <AdminScreen />}
       </main>
       <nav className="tabs" aria-label="메인 메뉴">

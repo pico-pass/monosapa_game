@@ -27,6 +27,13 @@ export interface Equipment {
 
 export type DiamondUpgrades = Record<DiamondUpgradeKind, number>;
 
+/** 장비 한계 돌파(★): 최대 레벨에 닿은 장비를 코인으로 더 올린다. 자아마다 따로 센다. */
+export type EquipStars = Record<Persona, Equipment>;
+
+/** 레벨 스킬 포인트를 찍는 갈래. rhyme 라임 생산 · coin 인세 · fan 팬 획득 · power 전투력 · offline 오프라인 정산 상한 */
+export type SkillId = 'rhyme' | 'coin' | 'fan' | 'power' | 'offline';
+export type Skills = Record<SkillId, number>;
+
 /** 스트리밍이 기록되는 음원 플랫폼 */
 export type StreamPlatform = 'spotify' | 'ytmusic' | 'melon' | 'applemusic';
 
@@ -40,6 +47,8 @@ export interface Streaming {
   lastClaimAt: number;
   /** 플랫폼 분배를 정하는 씨앗. 같은 씨앗·같은 시각이면 분배가 항상 같다. */
   seed: number;
+  /** 플랫폼별로 받은 인증 단계 수(0이면 아직). 받은 단계만큼 영구 보너스가 붙는다. */
+  certs: Record<StreamPlatform, number>;
 }
 
 export interface Single {
@@ -55,6 +64,8 @@ export interface Album {
   title: string;
   type: AlbumType;
   releasedAt: number;
+  /** 리마스터 단계(0이면 아직). 단계마다 이 앨범이 주는 인세 배율이 커진다. */
+  remaster: number;
 }
 
 export interface ConcertRecord {
@@ -166,7 +177,9 @@ export interface Featuring {
   guaranteed: boolean;
   /** NPC ID → 별 개수(1~maxStar) */
   owned: Record<string, number>;
-  /** 장착한 NPC (최대 slots명) */
+  /** NPC ID → 초월 중복 수. 별이 가득 찬 뒤에 나온 중복이고, 쌓인 수로 초월 단계가 정해진다(없으면 0). */
+  trans: Record<string, number>;
+  /** 장착한 NPC (기본 slots명, 별 합계가 늘면 최대 slots + extraSlotStars.length명) */
   slots: string[];
 }
 
@@ -327,6 +340,12 @@ export interface GameState {
   diamonds: number;
   /** 다이아 전용 영구 업그레이드 레벨 */
   diamondUpgrades: DiamondUpgrades;
+  /** 장비 한계 돌파 ★ 단계(자아별). 장비가 최대 레벨일 때만 올릴 수 있다. */
+  equipStars: EquipStars;
+  /** 레벨 스킬 포인트를 찍은 단계. 쓸 수 있는 포인트는 플레이어 레벨에서 계산한다(skills.ts). */
+  skills: Skills;
+  /** 끝없는 업적: 지표 ID → 지금까지 받은 단계 수 */
+  endless: Record<string, number>;
   /** 간식·홍보 캠페인 버프 */
   buffs: Buffs;
   cosmetics: Cosmetics;
@@ -400,6 +419,9 @@ export type FailReason =
   | 'need_duplicate'
   | 'full_slots'
   | 'too_few_cards'
+  // 성장 요소 확장
+  | 'no_points'
+  | 'need_max_level'
   // 모노사파 육성
   | 'nurture_locked'
   | 'level_low'

@@ -1,4 +1,4 @@
-import type { CampaignId, CardRarity, CostumeId, CounterKey, DarkCostumeId, DiamondUpgradeKind, EquipmentKind, Persona, PostKind, SnackId, StageId, StreamPlatform, ThemeId, Vibe } from './types';
+import type { CampaignId, CardRarity, CostumeId, CounterKey, DarkCostumeId, DiamondUpgradeKind, EquipmentKind, Persona, PostKind, SnackId, SkillId, StageId, StreamPlatform, ThemeId, Vibe } from './types';
 
 /**
  * 모든 경제 수치는 이 파일 한 곳에서만 수정한다. (기획서 3~7, 11장)
@@ -940,6 +940,16 @@ export const BALANCE = {
    * 중복은 별이 오르고(최대 maxStar), 넘치면 dupRefund 다이아로 돌려받는다. 장착한 slots명의 패시브가 영구로 붙는다.
    *   패시브 = passive[등급] × (1 + starBonus × (별 − 1))
    *   (별 상한은 처음 6이었다가 요청으로 10, 다시 18까지 늘렸다. 별마다 +10%p라 별 18개 전설은 패시브 10% × 2.7 = 27%. 예전 저장의 별은 그대로 이어지고 상한만 늘어난다.)
+   *
+   * 별 상한 뒤의 성장(사용자가 아이디어 5개 중 골라 요청):
+   *   ① 초월: 별이 maxStar까지 찬 래퍼가 또 나오면 환급 대신 초월 중복(trans)이 쌓이고, transNeed[k]번째 단계에 필요한 중복이 차면 단계가 오른다(최대 transNeed.length단계).
+   *      패시브 = passive[등급] × (1 + starBonus × (별 − 1) + transBonus × 초월 단계). 단계마다 별 반 개 폭(transBonus 0.05)이라 별 18 + 초월 10단계 전설은 10% × 3.2 = 32%.
+   *      초월 중복은 가득 차면(transNeed 합계) 그때부터 dupRefund로 환급한다. 중복이 필요한 개수는 단계마다 +1씩 늘어 1단계 2개, 10단계 11개이고 합계는 65개다.
+   *   ② 슬롯 확장: 장착 칸은 처음 slots(3)칸이고, 가진 래퍼의 별 합계가 extraSlotStars[i] 이상이 될 때마다 한 칸씩 늘어 최대 slots + extraSlotStars.length칸이다(별은 줄지 않아서 칸도 줄지 않는다).
+   *   ③ 시너지: 장착 구성에 따라 아래 보너스가 패시브에 더해진다(각각 따로 계산해 합친다). 값은 모두 "%p를 더하는" 방식이다.
+   *      같은 갈래(라임·인세·팬덤·전투력)를 n명 장착하면 그 갈래에 sameVibe[n], 장착한 래퍼가 모두 같은 등급(3명 이상)이면 네 갈래 모두에 sameRarity[등급],
+   *      네 갈래를 한 명씩 이상 장착하면(4칸부터 가능) 네 갈래 모두에 rainbow.
+   *   수치는 제안값이다. 슬롯이 5칸이면 전설 5명의 패시브 합이 이미 크므로 시너지는 일부러 작게 잡았다(5칸 전부 같은 갈래 전설이라도 +14%p).
    */
   feat: {
     pullCost: 10,
@@ -948,10 +958,24 @@ export const BALANCE = {
     pityAt: 50,
     pickupRate: 0.5,
     slots: 3,
+    /** 별 합계가 이 값 이상이면 장착 칸이 한 칸씩 늘어난다(4번째, 5번째 칸) */
+    extraSlotStars: [60, 150],
     maxStar: 18,
     starBonus: 0.1,
     passive: { N: 0.03, R: 0.05, SR: 0.07, SSR: 0.1 },
     dupRefund: { N: 1, R: 2, SR: 4, SSR: 8 },
+    /** 초월: 단계마다 필요한 중복 수(별이 가득 찬 뒤에 나온 중복). 길이가 최대 단계다. */
+    transNeed: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+    /** 초월 단계마다 (1 + …)에 더해지는 값(별 하나는 starBonus) */
+    transBonus: 0.05,
+    synergy: {
+      /** 같은 갈래 래퍼를 n명 장착했을 때 그 갈래에 더하는 값(인덱스 = n) */
+      sameVibe: [0, 0, 0.02, 0.05, 0.09, 0.14],
+      /** 장착한 래퍼가 모두 같은 등급(3명 이상)일 때 네 갈래 모두에 더하는 값 */
+      sameRarity: { N: 0.01, R: 0.015, SR: 0.02, SSR: 0.03 },
+      /** 네 갈래를 한 명씩 이상 장착했을 때 네 갈래 모두에 더하는 값 */
+      rainbow: 0.02,
+    },
     pickupWeekMs: 7 * 24 * 3600_000,
   },
   /**
@@ -1200,6 +1224,51 @@ export const BALANCE = {
     failBelow: 300,
     boostMs: 30 * 60_000,
   },
+  /**
+   * 성장 요소 확장(수치는 모두 제안값이라 여기서 조정한다).
+   *
+   * 레벨 스킬: 플레이어 레벨 levelsPerPoint마다 포인트 1개를 받아 다섯 갈래(라임·인세·팬·전투력·오프라인)에 찍는다.
+   *   갈래마다 maxLevel까지, 한 단계에 perLevel(오프라인은 offlinePerLevelMs)만큼 영구 보너스. 포인트는 팬 수에서 계산하니 저장하지 않고,
+   *   다이아 respecCost로 모두 돌려받아 다시 찍을 수 있다.
+   * 장비 한계 돌파(★): 최대 레벨(20)인 장비를 코인으로 ★ max까지 더 올린다. ★n은 레벨 extraLevels[n−1]개를 더 올린 것처럼 계산된다.
+   *   비용 = 그 장비의 최대 레벨 가격 × costMult[속성][n−1] (어둠 장비는 이미 비싸서 배수가 작다).
+   * 앨범 리마스터: 낸 앨범마다 코인으로 max단계까지. 단계마다 그 앨범이 주던 인세 배율이 (1 + boost[n−1])배가 된다.
+   *   비용 = 그 앨범의 발매 비용 × costMult[n−1].
+   * 스트리밍 인증: 플랫폼별 누적 스트리밍이 tiers[n].need를 넘으면 인증을 받아 다이아와 영구 보너스(단계당 bonusPerTier)를 얻는다.
+   *   보너스 갈래는 플랫폼마다 다르다(STREAM_CERT_VIBE).
+   * 칭호 효과: 달고 있는 칭호 하나가 그 업적 분야의 갈래를 올린다(titlePerkOf).
+   * 끝없는 업적: ENDLESS 표. 마지막 목표를 넘어서도 목표가 growth배씩 이어지고, 단계마다 다이아를 한 번 받는다.
+   */
+  skills: {
+    levelsPerPoint: 2,
+    maxLevel: 20,
+    respecCost: 30,
+    perLevel: 0.015,
+    offlinePerLevelMs: 10 * 60_000,
+  },
+  equipStars: {
+    max: 5,
+    extraLevels: [1, 3, 5, 8, 12],
+    costMult: { normal: [5, 25, 125, 625, 3125], dark: [2, 4, 8, 16, 32] },
+  },
+  remaster: {
+    max: 3,
+    costMult: [1, 4, 15],
+    boost: [0.25, 0.5, 1],
+  },
+  certs: {
+    tiers: [
+      { need: 1e6, diamonds: 2 },
+      { need: 1e7, diamonds: 3 },
+      { need: 1e8, diamonds: 5 },
+      { need: 1e9, diamonds: 8 },
+      { need: 1e10, diamonds: 12 },
+      { need: 1e11, diamonds: 18 },
+      { need: 1e12, diamonds: 25 },
+    ],
+    bonusPerTier: 0.01,
+  },
+  titlePerk: { low: 0.01, mid: 0.015, high: 0.02, top: 0.03, midDiamonds: 8, highDiamonds: 15, topDiamonds: 30 },
   offline: {
     capMs: 2 * 3600 * 1000,
     efficiency: 0.7,
@@ -1275,6 +1344,9 @@ export const TOUR_STAGE: StageId = 'hall';
 export const EQUIPMENT_KINDS: readonly EquipmentKind[] = ['mic', 'studio', 'promotion'];
 export const DIAMOND_UPGRADE_KINDS: readonly DiamondUpgradeKind[] = ['production', 'royalty', 'offline'];
 export const STREAM_PLATFORMS: readonly StreamPlatform[] = ['spotify', 'ytmusic', 'melon', 'applemusic'];
+/** 스트리밍 인증 보너스가 올리는 갈래: 스포티파이 라임 생산 · 유튜브 뮤직 팬 획득 · 멜론 인세 · 애플 뮤직 전투력 */
+export const STREAM_CERT_VIBE: Record<StreamPlatform, Vibe> = { spotify: 'rhyme', ytmusic: 'fan', melon: 'coin', applemusic: 'power' };
+export const SKILL_IDS: readonly SkillId[] = ['rhyme', 'coin', 'fan', 'power', 'offline'];
 
 export const SNACK_IDS = Object.keys(BALANCE.shop.snacks) as SnackId[];
 export const CAMPAIGN_IDS = Object.keys(BALANCE.shop.campaigns) as CampaignId[];
@@ -1593,3 +1665,81 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
   { id: 'chart-no1', metric: 'chartNo1', goal: 1, diamonds: 20 },
   { id: 'trade-1', metric: 'trades', goal: 1, diamonds: 3 },
 ];
+
+/* ---------- 칭호 효과 ---------- */
+
+/** 칭호의 업적 분야가 올리는 갈래. 칭호가 있는 업적의 지표만 있으면 된다. */
+const TITLE_VIBE: Partial<Record<AchievementMetric, Vibe>> = {
+  works: 'rhyme',
+  dawnWorks: 'rhyme',
+  seizures: 'rhyme',
+  snacks: 'rhyme',
+  lyricBest: 'rhyme',
+  themes: 'rhyme',
+  albums: 'coin',
+  maxedEquip: 'coin',
+  campaigns: 'coin',
+  streams: 'coin',
+  missions: 'coin',
+  bestStreak: 'coin',
+  singles: 'fan',
+  fans: 'fan',
+  level: 'fan',
+  posts: 'fan',
+  virals: 'fan',
+  mails: 'fan',
+  antiMails: 'fan',
+  world: 'power',
+  secrets: 'power',
+  rhythms: 'power',
+  survivalBest: 'power',
+  towerBest: 'power',
+  ticketBest: 'power',
+  featOwned: 'power',
+  photoCards: 'rhyme',
+  mascotStage: 'rhyme',
+  challenges: 'rhyme',
+  photoSets: 'coin',
+  pulls: 'coin',
+  chartNo1: 'fan',
+};
+
+/** 칭호(업적 ID)를 달았을 때 붙는 영구 보너스. 갈래는 업적 분야로, 값은 그 업적이 주는 다이아가 클수록 크다. 칭호가 없거나 모르는 ID면 null. */
+export function titlePerkOf(id: string | null): { vibe: Vibe; value: number } | null {
+  const def = id ? ACHIEVEMENTS.find((a) => a.id === id) : undefined;
+  const vibe = def ? TITLE_VIBE[def.metric] : undefined;
+  if (!def || !vibe) return null;
+  const T = BALANCE.titlePerk;
+  const value = def.diamonds >= T.topDiamonds ? T.top : def.diamonds >= T.highDiamonds ? T.high : def.diamonds >= T.midDiamonds ? T.mid : T.low;
+  return { vibe, value };
+}
+
+/* ---------- 끝없는 업적 ---------- */
+
+export interface EndlessDef {
+  id: string;
+  metric: AchievementMetric;
+  /** 1단계 목표 */
+  base: number;
+  /** 단계마다 목표에 곱해지는 배수 */
+  growth: number;
+  /** 단계마다 한 번 받는 다이아 */
+  diamonds: number;
+}
+/** 지표마다 마지막 일반 업적 목표 위에서 시작한다. n단계 목표 = ceil(base × growth^(n−1)). */
+export const ENDLESS: readonly EndlessDef[] = [
+  { id: 'e-works', metric: 'works', base: 25_000, growth: 1.6, diamonds: 6 },
+  { id: 'e-fans', metric: 'fans', base: 1_000_000, growth: 4, diamonds: 10 },
+  { id: 'e-level', metric: 'level', base: 100, growth: 1.3, diamonds: 6 },
+  { id: 'e-streams', metric: 'streams', base: 1e9, growth: 5, diamonds: 8 },
+  { id: 'e-concerts', metric: 'concerts', base: 100, growth: 1.8, diamonds: 5 },
+  { id: 'e-missions', metric: 'missions', base: 200, growth: 1.5, diamonds: 5 },
+  { id: 'e-arcades', metric: 'arcades', base: 100, growth: 1.7, diamonds: 5 },
+  { id: 'e-pulls', metric: 'pulls', base: 300, growth: 1.5, diamonds: 5 },
+  { id: 'e-posts', metric: 'posts', base: 100, growth: 1.6, diamonds: 4 },
+  { id: 'e-mails', metric: 'mails', base: 100, growth: 1.6, diamonds: 4 },
+  { id: 'e-tower', metric: 'towerBest', base: 100, growth: 1.2, diamonds: 8 },
+];
+/** 단계 수 상한. 지표 값이 재화 상한(1e15)을 넘지 못하니 실제로는 닿지 않는다. */
+export const ENDLESS_MAX_TIER = 200;
+export const endlessGoal = (def: Pick<EndlessDef, 'base' | 'growth'>, tier: number): number => Math.ceil(def.base * def.growth ** (tier - 1));

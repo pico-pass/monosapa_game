@@ -37,11 +37,15 @@ export function GachaModal() {
             <span>
               {FEAT_TEXT[x.id].icon} {FEAT_TEXT[x.id].name}
             </span>
-            <small>{x.isNew ? 'NEW' : x.starUp ? '별 +1' : `환급 💎 ${x.refund}`}{x.pickup ? ' · 픽업' : ''}</small>
+            <small>
+              {x.isNew ? 'NEW' : x.starUp ? '별 +1' : x.tierUp > 0 ? `초월 ${x.tierUp}단계!` : x.transUp ? '초월 +1' : `환급 💎 ${x.refund}`}
+              {x.pickup ? ' · 픽업' : ''}
+            </small>
           </li>
         ))}
       </ul>
-      {r.refund > 0 && <p>별이 가득 찬 래퍼는 💎 {r.refund}로 환급됐어요.</p>}
+      {r.results.some((x) => x.tierUp > 0) && <p>✦ 초월 단계가 올라 패시브가 커졌어요.</p>}
+      {r.refund > 0 && <p>별과 초월이 모두 가득 찬 래퍼는 💎 {r.refund}로 환급됐어요.</p>}
     </Modal>
   );
 }

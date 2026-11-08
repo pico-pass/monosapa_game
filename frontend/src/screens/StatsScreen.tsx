@@ -1,8 +1,10 @@
 import { fmt, fmtCountdown, fmtStreamRate, fmtStreams } from '../components/format';
-import { BALANCE, STREAM_PLATFORMS } from '../game/balance';
-import { DISTRIBUTOR_TEXT, STREAM_PLATFORM_TEXT } from '../game/content';
+import { Progress } from '../components/parts';
+import { BALANCE, STREAM_CERT_VIBE, STREAM_PLATFORMS } from '../game/balance';
+import { CERT_TIER_COUNT, certStatus } from '../game/certs';
+import { CERT_TIER_TEXT, DISTRIBUTOR_TEXT, STREAM_PLATFORM_TEXT, VIBE_TEXT } from '../game/content';
 import { previewDistributor, streamClaimStatus, streamRate, streamRevenueMult, streamTotal } from '../game/selectors';
-import { doBuyDistributor, doClaimStreaming, useUi } from '../store/gameStore';
+import { doBuyDistributor, doClaimCert, doClaimStreaming, useUi } from '../store/gameStore';
 
 /** 배율 표시: 1.05처럼 필요한 만큼만 소수점을 보인다. */
 const fmtMult = (m: number) => String(Math.round(m * 100) / 100);
@@ -67,6 +69,48 @@ export function StatsScreen() {
           })}
         </ul>
       )}
+
+      <h3 className="sub-title">스트리밍 인증</h3>
+      <p className="muted">
+        플랫폼마다 누적 스트리밍이 기준을 넘으면 인증을 받아요. 받으면 💎를 받고, 받은 단계마다 그 플랫폼의 보너스가 영구히 +{Math.round(BALANCE.certs.bonusPerTier * 100)}%씩 붙어요.
+      </p>
+      <ul className="platforms">
+        {STREAM_PLATFORMS.map((p) => {
+          const t = STREAM_PLATFORM_TEXT[p];
+          const c = certStatus(g, p);
+          const vibe = VIBE_TEXT[STREAM_CERT_VIBE[p]];
+          const tier = c.claimed > 0 ? CERT_TIER_TEXT[c.claimed - 1] : null;
+          return (
+            <li key={p} className="platform" style={{ ['--plat' as string]: t.color }}>
+              <div className="platform-head">
+                <strong>
+                  <span aria-hidden>{t.icon}</span> {t.name} · {tier ? `${tier.icon} ${tier.name}` : '인증 전'}
+                </strong>
+                <span>
+                  <small>
+                    {vibe.icon} {vibe.name} +{Math.round(c.bonus * 100)}%
+                  </small>
+                </span>
+              </div>
+              {c.next !== null ? (
+                <>
+                  <Progress value={c.total} max={c.next} label={`${t.name} 다음 인증까지`} />
+                  <small className="muted">
+                    다음 {CERT_TIER_TEXT[c.reached].icon} {CERT_TIER_TEXT[c.reached].name}: {fmtStreams(c.total)} / {fmtStreams(c.next)}
+                  </small>
+                </>
+              ) : (
+                <small className="muted">모든 인증을 받을 수 있어요 ({CERT_TIER_COUNT}/{CERT_TIER_COUNT}) ✨</small>
+              )}
+              {c.reached > c.claimed && (
+                <button type="button" className="btn btn-accent btn-wide" onClick={() => doClaimCert(p)}>
+                  인증 받기 {CERT_TIER_TEXT[c.reached - 1].icon} {CERT_TIER_TEXT[c.reached - 1].name} 💎 +{c.diamonds}
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
 
       <div className="card">
         <div className="card-row">

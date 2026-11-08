@@ -18,6 +18,8 @@ import {
   levelUpDiamonds,
   musicPowerCost,
   previewAlbum,
+  previewEquipStar,
+  previewRemaster,
   previewSingle,
   rhymesOf,
   stageDifficulty,
@@ -164,6 +166,19 @@ export function buyEquipment(
   return { ok: true, state: next, cost, level: level + 1 };
 }
 
+/* ---------- 장비 한계 돌파 (★) ---------- */
+
+/** 최대 레벨인 장비를 코인으로 ★ 한 단계 더 올린다. 레벨이 최대가 아니면 need_max_level, ★가 가득이면 max_level. */
+export function buyEquipStar(state: GameState, kind: EquipmentKind, persona: Persona = 'normal'): CommandResult<{ cost: number; stars: number }> {
+  const pv = previewEquipStar(state, kind, persona);
+  if (!pv.open) return fail(state, 'need_max_level');
+  if (pv.maxed) return fail(state, 'max_level');
+  if (state.coins < pv.cost) return fail(state, 'insufficient_coins');
+  const stars = pv.stars + 1;
+  const equipStars = { ...state.equipStars, [persona]: { ...state.equipStars[persona], [kind]: stars } };
+  return { ok: true, state: track({ ...state, coins: state.coins - pv.cost, equipStars }, 'buys'), cost: pv.cost, stars };
+}
+
 /* ---------- 클릭 업그레이드 (일반: 순수 음악력, 어둠: 음지 드립력) ---------- */
 
 /** 코인으로 그 속성의 클릭 업그레이드를 1레벨 올린다. 최대 레벨은 없다(코인이 모자라면 실패). */
@@ -204,7 +219,7 @@ export function releaseAlbum(state: GameState, type: AlbumType): CommandResult<A
   if (!preview) return fail(state, 'no_more_albums');
   if (!preview.affordable) return fail(state, 'insufficient_coins');
   const { def, index, cost, fans } = preview;
-  const album: Album = { id: def.id, title: def.title, type: def.type, releasedAt: state.lastSettledAt };
+  const album: Album = { id: def.id, title: def.title, type: def.type, releasedAt: state.lastSettledAt, remaster: 0 };
   const gainedFans = Math.ceil(fans * fanGainMult(state));
   const newFans = clampResource(state.fans + gainedFans);
   const diamonds = (BALANCE.diamond.album[type][index] ?? 0) + levelUpDiamonds(state.fans, newFans);
@@ -222,6 +237,19 @@ export function releaseAlbum(state: GameState, type: AlbumType): CommandResult<A
     BALANCE.photo.tickets.album,
   );
   return { ok: true, state: next, album, def, ordinal: index + 1, cost, fans: gainedFans, diamonds };
+}
+
+/* ---------- 앨범 리마스터 ---------- */
+
+/** 낸 앨범을 코인으로 한 단계 리마스터한다. 그 앨범이 주는 인세 배율이 커진다. */
+export function remasterAlbum(state: GameState, albumId: string): CommandResult<{ cost: number; remaster: number }> {
+  const pv = previewRemaster(state, albumId);
+  if (!pv) return fail(state, 'not_owned');
+  if (pv.maxed) return fail(state, 'max_level');
+  if (state.coins < pv.cost) return fail(state, 'insufficient_coins');
+  const remaster = pv.remaster + 1;
+  const albums = state.albums.map((a) => (a.id === albumId ? { ...a, remaster } : a));
+  return { ok: true, state: { ...state, coins: state.coins - pv.cost, albums }, cost: pv.cost, remaster };
 }
 
 /* ---------- 공연 ---------- */

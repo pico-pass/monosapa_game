@@ -3,10 +3,11 @@ import { useAuth } from '../store/authStore';
 import { setTab, useUi, type TabId } from '../store/gameStore';
 import { friendBadge, mailBadge, useSocial } from '../store/socialStore';
 
-const ITEMS: { id: TabId; icon: string; name: string; desc: string; alert?: 'missions' | 'mail' | 'monogram' | 'collect' | 'nurture'; social?: 'postbox' | 'friends' }[] = [
+const ITEMS: { id: TabId; icon: string; name: string; desc: string; alert?: 'missions' | 'mail' | 'monogram' | 'collect' | 'nurture' | 'skills' | 'stats'; social?: 'postbox' | 'friends' }[] = [
   { id: 'shop', icon: '🛒', name: '상점', desc: '간식·홍보 캠페인·테마' },
   { id: 'missions', icon: '📅', name: '미션·출석', desc: '일일·주간 미션 보상', alert: 'missions' },
-  { id: 'achievements', icon: '🏅', name: '업적·칭호', desc: '달성하고 칭호를 달아요' },
+  { id: 'achievements', icon: '🏅', name: '업적·칭호', desc: '달성하고 칭호를 달아요 · 끝없는 업적' },
+  { id: 'skills', icon: '🌟', name: '레벨 스킬', desc: '레벨 포인트를 찍어 영구히 강해져요', alert: 'skills' },
   { id: 'mail', icon: '💌', name: '팬 DM', desc: '응원·공감·안티 메시지', alert: 'mail' },
   { id: 'monogram', icon: '📸', name: '모노그램', desc: '게시물로 팬을 모아요', alert: 'monogram' },
   { id: 'collect', icon: '🃏', name: '수집', desc: '곡 카드·포토카드·피처링·마스코트', alert: 'collect' },
@@ -20,7 +21,7 @@ const ITEMS: { id: TabId; icon: string; name: string; desc: string; alert?: 'mis
   { id: 'friends', icon: '🤝', name: '친구', desc: '친구 추가·하루 한 번 💎 선물·개인 채팅', social: 'friends' },
   { id: 'postbox', icon: '📬', name: '우편함', desc: '친구 선물과 운영 안내', social: 'postbox' },
   { id: 'inquiry', icon: '📮', name: '문의함', desc: '버그·제안·계정 문의' },
-  { id: 'stats', icon: '📊', name: '통계', desc: '스트리밍 기록과 정산' },
+  { id: 'stats', icon: '📊', name: '통계', desc: '스트리밍 기록·정산·인증', alert: 'stats' },
   { id: 'ranking', icon: '🏆', name: '랭킹', desc: '계정 레벨·무한의 계단 순위' },
   { id: 'collection', icon: '📚', name: '도감', desc: '곡·앨범·공연장 기록' },
 ];

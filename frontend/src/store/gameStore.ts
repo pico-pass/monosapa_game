@@ -9,6 +9,7 @@ import {
   beginManualConcert,
   buyDiamondUpgrade,
   buyDistributor,
+  buyEquipStar,
   buyEquipment,
   buyMusicPower,
   claimStreaming,
@@ -16,6 +17,7 @@ import {
   finishManualConcert,
   releaseAlbum,
   releaseSingle,
+  remasterAlbum,
   runAutoConcert,
   skipConcertCooldown,
   switchPersona,
@@ -27,6 +29,9 @@ import {
 } from '../game/commands';
 import { abandonArcade, beginArcade, finishArcade, type ArcadeOutcome, type ArcadeRun, type RhythmLevel } from '../game/arcade';
 import { evaluateAchievements, setTitle } from '../game/achievements';
+import { claimCert } from '../game/certs';
+import { evaluateEndless } from '../game/endless';
+import { buySkill, respecSkills } from '../game/skills';
 import { featPull, toggleFeat, type FeatPullResult } from '../game/featuring';
 import { addLyricCard, draftChoices, trimLyricCard } from '../game/lyricdeck';
 import { claimPresent, feedMascot, giftMascot, playMascot } from '../game/mascot';
@@ -76,8 +81,10 @@ import type {
   Persona,
   PostKind,
   Settings,
+  SkillId,
   SnackId,
   StageId,
+  StreamPlatform,
   ThemeId,
 } from '../game/types';
 import { api, errorText } from '../platform/api';
@@ -111,9 +118,10 @@ export type TabId =
   | 'friends'
   | 'dm'
   | 'postbox'
+  | 'skills'
   | 'admin';
 /** 하단 탭의 「더보기」 안에 있는 화면들 */
-export const MORE_TABS: readonly TabId[] = ['stats', 'ranking', 'collection', 'shop', 'missions', 'achievements', 'mail', 'monogram', 'chat', 'inquiry', 'collect', 'nurture', 'arcade', 'challenge', 'chart', 'wrapped', 'sampler', 'friends', 'dm', 'postbox', 'admin'];
+export const MORE_TABS: readonly TabId[] = ['stats', 'ranking', 'collection', 'shop', 'missions', 'achievements', 'mail', 'monogram', 'chat', 'inquiry', 'collect', 'nurture', 'arcade', 'challenge', 'chart', 'wrapped', 'sampler', 'friends', 'dm', 'postbox', 'skills', 'admin'];
 export type Phase = 'booting' | 'ready' | 'readonly' | 'corrupt';
 
 export interface Bubble {
@@ -254,6 +262,8 @@ const FAIL_TEXT: Record<FailReason, string> = {
   too_tired: '너무 지쳐서 못 해요. 먼저 재워 주세요.',
   not_sleepy: '아직 졸리지 않아요.',
   care_cooldown: '이 행동은 1분에 한 번만 할 수 있어요. 잠시 뒤에 해 주세요.',
+  no_points: '쓸 수 있는 스킬 포인트가 없어요. 플레이어 레벨이 오르면 생겨요.',
+  need_max_level: '장비를 최대 레벨까지 올린 뒤에 한계를 돌파할 수 있어요.',
 };
 
 /* ---------- 런타임(저장하지 않는) 변수 ---------- */
@@ -607,14 +617,23 @@ function rollDaily(): void {
 /** 새로 달성한 업적을 열고 알린다. aggregate면 한꺼번에 하나의 토스트로 알린다(예전 저장을 처음 불러올 때). */
 function checkAchievements(aggregate = false): void {
   const r = evaluateAchievements(ui.game);
-  if (r.unlocked.length === 0) return;
-  set({ game: r.state });
-  if (aggregate || r.unlocked.length > 2) {
-    const diamonds = r.unlocked.reduce((a, d) => a + d.diamonds, 0);
-    toast(`🏅 업적 ${r.unlocked.length}개 달성! 💎 +${diamonds}`, 'good');
-  } else {
-    for (const d of r.unlocked) toast(`🏅 업적 달성: ${ACHIEVEMENT_TEXT[d.id]?.name ?? d.id} · 💎 +${d.diamonds}`, 'good');
+  if (r.unlocked.length > 0) {
+    set({ game: r.state });
+    if (aggregate || r.unlocked.length > 2) {
+      const diamonds = r.unlocked.reduce((a, d) => a + d.diamonds, 0);
+      toast(`🏅 업적 ${r.unlocked.length}개 달성! 💎 +${diamonds}`, 'good');
+    } else {
+      for (const d of r.unlocked) toast(`🏅 업적 달성: ${ACHIEVEMENT_TEXT[d.id]?.name ?? d.id} · 💎 +${d.diamonds}`, 'good');
+    }
+    sfx.unlock();
   }
+  // 끝없는 업적: 새로 닿은 단계는 한꺼번에 하나의 토스트로 알린다
+  const e = evaluateEndless(ui.game);
+  if (e.gains.length === 0) return;
+  set({ game: e.state });
+  const tiers = e.gains.reduce((a, g) => a + g.tiers, 0);
+  const diamonds = e.gains.reduce((a, g) => a + g.diamonds, 0);
+  toast(`♾️ 끝없는 업적 ${tiers}단계 달성! 💎 +${diamonds}`, 'good');
   sfx.unlock();
 }
 
@@ -735,6 +754,56 @@ export function doBuyDiamondUpgrade(kind: DiamondUpgradeKind): void {
   if (!r) return;
   if (!r.ok) return failToast(r.reason);
   sfx.buy();
+  saveNow();
+}
+
+/** 최대 레벨 장비의 한계 돌파(★)를 한 단계 올린다. */
+export function doBuyEquipStar(kind: EquipmentKind, persona: Persona = 'normal'): void {
+  const r = exec((s) => buyEquipStar(s, kind, persona));
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  say('buy', true);
+  sfx.buy();
+  toast(`★ 한계 돌파 ${r.stars}단계! (🪙 ${fmt(r.cost)})`, 'good');
+  saveNow();
+}
+
+/** 낸 앨범을 한 단계 리마스터한다. */
+export function doRemasterAlbum(albumId: string): void {
+  const r = exec((s) => remasterAlbum(s, albumId));
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  sfx.buy();
+  toast(`💿 리마스터 ${r.remaster}단계 완료! (🪙 ${fmt(r.cost)})`, 'good');
+  saveNow();
+}
+
+/** 레벨 스킬 포인트를 한 갈래에 찍는다. */
+export function doBuySkill(id: SkillId): void {
+  const r = exec((s) => buySkill(s, id));
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  sfx.buy();
+  saveNow();
+}
+
+/** 다이아를 내고 찍은 스킬 포인트를 모두 돌려받는다. */
+export function doRespecSkills(): void {
+  const r = exec(respecSkills);
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  sfx.buy();
+  toast(`🔄 스킬 포인트 ${r.points}개를 돌려받았어요. (💎 ${r.cost})`, 'good');
+  saveNow();
+}
+
+/** 스트리밍 인증을 받는다(닿은 단계를 모두). */
+export function doClaimCert(platform: StreamPlatform): void {
+  const r = exec((s) => claimCert(s, platform));
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  sfx.unlock();
+  toast(`🏆 스트리밍 인증 ${r.tiers}단계! 💎 +${r.diamonds}`, 'good');
   saveNow();
 }
 

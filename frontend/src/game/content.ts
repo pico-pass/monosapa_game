@@ -1,4 +1,4 @@
-import type { AlbumType, CampaignId, CardRarity, CostumeId, DialogueTone, Persona, PostKind, SnackId, StageId, StreamPlatform, ThemeId, Vibe, VirtualComment } from './types';
+import type { AlbumType, CampaignId, CardRarity, CostumeId, DialogueTone, Persona, PostKind, SnackId, StageId, StreamPlatform, SkillId, ThemeId, Vibe, VirtualComment } from './types';
 
 /* 대사·제목·댓글·공연장 이름. 모두 게임용 창작 문구이며 실제 인물의 곡·발언이 아니다.
    가상의 상대·자기디스·황당한 상황만 다루고, 현실 이용자나 실제 인물을 겨냥하지 않는다. */
@@ -967,6 +967,41 @@ export const MISSION_TEXT: Record<string, { name: string; unit: string }> = {
 
 /* ---------- 콘텐츠 팩 2: 수집·육성 ---------- */
 
+/** 스트리밍 인증 단계 이름. 앞에서부터 BALANCE.certs.tiers와 같은 순서다. */
+export const CERT_TIER_TEXT: readonly { name: string; icon: string }[] = [
+  { name: '브론즈', icon: '🥉' },
+  { name: '실버', icon: '🥈' },
+  { name: '골드', icon: '🥇' },
+  { name: '플래티넘', icon: '💠' },
+  { name: '다이아', icon: '💎' },
+  { name: '마스터', icon: '👑' },
+  { name: '레전드', icon: '🌟' },
+];
+
+/** 레벨 스킬 갈래 문구 */
+export const LEVEL_SKILL_TEXT: Record<SkillId, { name: string; icon: string; effect: string }> = {
+  rhyme: { name: '라임 감각', icon: '✍️', effect: '두 자아의 라임 생산이 늘어요' },
+  coin: { name: '인세 감각', icon: '🪙', effect: '두 자아의 인세 코인이 늘어요' },
+  fan: { name: '팬 감각', icon: '👥', effect: '싱글·앨범·모노그램으로 얻는 팬이 늘어요' },
+  power: { name: '무대 감각', icon: '⚡', effect: '아케이드·직접 공연·계단 전투력이 늘어요' },
+  offline: { name: '휴식 감각', icon: '🌙', effect: '자리를 비운 동안 쌓이는 시간 상한이 늘어요' },
+};
+
+/** 끝없는 업적 문구. 지표 하나마다 이름과 설명(단계 목표를 받아 문장을 만든다). */
+export const ENDLESS_TEXT: Record<string, { name: string; icon: string; desc: (goal: string) => string }> = {
+  'e-works': { name: '끝없는 손놀림', icon: '🖊️', desc: (g) => `작업하기 ${g}번` },
+  'e-fans': { name: '끝없는 팬덤', icon: '👥', desc: (g) => `팬 ${g}명` },
+  'e-level': { name: '끝없는 레벨', icon: '💫', desc: (g) => `플레이어 레벨 ${g}` },
+  'e-streams': { name: '끝없는 스트리밍', icon: '🎵', desc: (g) => `누적 스트리밍 ${g}회` },
+  'e-concerts': { name: '끝없는 무대', icon: '🎤', desc: (g) => `공연 ${g}번` },
+  'e-missions': { name: '끝없는 미션', icon: '📅', desc: (g) => `미션 보상 ${g}번` },
+  'e-arcades': { name: '끝없는 오락실', icon: '🎮', desc: (g) => `아케이드 ${g}번` },
+  'e-pulls': { name: '끝없는 뽑기', icon: '🎰', desc: (g) => `가챠 ${g}번` },
+  'e-posts': { name: '끝없는 게시물', icon: '📱', desc: (g) => `모노그램 ${g}번 올리기` },
+  'e-mails': { name: '끝없는 답장', icon: '✉️', desc: (g) => `팬 DM 답장 ${g}번` },
+  'e-tower': { name: '끝없는 계단', icon: '🗼', desc: (g) => `무한의 계단 ${g}층` },
+};
+
 export const VIBE_TEXT: Record<Vibe, { name: string; icon: string; desc: string }> = {
   rhyme: { name: '라임', icon: '✍️', desc: '라임 생산' },
   coin: { name: '인세', icon: '🪙', desc: '인세 코인' },
@@ -997,7 +1032,8 @@ export function photoCardName(set: number, grade: number): string {
 export const FEAT_RARITY_NAME: Record<CardRarity, string> = { N: '일반', R: '레어', SR: '에픽', SSR: '전설' };
 
 export const FEAT_TEXT: Record<string, { name: string; blurb: string; icon: string }> = {
-  'f-alfrado': { name: 'Alfrado', blurb: '한 줄만 얹어도 라임이 길어진다.', icon: '✍️' },
+  // Alfredo의 ID는 예전 철자(f-alfrado) 그대로다. 저장이 이 ID로 래퍼를 기억하므로 이름만 고치고 ID는 바꾸지 않는다.
+  'f-alfrado': { name: 'Alfredo', blurb: '한 줄만 얹어도 라임이 길어진다.', icon: '✍️' },
   'f-haname': { name: '한아메', blurb: '이름이 걸린 곡은 인세가 차곡차곡 쌓인다.', icon: '🪙' },
   'f-seungcheon': { name: '†昇天†', blurb: '무대에 서면 팬이 따라 올라온다.', icon: '🕊️' },
   'f-0ik2': { name: '0ik2', blurb: '마이크를 잡으면 분위기가 달라진다.', icon: '⚡' },

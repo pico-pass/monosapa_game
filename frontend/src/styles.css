@@ -832,6 +832,18 @@ button {
   color: var(--good);
   font-weight: 700;
 }
+.star-row {
+  color: var(--accent);
+  letter-spacing: 1px;
+  margin-left: 6px;
+}
+.remaster-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
 .tracklist {
   list-style: none;
   margin: 0;
@@ -2115,6 +2127,24 @@ span.rar {
 }
 .feat-locked {
   opacity: 0.6;
+}
+.feat-trans {
+  color: var(--rar, var(--accent));
+  font-weight: 700;
+}
+.feat-syn-list {
+  list-style: none;
+  margin: 6px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.feat-syn-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
 }
 .pk-row {
   display: grid;
@@ -4270,10 +4300,12 @@ span.rar {
   text-align: right;
   color: #cfc8ee;
 }
+/* 지도는 가로세로 비율(--galaxy-ratio)이 고정이고, 폭을 줄여서 화면 높이에 맞춘다. 높이만 눌러 두면 옆이 비고 손가락 위치가 어긋난다. */
 .galaxy-field {
   position: relative;
-  width: 100%;
-  max-width: 420px;
+  width: min(100%, 420px);
+  width: min(100%, 420px, calc(max(260px, 100dvh - 232px) * var(--galaxy-ratio, 0.77)));
+  aspect-ratio: var(--galaxy-ratio, 0.77);
   align-self: center;
   border-radius: 14px;
   overflow: hidden;
@@ -4284,8 +4316,7 @@ span.rar {
 .galaxy-svg {
   display: block;
   width: 100%;
-  height: auto;
-  max-height: 46dvh;
+  height: 100%;
   touch-action: none;
 }
 .galaxy-station {
@@ -4682,6 +4713,41 @@ span.rar {
 .avatar-char {
   background: var(--panel-soft);
   object-position: center top;
+}
+.avatar-pick {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: none;
+}
+.pf-costumes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: 8px;
+}
+.pf-costume {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.pf-costume small {
+  font-size: 11px;
+  line-height: 1.25;
+  text-align: center;
+  word-break: keep-all;
+}
+.pf-costume[aria-pressed='true'] {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
 }
 .rank-clickable {
   cursor: pointer;

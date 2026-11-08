@@ -11,7 +11,7 @@ import { tallyNick } from '../fanmail';
 import { addLyricCard, deckSize, draftChoices, endTurn, lyricScore, playCard, previewGain, startLyric, trimLyricCard, type LyricRun } from '../lyricdeck';
 import { claimPresent, feedCost, feedMascot, giftMascot, mascotView, playMascot } from '../mascot';
 import { weekKey } from '../missions';
-import { bonuses, cardRarityOf, completedSets, featPassive, mascotMood, mascotStage, pickupOf, songCardOf } from '../packdata';
+import { FEAT_MAX_SLOTS, FEAT_TRANS_MAX_TIER, FEAT_TRANS_TOTAL, bonuses, cardRarityOf, completedSets, featPassive, featSlotCount, featSynergies, featTransView, mascotMood, mascotStage, pickupOf, songCardOf } from '../packdata';
 import { buyTickets, craftPhoto, dismantlePhoto, giveCard, photoPull, rollPhoto, settleSets, takeCard } from '../photocards';
 import { createInitialState, validateState } from '../persistence';
 import { buildChart, createRhythm, isRhythmFinished, pressLane, rhythmScore, tickTo } from '../rhythm';
@@ -274,7 +274,7 @@ describe('피처링 가챠', () => {
     expect(ten.def.rarity === 'N').toBe(false); // 10연 마지막은 레어 이상
   });
 
-  it('중복은 별이 오르고 가득 차면 다이아로 환급한다', () => {
+  it('중복은 별이 오르고 가득 차면 초월 중복이 쌓이고 초월도 끝나면 다이아로 환급한다', () => {
     let s = base({ diamonds: 100000 });
     s = { ...s, feat: { ...s.feat, pity: BALANCE.feat.pityAt - 1 } };
     const first = ok(featPull(s, 1));
@@ -283,17 +283,26 @@ describe('피처링 가챠', () => {
     expect(first.state.feat.owned[id]).toBe(1);
     expect(first.state.feat.pity).toBe(0);
     expect(first.state.diamonds).toBe(100000 - BALANCE.feat.pullCost);
-    // 같은 카드로 별을 가득 채운 뒤 또 나오면 환급
+    // 같은 카드로 별을 가득 채운 뒤 또 나오면 초월 중복이 쌓이고(환급 없음), 초월까지 끝난 뒤에야 환급
     const maxed = { ...first.state, feat: { ...first.state.feat, owned: { ...first.state.feat.owned, [id]: BALANCE.feat.maxStar } } };
     const def = FEAT_NPCS.find((n) => n.id === id)!;
-    let t = maxed;
-    let refunded = 0;
-    for (let i = 0; i < 400 && refunded === 0; i++) {
-      const r = ok(featPull(t, 1));
-      t = r.state;
-      refunded = r.results[0].id === id ? r.refund : 0;
-    }
-    expect(refunded).toBe(BALANCE.feat.dupRefund[def.rarity]);
+    const pullUntil = (from: GameState) => {
+      let t = from;
+      for (let i = 0; i < 400; i++) {
+        const r = ok(featPull(t, 1));
+        if (r.results[0].id === id) return r;
+        t = r.state;
+      }
+      throw new Error('래퍼가 나오지 않았다');
+    };
+    const piled = pullUntil(maxed);
+    expect(piled.results[0]).toMatchObject({ transUp: true, starUp: false, refund: 0 });
+    expect(piled.state.feat.trans[id]).toBe(1);
+    const done = { ...maxed, feat: { ...maxed.feat, trans: { [id]: FEAT_TRANS_TOTAL } } };
+    const refunded = pullUntil(done);
+    expect(refunded.results[0]).toMatchObject({ transUp: false, tierUp: 0 });
+    expect(refunded.refund).toBe(BALANCE.feat.dupRefund[def.rarity]);
+    expect(refunded.state.feat.trans[id]).toBe(FEAT_TRANS_TOTAL);
   });
 
   it('10연은 다이아 90, 부족하면 실패하고, 장착은 3명까지', () => {
@@ -319,7 +328,7 @@ describe('피처링 가챠', () => {
     expect(names.every(Boolean)).toBe(true);
     expect(new Set(names).size).toBe(21);
     expect(FEAT_NPCS.every((n) => FEAT_TEXT[n.id].blurb && FEAT_TEXT[n.id].icon)).toBe(true);
-    expect(['Alfrado', '한아메', '†昇天†', '0ik2', '새림']).toEqual(FEAT_NPCS.filter((n) => n.rarity === 'N').map((n) => FEAT_TEXT[n.id].name));
+    expect(['Alfredo', '한아메', '†昇天†', '0ik2', '새림']).toEqual(FEAT_NPCS.filter((n) => n.rarity === 'N').map((n) => FEAT_TEXT[n.id].name));
     expect(['강유시', 'Upia', 'feiz', 'p4rki', '눈알고기']).toEqual(FEAT_NPCS.filter((n) => n.rarity === 'R').map((n) => FEAT_TEXT[n.id].name));
     expect(['소희', 'Truman', 'pshine', 'ch1tkey', 'k4ton', '룰더']).toEqual(FEAT_NPCS.filter((n) => n.rarity === 'SR').map((n) => FEAT_TEXT[n.id].name));
     expect(['Scails', 'hamo', '고스트클럽', '최성', 'ruru']).toEqual(FEAT_NPCS.filter((n) => n.rarity === 'SSR').map((n) => FEAT_TEXT[n.id].name));
@@ -411,6 +420,190 @@ describe('피처링 가챠', () => {
     expect(got.results[0].starUp).toBe(true);
     expect(got.results[0].refund).toBe(0);
     expect(got.state.feat.owned[id]).toBe(7);
+  });
+});
+
+describe('피처링: 초월·장착 칸·시너지', () => {
+  const withFeat = (patch: Partial<GameState['feat']>, diamonds = 100000): GameState => {
+    const s = base({ diamonds });
+    return { ...s, feat: { ...s.feat, ...patch } };
+  };
+  const allStars = (n: number): Record<string, number> => Object.fromEntries(FEAT_IDS.map((id) => [id, n]));
+  /** 이 래퍼가 처음 나오는 뽑기까지 한 번씩 뽑는다. 그 뽑기 직전의 상태와 결과를 돌려준다. */
+  const pullUntil = (s: GameState, id: string) => {
+    let t = s;
+    for (let i = 0; i < 600; i++) {
+      const r = ok(featPull(t, 1));
+      if (r.results[0].id === id) return { r, from: t };
+      t = r.state;
+    }
+    throw new Error('래퍼가 나오지 않았다');
+  };
+
+  it('초월 단계는 필요한 중복이 쌓일 때마다 오르고 합계가 차면 끝난다', () => {
+    const need = BALANCE.feat.transNeed;
+    expect(FEAT_TRANS_MAX_TIER).toBe(need.length);
+    expect(FEAT_TRANS_TOTAL).toBe(need.reduce((a, b) => a + b, 0));
+    expect(featTransView(0)).toEqual({ tier: 0, into: 0, need: need[0] });
+    expect(featTransView(need[0] - 1)).toEqual({ tier: 0, into: need[0] - 1, need: need[0] });
+    expect(featTransView(need[0])).toEqual({ tier: 1, into: 0, need: need[1] });
+    expect(featTransView(need[0] + need[1] + 1)).toEqual({ tier: 2, into: 1, need: need[2] });
+    expect(featTransView(FEAT_TRANS_TOTAL - 1).tier).toBe(FEAT_TRANS_MAX_TIER - 1);
+    expect(featTransView(FEAT_TRANS_TOTAL)).toEqual({ tier: FEAT_TRANS_MAX_TIER, into: 0, need: 0 });
+    expect(featTransView(FEAT_TRANS_TOTAL + 9).tier).toBe(FEAT_TRANS_MAX_TIER);
+    expect(need.every((n, i) => i === 0 || n > need[i - 1])).toBe(true); // 뒤 단계일수록 중복이 더 든다
+  });
+
+  it('초월 단계마다 패시브가 별 반 개 폭만큼 커진다', () => {
+    const ssr = FEAT_NPCS.find((n) => n.rarity === 'SSR')!;
+    const stars = BALANCE.feat.maxStar;
+    expect(featPassive(ssr, stars, 0)).toBeCloseTo(featPassive(ssr, stars));
+    for (let tier = 1; tier <= FEAT_TRANS_MAX_TIER; tier++) {
+      expect(featPassive(ssr, stars, tier) - featPassive(ssr, stars, tier - 1)).toBeCloseTo(BALANCE.feat.passive.SSR * BALANCE.feat.transBonus);
+    }
+    expect(featPassive(ssr, stars, FEAT_TRANS_MAX_TIER)).toBeCloseTo(BALANCE.feat.passive.SSR * (1 + BALANCE.feat.starBonus * (stars - 1) + BALANCE.feat.transBonus * FEAT_TRANS_MAX_TIER));
+    // 보너스 합산에도 반영된다(장착한 래퍼 하나라 시너지는 없다)
+    const s = withFeat({ owned: { 'f-gangyusi': stars }, trans: { 'f-gangyusi': FEAT_TRANS_TOTAL }, slots: ['f-gangyusi'] }); // 레어 인세
+    expect(bonuses(s).coin).toBeCloseTo(featPassive({ rarity: 'R' }, stars, FEAT_TRANS_MAX_TIER));
+    expect(bonuses({ ...s, feat: { ...s.feat, trans: {} } }).coin).toBeCloseTo(featPassive({ rarity: 'R' }, stars));
+  });
+
+  it('별이 가득 찬 래퍼의 중복은 초월 중복이 되고 단계가 오르면 알려 주며, 끝난 뒤에야 환급한다', () => {
+    const id = 'f-alfrado';
+    const stars = BALANCE.feat.maxStar;
+    const need = BALANCE.feat.transNeed;
+    // 중복 1개: 단계는 그대로
+    const a = pullUntil(withFeat({ owned: { [id]: stars } }), id);
+    expect(a.r.results[0]).toMatchObject({ isNew: false, starUp: false, transUp: true, tierUp: 0, refund: 0 });
+    expect(a.r.state.feat.trans[id]).toBe(1);
+    expect(a.r.state.feat.owned[id]).toBe(stars);
+    expect(a.r.state.diamonds).toBe(a.from.diamonds - BALANCE.feat.pullCost);
+    // 필요한 수가 차는 중복: 1단계로 오른다
+    const b = pullUntil(withFeat({ owned: { [id]: stars }, trans: { [id]: need[0] - 1 } }), id);
+    expect(b.r.results[0]).toMatchObject({ transUp: true, tierUp: 1, refund: 0 });
+    // 마지막 단계가 차는 중복도 환급 없이 최대 단계로
+    const c = pullUntil(withFeat({ owned: { [id]: stars }, trans: { [id]: FEAT_TRANS_TOTAL - 1 } }), id);
+    expect(c.r.results[0]).toMatchObject({ transUp: true, tierUp: FEAT_TRANS_MAX_TIER, refund: 0 });
+    expect(c.r.state.feat.trans[id]).toBe(FEAT_TRANS_TOTAL);
+    // 다 찬 뒤에는 환급만 하고 초월 중복은 더 쌓이지 않는다
+    const d = pullUntil(withFeat({ owned: { [id]: stars }, trans: { [id]: FEAT_TRANS_TOTAL } }), id);
+    expect(d.r.results[0]).toMatchObject({ transUp: false, tierUp: 0, refund: BALANCE.feat.dupRefund.N });
+    expect(d.r.state.feat.trans[id]).toBe(FEAT_TRANS_TOTAL);
+    expect(d.r.state.diamonds).toBe(d.from.diamonds - BALANCE.feat.pullCost + BALANCE.feat.dupRefund.N);
+    // 별이 덜 찬 래퍼의 중복은 예전처럼 별이 오르고 초월은 쌓이지 않는다
+    const e = pullUntil(withFeat({ owned: { [id]: stars - 1 } }), id);
+    expect(e.r.results[0]).toMatchObject({ starUp: true, transUp: false });
+    expect(e.r.state.feat.owned[id]).toBe(stars);
+    expect(e.r.state.feat.trans[id]).toBeUndefined();
+  });
+
+  it('장착 칸은 별 합계가 기준에 닿을 때마다 하나씩 늘어난다', () => {
+    const [fourth, fifth] = BALANCE.feat.extraSlotStars;
+    expect(FEAT_MAX_SLOTS).toBe(BALANCE.feat.slots + 2);
+    expect(featSlotCount({})).toBe(BALANCE.feat.slots);
+    expect(featSlotCount({ a: fourth - 1 })).toBe(BALANCE.feat.slots);
+    expect(featSlotCount({ a: fourth - 10, b: 10 })).toBe(BALANCE.feat.slots + 1);
+    expect(featSlotCount({ a: fifth - 1 })).toBe(BALANCE.feat.slots + 1);
+    expect(featSlotCount({ a: fifth })).toBe(FEAT_MAX_SLOTS);
+    expect(fourth).toBeLessThan(fifth);
+    // 장착 명령도 열린 칸까지만 받는다
+    const ids = FEAT_NPCS.map((n) => n.id);
+    let s = withFeat({ owned: allStars(3) }); // 별 합계 63 → 4칸
+    expect(Object.values(s.feat.owned).reduce((a, b) => a + b, 0)).toBeGreaterThanOrEqual(fourth);
+    for (const id of ids.slice(0, 4)) s = ok(toggleFeat(s, id)).state;
+    expect(s.feat.slots).toHaveLength(4);
+    expect(failReason(toggleFeat(s, ids[4]))).toBe('full_slots');
+    s = { ...s, feat: { ...s.feat, owned: allStars(Math.ceil(fifth / ids.length)) } }; // 5칸
+    s = ok(toggleFeat(s, ids[4])).state;
+    expect(s.feat.slots).toHaveLength(5);
+    expect(failReason(toggleFeat(s, ids[5]))).toBe('full_slots');
+    // 별이 모자라면 4번째 칸은 닫혀 있다
+    let few = withFeat({ owned: { [ids[0]]: 1, [ids[1]]: 1, [ids[2]]: 1, [ids[3]]: 1 } });
+    for (const id of ids.slice(0, 3)) few = ok(toggleFeat(few, id)).state;
+    expect(failReason(toggleFeat(few, ids[3]))).toBe('full_slots');
+  });
+
+  it('시너지: 같은 갈래·같은 등급·네 갈래 모두', () => {
+    const S = BALANCE.feat.synergy;
+    expect(featSynergies([])).toEqual([]);
+    expect(featSynergies(['f-alfrado'])).toEqual([]);
+    // 라임 2명(일반): 같은 갈래 시너지만 있고, 3명 미만이라 같은 등급 시너지는 없다
+    const duo = featSynergies(['f-alfrado', 'f-saerim']);
+    expect(duo).toHaveLength(1);
+    expect(duo[0]).toMatchObject({ kind: 'vibe', vibe: 'rhyme', count: 2, vibes: ['rhyme'], value: S.sameVibe[2] });
+    // 일반 3명, 갈래는 모두 다름: 같은 등급 시너지(네 갈래 모두)
+    const trio = featSynergies(['f-alfrado', 'f-haname', 'f-seungcheon']);
+    expect(trio).toHaveLength(1);
+    expect(trio[0]).toMatchObject({ kind: 'rarity', rarity: 'N', value: S.sameRarity.N });
+    expect(trio[0].vibes).toEqual(['rhyme', 'coin', 'fan', 'power']);
+    // 등급이 섞이면 같은 등급 시너지는 없다
+    expect(featSynergies(['f-alfrado', 'f-haname', 'f-gangyusi']).some((x) => x.kind === 'rarity')).toBe(false);
+    // 네 갈래가 한 명씩: 무지개 + (모두 일반이라) 같은 등급
+    const four = featSynergies(['f-alfrado', 'f-haname', 'f-seungcheon', 'f-0ik2']);
+    expect(four.map((x) => x.kind).sort()).toEqual(['rainbow', 'rarity']);
+    expect(four.find((x) => x.kind === 'rainbow')?.value).toBe(S.rainbow);
+    // 라임 5명: 가장 큰 같은 갈래 시너지
+    const five = featSynergies(['f-alfrado', 'f-saerim', 'f-upia', 'f-sohee', 'f-k4ton']);
+    expect(five).toHaveLength(1);
+    expect(five[0]).toMatchObject({ kind: 'vibe', vibe: 'rhyme', count: 5, value: S.sameVibe[5] });
+    // 값은 사람이 늘릴수록 커지고, 등급이 높을수록 같은 등급 시너지가 크다
+    expect(S.sameVibe.every((v, i) => i === 0 || v >= S.sameVibe[i - 1])).toBe(true);
+    expect(S.sameRarity.N).toBeLessThan(S.sameRarity.R);
+    expect(S.sameRarity.R).toBeLessThan(S.sameRarity.SR);
+    expect(S.sameRarity.SR).toBeLessThan(S.sameRarity.SSR);
+  });
+
+  it('시너지는 패시브 합산에 더해지고, 가지지 않은 래퍼는 장착 목록에 있어도 세지 않는다', () => {
+    const S = BALANCE.feat.synergy;
+    const N = BALANCE.feat.passive.N;
+    // 일반 3명(라임·인세·팬덤, 별 1): 갈래마다 패시브 + 같은 등급 시너지, 전투력은 시너지만
+    let s = withFeat({ owned: { 'f-alfrado': 1, 'f-haname': 1, 'f-seungcheon': 1 }, slots: ['f-alfrado', 'f-haname', 'f-seungcheon'] });
+    let b = bonuses(s);
+    expect(b.rhyme.normal).toBeCloseTo(N + S.sameRarity.N);
+    expect(b.rhyme.dark).toBeCloseTo(N + S.sameRarity.N);
+    expect(b.coin).toBeCloseTo(N + S.sameRarity.N);
+    expect(b.fan).toBeCloseTo(N + S.sameRarity.N);
+    expect(b.power).toBeCloseTo(S.sameRarity.N);
+    // 4칸이 열린 상태에서 일반 4명: 무지개까지 더해진다
+    s = withFeat({ owned: { ...allStars(3) }, slots: ['f-alfrado', 'f-haname', 'f-seungcheon', 'f-0ik2'] });
+    b = bonuses(s);
+    expect(b.power).toBeCloseTo(N * (1 + BALANCE.feat.starBonus * 2) + S.sameRarity.N + S.rainbow);
+    // 라임 2명: 라임 갈래에만 같은 갈래 시너지
+    s = withFeat({ owned: { 'f-alfrado': 1, 'f-saerim': 1 }, slots: ['f-alfrado', 'f-saerim'] });
+    expect(bonuses(s).rhyme.normal).toBeCloseTo(2 * N + S.sameVibe[2]);
+    expect(bonuses(s).coin).toBe(0);
+    // 갖고 있지 않은 래퍼가 장착 목록에 끼어 있으면(손상된 저장) 시너지에도 안 센다
+    s = withFeat({ owned: { 'f-alfrado': 1 }, slots: ['f-alfrado', 'f-saerim'] });
+    expect(bonuses(s).rhyme.normal).toBeCloseTo(N);
+  });
+
+  it('저장: 초월·넓어진 장착 칸이 그대로 이어지고, 없거나 맞지 않는 값은 안전하게 정리한다', () => {
+    const id = 'f-alfrado';
+    const stars = BALANCE.feat.maxStar;
+    const roundTrip = (s: GameState, edit?: (raw: any) => void) => {
+      const raw = JSON.parse(JSON.stringify(s));
+      edit?.(raw);
+      return validateState(raw);
+    };
+    const full = withFeat({ owned: { [id]: stars }, trans: { [id]: 7 }, slots: [id] });
+    const v = roundTrip(full);
+    expect(v.ok && v.state.feat.trans).toEqual({ [id]: 7 });
+    // 초월이 생기기 전 저장에는 trans가 없다
+    const old = roundTrip(full, (raw) => delete raw.feat.trans);
+    expect(old.ok && old.state.feat.trans).toEqual({});
+    // 별이 가득 차지 않은 래퍼의 초월 값은 버린다
+    const unmaxed = roundTrip(withFeat({ owned: { [id]: stars - 1 }, trans: { [id]: 3 } }));
+    expect(unmaxed.ok && unmaxed.state.feat.trans).toEqual({});
+    // 최대치를 넘는 값은 거부한다
+    expect(roundTrip(full, (raw) => (raw.feat.trans[id] = FEAT_TRANS_TOTAL + 1)).ok).toBe(false);
+    expect(roundTrip(full, (raw) => (raw.feat.trans[id] = -1)).ok).toBe(false);
+    // 별 합계가 모자란데 장착이 기본 칸보다 많으면 열린 칸까지만 남긴다
+    const ids = FEAT_NPCS.map((n) => n.id);
+    const crowded = roundTrip(withFeat({ owned: Object.fromEntries(ids.slice(0, 5).map((x) => [x, 1])), slots: ids.slice(0, 5) }));
+    expect(crowded.ok && crowded.state.feat.slots).toEqual(ids.slice(0, BALANCE.feat.slots));
+    // 별 합계가 충분하면 넓어진 칸만큼 그대로 읽는다
+    const wide = roundTrip(withFeat({ owned: allStars(Math.ceil(BALANCE.feat.extraSlotStars[1] / ids.length)), slots: ids.slice(0, FEAT_MAX_SLOTS) }));
+    expect(wide.ok && wide.state.feat.slots).toEqual(ids.slice(0, FEAT_MAX_SLOTS));
   });
 });
 

@@ -1,5 +1,5 @@
 import { BALANCE, FEAT_NPCS, featDefById, type FeatDef } from './balance';
-import { pickupOf } from './packdata';
+import { FEAT_TRANS_TOTAL, featSlotCount, featTransView, pickupOf } from './packdata';
 import { mulberry32 } from './runner';
 import { clampResource } from './selectors';
 import { mix } from './streaming';
@@ -9,6 +9,7 @@ import type { CommandResult, Fail, FailReason, GameState } from './types';
 /*
  * 피처링 가챠: 래퍼 카드를 다이아로 뽑는다. 전설(SSR)은 이번 주 픽업이 50%, 빗나가면 다음 전설은 픽업 확정, 50회 천장.
  * 결과는 씨앗과 뽑기 번호로만 정해진다.
+ * 중복: 별이 오르고, 별이 가득 찬 뒤에는 초월 중복이 쌓이고(단계가 오른다), 초월도 끝나면 다이아로 환급한다.
  */
 
 const F = BALANCE.feat;
@@ -22,7 +23,11 @@ export interface FeatPullResult {
   isNew: boolean;
   /** 별이 올랐다(중복) */
   starUp: boolean;
-  /** 별이 가득 차서 다이아로 환급됐다 */
+  /** 별이 가득 차서 초월 중복이 쌓였다 */
+  transUp: boolean;
+  /** 초월 단계가 올랐다(오른 뒤의 단계, 오르지 않았으면 0) */
+  tierUp: number;
+  /** 별이 가득 차고 초월도 끝나서 다이아로 환급됐다 */
   refund: number;
   pickup: boolean;
 }
@@ -60,6 +65,7 @@ export function featPull(state: GameState, count: 1 | 10 = 1): CommandResult<{ r
   if (state.diamonds < cost) return fail(state, 'insufficient_diamonds');
   const pickup = pickupOf(state.lastSettledAt);
   const owned = { ...state.feat.owned };
+  const trans = { ...state.feat.trans };
   let { pity, guaranteed, pulls } = state.feat;
   let refundTotal = 0;
   let hasRare = false;
@@ -75,16 +81,27 @@ export function featPull(state: GameState, count: 1 | 10 = 1): CommandResult<{ r
     if (def.rarity !== 'N') hasRare = true;
     const stars = owned[def.id] ?? 0;
     let refund = 0;
-    if (stars >= F.maxStar) refund = F.dupRefund[def.rarity];
-    else owned[def.id] = stars + 1;
+    let transUp = false;
+    let tierUp = 0;
+    if (stars < F.maxStar) owned[def.id] = stars + 1;
+    else {
+      const had = trans[def.id] ?? 0;
+      if (had < FEAT_TRANS_TOTAL) {
+        trans[def.id] = had + 1;
+        transUp = true;
+        const before = featTransView(had).tier;
+        const after = featTransView(had + 1).tier;
+        if (after > before) tierUp = after;
+      } else refund = F.dupRefund[def.rarity];
+    }
     refundTotal += refund;
-    results.push({ id: def.id, rarity: def.rarity, isNew: stars === 0, starUp: stars > 0 && refund === 0, refund, pickup: roll.pickup });
+    results.push({ id: def.id, rarity: def.rarity, isNew: stars === 0, starUp: stars > 0 && stars < F.maxStar, transUp, tierUp, refund, pickup: roll.pickup });
   }
   const next = track(
     {
       ...state,
       diamonds: clampResource(state.diamonds - cost + refundTotal),
-      feat: { ...state.feat, owned, pity, guaranteed, pulls },
+      feat: { ...state.feat, owned, trans, pity, guaranteed, pulls },
     },
     'pulls',
     count,
@@ -97,7 +114,7 @@ export function toggleFeat(state: GameState, id: string): CommandResult<{ equipp
   if (!featDefById(id)) return fail(state, 'not_found');
   if ((state.feat.owned[id] ?? 0) < 1) return fail(state, 'not_owned');
   const on = state.feat.slots.includes(id);
-  if (!on && state.feat.slots.length >= F.slots) return fail(state, 'full_slots');
+  if (!on && state.feat.slots.length >= featSlotCount(state.feat.owned)) return fail(state, 'full_slots');
   const slots = on ? state.feat.slots.filter((x) => x !== id) : [...state.feat.slots, id];
   return { ok: true, state: { ...state, feat: { ...state.feat, slots } }, equipped: !on };
 }

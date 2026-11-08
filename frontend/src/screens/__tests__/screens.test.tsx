@@ -46,6 +46,7 @@ async function render(tab: TabId, game: GameState): Promise<string> {
     equip: () => import('../EquipScreen'),
     studio: () => import('../StudioScreen'),
     stats: () => import('../StatsScreen'),
+    skills: () => import('../SkillScreen'),
     release: () => import('../ReleaseScreen'),
     nurture: () => import('../NurtureScreen'),
     friends: () => import('../FriendsScreen'),
@@ -203,7 +204,7 @@ describe('새 화면 렌더링', () => {
   });
 
   it('앨범: 일반 4~6번째와 어둠 1~3번째 앨범이 발매 화면과 도감에 나온다', async () => {
-    const have = (ids: string[]) => ids.map((id) => ({ id, title: albumDefById(id)!.title, type: albumDefById(id)!.type, releasedAt: T0 }));
+    const have = (ids: string[]) => ids.map((id) => ({ id, title: albumDefById(id)!.title, type: albumDefById(id)!.type, releasedAt: T0, remaster: 0 }));
     const normal = (n: number) => albumSeries('normal').slice(0, n).map((d) => d.id);
     const dark = (n: number) => albumSeries('dark').slice(0, n).map((d) => d.id);
 
@@ -605,6 +606,9 @@ describe('새 화면 렌더링', () => {
     const html = await renderNamed(loader, 'ConcertStage', 'concert', g, {}, { run });
     for (const t of ['유니버스 페스티벌', '은하 노선 잇기', '열기 점수', '1곡 1/4', '불만 0', `목표 ${BALANCE.galaxy.persona.normal.goals[0]}`, '노선 0/2 · 예비 셔틀 1대', '아직 노선이 없어요', '➕ 새 노선으로 잇기', '관객은 자기와 다른 모양의 정거장', '공연 포기']) expect(html).toContain(t);
     expect(html).toContain('stage-normal');
+    // 지도 칸의 비율이 지도 그림(viewBox)과 같아야 옆이 비거나 잘리지 않고 손가락 위치가 맞는다
+    expect(html).toContain(`--galaxy-ratio:${BALANCE.galaxy.width / BALANCE.galaxy.height}`);
+    expect(html).toContain(`viewBox="0 0 ${BALANCE.galaxy.width} ${BALANCE.galaxy.height}"`);
     expect((html.match(/data-station=/g) ?? []).length).toBe(3);
 
     const galaxy = { delivered: 280, spawned: 407, complaints: 3, transfers: 46, stations: 9, lines: 5, shuttles: 3, waves: [100, 96, 88, 71], seconds: 92 };
@@ -706,13 +710,30 @@ describe('콘텐츠 팩 2 화면', () => {
 
     const feat = await renderNamed(loader, 'FeatTab', 'collect', g);
     expect(feat).toContain('이번 주 픽업');
-    expect(feat).toContain('Alfrado');
+    expect(feat).toContain('Alfredo');
     expect(feat).toContain('일반');
     expect(feat).toContain('전설');
     expect(feat).toContain('85%'); // 일반 확률
     expect(feat).not.toMatch(/>(N|R|SR|SSR)</); // 등급 배지는 한글 이름으로
     expect(feat).toContain('？？？'); // 미계약 래퍼는 가려 둔다
     expect(feat).toContain('해제'); // 장착한 래퍼
+    expect(feat).toContain('장착한 래퍼 1/3명'); // 기본 칸 3칸
+    expect(feat).toContain(`별 합계 3 — ${BALANCE.feat.extraSlotStars[0]}이 되면 장착 칸이 하나 늘어요`);
+    expect(feat).toContain('시너지');
+    expect(feat).not.toContain('초월 0/'); // 별이 가득 차지 않은 래퍼에는 초월 줄이 없다
+
+    // 별이 가득 찬 래퍼는 초월 단계·진행도가 보이고, 시너지와 넓어진 칸이 반영된다
+    const stars = BALANCE.feat.maxStar;
+    const rich: GameState = {
+      ...g,
+      feat: { ...g.feat, owned: { 'f-alfrado': stars, 'f-saerim': stars, 'f-haname': stars, 'f-seungcheon': stars }, trans: { 'f-alfrado': BALANCE.feat.transNeed[0] + 1, 'f-haname': 9999 }, slots: ['f-alfrado', 'f-saerim'] },
+    };
+    const maxed = await renderNamed(loader, 'FeatTab', 'collect', rich);
+    expect(maxed).toContain(`초월 1/${BALANCE.feat.transNeed.length}단계 · 다음 단계까지 1/${BALANCE.feat.transNeed[1]}`);
+    expect(maxed).toContain('초월 0/'); // 별만 찬 래퍼
+    expect(maxed).toContain('같은 갈래 2명 +2.0%'); // 설명
+    expect(maxed).toContain('래퍼 2명'); // 라임 래퍼 2명 시너지 줄
+    expect(maxed).toContain('장착한 래퍼 2/4명'); // 별 합계 72 → 4칸
 
     const pet = await renderNamed(loader, 'MascotTab', 'collect', g);
     expect(pet).toContain('몽글이');
@@ -925,6 +946,21 @@ describe('친구·우편함·프로필·관리자', () => {
     expect(await renderNamed(loader, 'ProfileSheet', 'ranking', richState(), {}, { uid: 'x', edit: true })).toContain('프로필 설정');
   });
 
+  it('프로필 사진 고르기: 산 코스튬만 일반 → 어둠 순서로 보이고 고른 것이 눌려 있다', async () => {
+    const loader = () => import('../ProfileSheet');
+    const render = (props: Record<string, unknown>) => renderNamed(loader, 'CostumePicker', 'ranking', richState(), {}, props);
+    const none = await render({ owned: [], value: 'google', onPick: () => {} });
+    expect(none).toContain('아직 산 코스튬이 없어요');
+    expect(none).not.toContain('pf-costume"');
+    const html = await render({ owned: ['dbride', 'maid'], value: 'costume-maid', onPick: () => {} });
+    expect(html).toContain('/assets/costume-maid.webp');
+    expect(html).toContain('/assets/costume-dbride.webp');
+    expect(html).not.toContain('/assets/costume-bunny.webp'); // 안 산 코스튬은 없다
+    expect(html.indexOf('메이드사파')).toBeLessThan(html.indexOf('어둠의신부사파')); // 일반이 먼저
+    expect(html.match(/aria-pressed="true"/g)).toHaveLength(1);
+    expect(html).toMatch(/aria-pressed="true"[^>]*aria-label="메이드사파"|aria-label="메이드사파"[^>]*aria-pressed="true"/);
+  });
+
   it('신고창: 대상 이름과 사유 목록, 개인채팅 안내', async () => {
     const loader = () => import('../../components/ReportDialog');
     const chat = await renderNamed(loader, 'ReportDialog', 'chat', richState(), {}, { target: { kind: 'chat', refId: 'm1', label: '밤새는사람' } });
@@ -1000,5 +1036,76 @@ describe('모노사파 육성 화면', () => {
     expect(html).toContain('자는 중');
     expect(html).toContain('깨우기');
     expect(await render('more', g)).toContain('모노사파 육성');
+  });
+});
+
+describe('성장 요소 확장 화면', () => {
+  const firstAlbum = albumSeries('normal')[0];
+  const maxed = { mic: 20, studio: 20, promotion: 20 };
+
+  it('더보기: 레벨 스킬 메뉴와 포인트 알림, 통계 인증 알림', async () => {
+    const fresh = await render('more', createInitialState(T0));
+    expect(fresh).toContain('레벨 스킬');
+    // 포인트가 생기면 알림이 뜬다 (레벨 3 → 포인트 1)
+    const html = await render('more', { ...createInitialState(T0), fans: 80 });
+    expect(html).toContain('dot-badge');
+  });
+
+  it('레벨 스킬: 포인트, 다섯 갈래, 찍기·다시 찍기 버튼', async () => {
+    const html = await render('skills', { ...createInitialState(T0), fans: 320, diamonds: 100, skills: { rhyme: 1, coin: 0, fan: 0, power: 0, offline: 0 } });
+    expect(html).toContain('레벨 스킬');
+    for (const name of ['라임 감각', '인세 감각', '팬 감각', '무대 감각', '휴식 감각']) expect(html).toContain(name);
+    expect(html).toContain('쓸 수 있는 포인트');
+    expect(html).toContain('포인트 1개 찍기');
+    expect(html).toContain('다시 찍기 💎 30');
+    const none = await render('skills', createInitialState(T0));
+    expect(none).toContain('포인트가 없어요');
+    expect(none).toContain('찍은 포인트가 없어요');
+  });
+
+  it('통계: 스트리밍 인증 단계와 받기 버튼', async () => {
+    const s = createInitialState(T0);
+    const html = await render('stats', { ...s, streaming: { ...s.streaming, totals: { ...s.streaming.totals, spotify: 2e7 } } });
+    expect(html).toContain('스트리밍 인증');
+    expect(html).toContain('인증 전');
+    expect(html).toContain('인증 받기');
+    const claimed = await render('stats', { ...s, streaming: { ...s.streaming, totals: { ...s.streaming.totals, spotify: 2e7 }, certs: { ...s.streaming.certs, spotify: 2 } } });
+    expect(claimed).toContain('🥈 실버');
+    expect(claimed).not.toContain('인증 받기');
+  });
+
+  it('장비: 최대 레벨이면 한계 돌파(★) 단계와 버튼이 나온다', async () => {
+    const html = await render('equip', { ...createInitialState(T0), coins: 1e15, equipment: maxed, equipStars: { normal: { mic: 2, studio: 0, promotion: 0 }, dark: { mic: 0, studio: 0, promotion: 0 } } });
+    expect(html).toContain('★ 한계 돌파 🪙');
+    expect(html).toContain('★★☆☆☆');
+    expect(html).toContain('레벨 +3 → +5');
+    const notMax = await render('equip', createInitialState(T0));
+    expect(notMax).not.toContain('★ 한계 돌파 🪙');
+  });
+
+  it('도감: 낸 앨범마다 리마스터 단계와 버튼', async () => {
+    const owned = { id: firstAlbum.id, title: firstAlbum.title, type: 'normal' as const, releasedAt: T0, remaster: 1 };
+    const html = await render('collection', { ...createInitialState(T0), coins: 1e9, albums: [owned] });
+    expect(html).toContain('리마스터 ★☆☆');
+    expect(html).toContain('인세 +10%'); // 8% × 1.25
+    expect(html).toContain('→ +12%'); // 8% × 1.5
+    expect(html).toContain('리마스터 🪙');
+    const done = await render('collection', { ...createInitialState(T0), albums: [{ ...owned, remaster: 3 }] });
+    expect(done).toContain('리마스터 ★★★');
+    expect(done).toContain('최대');
+  });
+
+  it('업적: 끝없는 업적 단계와 칭호 효과', async () => {
+    const s = richState();
+    const html = await render('achievements', { ...s, endless: { 'e-works': 1 } });
+    expect(html).toContain('끝없는 업적');
+    expect(html).toContain('끝없는 손놀림');
+    expect(html).toContain('1단계');
+    expect(html).toContain('칭호 효과: ✍️ 라임 +1.5%'); // 지금 단 「라임 기계」
+    expect(html).toContain('다는 중'); // 달고 있는 칭호 버튼
+    // 달지 않은 칭호에도 달았을 때의 효과가 보인다
+    const other = await render('achievements', { ...s, cosmetics: { ...s.cosmetics, title: null } });
+    expect(other).toContain('「라임 기계」 달기');
+    expect(other).toContain('✍️ 라임 +1.5%');
   });
 });
