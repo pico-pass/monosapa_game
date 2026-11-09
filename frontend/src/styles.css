@@ -2450,6 +2450,11 @@ span.rar {
   max-width: 420px;
   align-self: center;
 }
+/* 악플 베기·게이트 행진·음표 플링코처럼 세로로 긴 아케이드 화면 */
+.arc-field {
+  max-width: 400px;
+  align-self: center;
+}
 .surv-choices {
   position: absolute;
   inset: 0;

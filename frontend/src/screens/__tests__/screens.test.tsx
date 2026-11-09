@@ -775,7 +775,9 @@ describe('콘텐츠 팩 2 화면', () => {
 
   it('아케이드: 곡 선택·계단·덱', async () => {
     const html = await renderNamed(() => import('../ArcadeScreen'), 'ArcadeScreen', 'arcade', packState());
-    for (const t of ['리듬 모드', '새벽 생존', '가사 덱', '피켓팅', '무한의 계단']) expect(html).toContain(t);
+    for (const t of ['리듬 모드', '새벽 생존', '가사 덱', '피켓팅', '무한의 계단', '악플 베기', '블랙홀 먹기', '게이트 행진', '음표 플링코']) expect(html).toContain(t);
+    expect(html).toContain('45초 베기');
+    expect(html).toContain('60초 먹기');
     expect(html).toContain('최고 850');
     expect(html).toContain('4층');
     expect(html).toContain('약점');
@@ -823,6 +825,19 @@ describe('콘텐츠 팩 2 화면', () => {
     expect(lyric).toContain('가사 덱');
     expect(lyric).toContain('턴 끝내기');
     expect(await renderNamed(loader, 'ArcadeStage', 'arcade', g, {}, { run: run('ticketing') })).toContain('피켓팅');
+    // 새 게임 넷: 전체화면과 이름·조작 안내가 그려진다
+    const more = (kind: 'slash' | 'hole' | 'gate' | 'plinko', persona: 'normal' | 'dark') => ({ id: 'r1', kind, persona, power: 0.1, seed: 7, target: null, level: 'normal', status: 'running' });
+    for (const persona of ['normal', 'dark'] as const) {
+      expect(await renderNamed(loader, 'ArcadeStage', 'arcade', g, {}, { run: more('slash', persona) })).toContain('악플 베기');
+      expect(await renderNamed(loader, 'ArcadeStage', 'arcade', g, {}, { run: more('hole', persona) })).toContain('블랙홀 먹기');
+      expect(await renderNamed(loader, 'ArcadeStage', 'arcade', g, {}, { run: more('gate', persona) })).toContain('게이트 행진');
+      expect(await renderNamed(loader, 'ArcadeStage', 'arcade', g, {}, { run: more('plinko', persona) })).toContain('음표 플링코');
+    }
+    const plinkoDone = { ...more('plinko', 'normal'), status: 'finished' };
+    const plinkoOutcome = { kind: 'plinko', score: 640, grade: 'B', coins: 300, fans: 2, diamonds: 0, newBest: false, boost: null, lyricBonus: null };
+    const plinkoResult = await renderNamed(loader, 'ArcadeStage', 'arcade', g, { arcadeResult: { outcome: plinkoOutcome, run: plinkoDone } }, { run: plinkoDone });
+    expect(plinkoResult).toContain('음표 플링코 결과');
+    expect(plinkoResult).toContain('640점');
 
     const finished = { ...run('lyric'), status: 'finished' };
     const outcome = { kind: 'lyric', score: 820, grade: 'A', coins: 500, fans: 3, diamonds: 2, newBest: true, boost: null, lyricBonus: 0.35 };

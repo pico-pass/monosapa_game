@@ -175,6 +175,10 @@ export type CounterKey =
   | 'survivals'
   | 'lyrics'
   | 'ticketings'
+  | 'slashes'
+  | 'holes'
+  | 'gates'
+  | 'plinkos'
   | 'towerClears'
   | 'pulls'
   | 'pets'
@@ -266,7 +270,7 @@ export type Nurtures = Record<Persona, NurtureSide>;
 
 /* ---------- 아케이드 ---------- */
 
-export type ArcadeKind = 'rhythm' | 'survival' | 'lyric' | 'ticketing';
+export type ArcadeKind = 'rhythm' | 'survival' | 'lyric' | 'ticketing' | 'slash' | 'hole' | 'gate' | 'plinko';
 
 export interface ArcadeRecord {
   cooldownUntil: number;
@@ -283,6 +287,11 @@ export interface Arcade {
   lyric: ArcadeRecord & { cards: Record<string, number>; bonus: number };
   /** boost: 다음 공연 코인 배율(until까지, 한 번 쓰면 사라진다) */
   ticketing: ArcadeRecord & { boost: { mult: number; until: number } | null };
+  /** 악플 베기·블랙홀 먹기·게이트 행진·음표 플링코: 쿨다운·최고 점수·횟수만 있다 */
+  slash: ArcadeRecord;
+  hole: ArcadeRecord;
+  gate: ArcadeRecord;
+  plinko: ArcadeRecord;
   /** week: 이번 주 월요일 날짜 · floor: 이번 주에 도전할 다음 층 · best: 역대 최고 클리어 층 · claimed: 이번 주 보상을 받은 층 */
   tower: { week: string; floor: number; best: number; claimed: number[]; cooldownUntil: number; attempts: number };
 }

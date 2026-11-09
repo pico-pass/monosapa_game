@@ -1048,6 +1048,11 @@ export const BALANCE = {
       survival: { cooldownMs: 240_000, coinSecs: { S: 900, A: 600, B: 360, C: 120 }, fansPct: { S: 0.008, A: 0.005, B: 0.0025, C: 0 }, minCoins: 60 },
       lyric: { cooldownMs: 180_000, coinSecs: { S: 600, A: 400, B: 240, C: 80 }, fansPct: { S: 0.006, A: 0.004, B: 0.002, C: 0 }, minCoins: 50 },
       ticketing: { cooldownMs: 180_000, coinSecs: { S: 0, A: 0, B: 0, C: 0 }, fansPct: { S: 0, A: 0, B: 0, C: 0 }, minCoins: 0 },
+      // 짧은 판(악플 베기 45초·게이트 행진 약 25초)은 리듬 모드와 같은 보상 줄, 긴 판(블랙홀 60초·음표 플링코 3분)은 생존·가사 덱 줄을 쓴다.
+      slash: { cooldownMs: 120_000, coinSecs: { S: 300, A: 200, B: 120, C: 40 }, fansPct: { S: 0.004, A: 0.0025, B: 0.0012, C: 0 }, minCoins: 30 },
+      hole: { cooldownMs: 150_000, coinSecs: { S: 600, A: 400, B: 240, C: 80 }, fansPct: { S: 0.006, A: 0.004, B: 0.002, C: 0 }, minCoins: 50 },
+      gate: { cooldownMs: 120_000, coinSecs: { S: 300, A: 200, B: 120, C: 40 }, fansPct: { S: 0.004, A: 0.0025, B: 0.0012, C: 0 }, minCoins: 30 },
+      plinko: { cooldownMs: 240_000, coinSecs: { S: 900, A: 600, B: 360, C: 120 }, fansPct: { S: 0.008, A: 0.005, B: 0.0025, C: 0 }, minCoins: 60 },
     },
   },
   /**
@@ -1223,6 +1228,164 @@ export const BALANCE = {
     captchaSpeed: 200,
     failBelow: 300,
     boostMs: 30 * 60_000,
+  },
+  /**
+   * 악플 베기: 45초 동안 아래에서 튀어 오르는 악플 말풍선을 그어서 벤다. 놓친 악플은 체력 1, 벤 하트는 heartCost를 깎고(체력 10, 어둠 8) 체력이 0이 되면 끝난다.
+   * 콤보는 comboGapMs 안에 이어서 벨 때마다 쌓이고 comboStep개마다 포인트가 comboBonus만큼 더 붙는다(큰 악플 3점). 한 번에 둘 이상 베면 덤 multiBonus.
+   * 점수 = 700 × min(1, 포인트 / ptsTarget) + 300 × min(1, 최고 콤보 / comboTarget). 전투력 보너스는 칼날 반지름을 최대 powerCap까지 넓힌다.
+   * 어둠은 벤 악플이 둘로 쪼개져 날아가고(조각은 0.5점, 놓쳐도 안 아프다) 하트는 덜 나오지만 간격이 빨라지고 체력이 1 적다.
+   */
+  slash: {
+    durationMs: 45_000,
+    stepMs: 1000 / 60,
+    w: 100,
+    h: 140,
+    gravity: 120,
+    hp: 10,
+    darkHp: 8,
+    heartCost: 2,
+    bladeR: 2.6,
+    powerCap: 0.5,
+    comboGapMs: 1100,
+    comboStep: 5,
+    comboBonus: 0.5,
+    multiBonus: 1,
+    fadeMs: 260,
+    gapMs: [900, 450] as [number, number],
+    multiP: 0.45,
+    heartP: 0.16,
+    bigP: 0.1,
+    ptsTarget: 110,
+    comboTarget: 30,
+    dark: { gapMult: 0.9, heartP: 0.12 },
+  },
+  /**
+   * 블랙홀 먹기: 60초 동안 무대 소품(여섯 크기)을 삼켜 구멍을 키운다. 구멍은 반지름의 eatRatio 이하인 소품만 삼키고, 삼키면 소품 크기² × growth만큼 면적이 는다.
+   * 라이벌 구멍 rivals개(성장 배율 rivalGrowth)는 먹음직한 소품을 쫓고, 자기보다 swallowRatio배 이상 작은 구멍(나 포함)을 chaseRange 안에서 쫓고 큰 구멍은 피한다. 잡아먹힌 쪽은 면적 lossKeep만 남기고 되살아난다.
+   * 점수 = 600 × 자란 정도((r − startR)/(targetR − startR)) + 400 × 순위(rankFrac). 전투력 보너스는 성장 배율에 곱한다.
+   * 어둠(삼도천 구멍)은 내가 더 빨리 자라지만 라이벌도 처음부터 크고 빠르고 더 잘 자란다.
+   */
+  hole: {
+    durationMs: 60_000,
+    stepMs: 1000 / 60,
+    size: 70,
+    startR: 2.4,
+    speed: 17,
+    speedFall: 0.35,
+    eatRatio: 0.8,
+    eatReach: 0.85,
+    growth: 0.55,
+    tiers: [
+      { size: 0.7, weight: 40 },
+      { size: 1.1, weight: 28 },
+      { size: 1.7, weight: 18 },
+      { size: 2.6, weight: 12 },
+      { size: 4, weight: 8 },
+      { size: 6, weight: 4 },
+    ],
+    props: 90,
+    respawnMs: 500,
+    rivals: 2,
+    rivalSpeed: 0.78,
+    rivalGrowth: 0.85,
+    rivalStartR: 2.4,
+    rivalThinkMs: 350,
+    chaseRange: 14,
+    fleeRange: 14,
+    swallowRatio: 1.25,
+    lossKeep: 0.65,
+    invMs: 2000,
+    targetR: 18,
+    rankFrac: [1, 0.45, 0] as number[],
+    dark: { growth: 1.1, rivalSpeed: 1.12, rivalStartR: 3, rivalGrowth: 1.2 },
+  },
+  /**
+   * 게이트 행진: 팬 군중(처음 start명)이 길을 달리며 rows줄의 게이트를 지나고 끝에서 악플 괴수와 맞붙는다. 앞으로는 speed로 달리고 옆으로는 latSpeed로 움직인다.
+   * 줄마다 길 폭(road)을 2~3구간으로 나눠 문 하나씩 두고, 군중은 자기 폭(반폭 = crowdBase + crowdK·√인원, 최소·최대 있음)만큼 걸친 구간마다 몫을 받는다(더하기·빼기는 몫만큼, 곱하기·나누기는 몫에 곱, 싸움은 몫이 얼마든 악플 수만큼).
+   * 줄마다 좋은 문(더하기·곱하기)이 하나는 있고, fightFrom줄부터는 fightP 확률로 싸움 구간이 낀다. 괴수 체력 = 줄마다 가장 좋은 문만 골랐을 때 인원 × bossFrac(최소 bossMin).
+   * 점수 = 1000 × min(1, 괴수 대비 인원 / 2): 인원이 괴수 체력과 같으면 500, 두 배면 만점. 군중이 전멸하면 0. 전투력 보너스는 처음 인원에 곱한다.
+   * 어둠은 −·÷ 문이 많고 ×3 문이 더 자주 나오며 싸움이 더 크다.
+   */
+  gate: {
+    rows: 14,
+    firstRow: 25,
+    rowGap: 20,
+    bossGap: 28,
+    stepMs: 50,
+    speed: 14,
+    latSpeed: 45,
+    road: 100,
+    start: 10,
+    crowdMinW: 4,
+    crowdMaxW: 18,
+    crowdBase: 2,
+    crowdK: 0.9,
+    threeP: 0.45,
+    mulP: 0.35,
+    mul3P: 0.3,
+    badP: 0.55,
+    addBase: 8,
+    addStep: 4,
+    subBase: 5,
+    subStep: 3,
+    fightFrom: 3,
+    fightP: 0.35,
+    fightBase: 6,
+    fightStep: 3,
+    bossFrac: 0.45,
+    bossMin: 30,
+    dark: { badP: 0.75, fight: 1.4 },
+  },
+  /**
+   * 음표 플링코: 위 대포에서 음표 구슬을 쏘아 핀에 튕기며 악플 괴수 hp.length마리를 차례로 쓰러뜨린다. 한 마리에 구슬 balls개, 쓰러뜨리면 남은 구슬 carryMax개까지 이어지고 유물을 3택 1한다.
+   * 핀을 칠 때마다 데미지 = dmg × (1 + chainStep × 이번 구슬이 친 핀 수, 최대 chainMax) (금 핀 goldMult배). 폭탄 핀은 bombR 안의 핀을 blastMult배로 한꺼번에 터뜨린다.
+   * 구슬이 바닥에 닿는 칸: 가장자리 binEdge · 안쪽 binMid 데미지, 가운데(freeHalf)는 구슬 1개를 돌려준다(괴수당 freeCap번까지).
+   * 점수 = 800 × (쓰러뜨린 괴수 + 지금 괴수 진행도) / 3 (+ 다 쓰러뜨리면 남은 구슬 bonusBalls개 기준 덤 200). 전투력 보너스는 데미지에 곱한다.
+   * 유물: big(구슬 반지름 +bigBonus) · dmg(데미지 +dmgBonus) · boom(구슬마다 첫 타가 boomR 폭발) · extra(괴수마다 구슬 +extraBalls) · bin(바닥 칸 데미지 ×binMult, 가운데 칸 넓어짐).
+   * 어둠은 데미지가 세지만 야유 핀(맞으면 연쇄가 끊기고 데미지 없음)이 섞인다.
+   */
+  plinko: {
+    w: 100,
+    h: 140,
+    cannonY: 4,
+    cols: 8,
+    rows: 9,
+    margin: 8,
+    top: 28,
+    rowGap: 10.5,
+    holeP: 0.2,
+    golds: 5,
+    bombs: 3,
+    pegR: 2,
+    ballR: 1.6,
+    gravity: 150,
+    restitution: 0.62,
+    shotSpeed: 75,
+    maxSpeed: 150,
+    maxAngle: 1.1,
+    ballLifeMs: 9000,
+    previewSteps: 200,
+    hp: [150, 260, 400] as number[],
+    balls: 6,
+    carryMax: 2,
+    extraBalls: 2,
+    bonusBalls: 4,
+    freeCap: 2,
+    freeHalf: 9,
+    binWide: 6,
+    binEdge: 10,
+    binMid: 4,
+    binMult: 2,
+    dmg: 3,
+    chainStep: 0.12,
+    chainMax: 4,
+    goldMult: 3,
+    bombR: 13,
+    blastMult: 0.6,
+    boomR: 10,
+    bigBonus: 0.35,
+    dmgBonus: 0.4,
+    dark: { dmg: 1.2, jeerP: 0.16 },
   },
   /**
    * 성장 요소 확장(수치는 모두 제안값이라 여기서 조정한다).
@@ -1708,6 +1871,10 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
   { id: 'tower-30', metric: 'towerBest', goal: 30, diamonds: 15 },
   { id: 'tower-60', metric: 'towerBest', goal: 60, diamonds: 40 },
   { id: 'ticket-1', metric: 'ticketings', goal: 1, diamonds: 2 },
+  { id: 'slash-1', metric: 'slashes', goal: 1, diamonds: 2 },
+  { id: 'hole-1', metric: 'holes', goal: 1, diamonds: 2 },
+  { id: 'gate-1', metric: 'gates', goal: 1, diamonds: 2 },
+  { id: 'plinko-1', metric: 'plinkos', goal: 1, diamonds: 2 },
   { id: 'ticket-ace', metric: 'ticketBest', goal: 900, diamonds: 6 },
   { id: 'pull-10', metric: 'pulls', goal: 10, diamonds: 3 },
   { id: 'pull-100', metric: 'pulls', goal: 100, diamonds: 12 },

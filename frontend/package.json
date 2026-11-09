@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "sim": "tsx scripts/simulate.ts",
     "sim:nurture": "tsx scripts/nurture-sim.ts",
-    "sim:village": "tsx scripts/village-sim.ts"
+    "sim:village": "tsx scripts/village-sim.ts",
+    "sim:arcade": "tsx scripts/arcade-sim.ts"
   },
   "dependencies": {
     "react": "^19.3.1",

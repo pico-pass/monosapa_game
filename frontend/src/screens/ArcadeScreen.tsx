@@ -38,12 +38,16 @@ export function ArcadeScreen() {
       <SurvivalCard g={g} />
       <LyricCard g={g} />
       <TicketCard g={g} />
+      <SlashCard g={g} />
+      <HoleCard g={g} />
+      <GateCard g={g} />
+      <PlinkoCard g={g} />
       <TowerCard g={g} />
     </section>
   );
 }
 
-function Head({ k }: { k: 'rhythm' | 'survival' | 'lyric' | 'tower' | 'ticketing' }) {
+function Head({ k }: { k: keyof typeof ARCADE_TEXT }) {
   const t = ARCADE_TEXT[k];
   return (
     <>
@@ -172,6 +176,39 @@ function TicketCard({ g }: { g: GameState }) {
       <StartButton g={g} kind="ticketing" label="티켓 오픈 대기" onStart={() => startArcade('ticketing')} />
     </div>
   );
+}
+
+/** 점수만 남는 짧은 게임 한 장: 자아 한 줄 설명·최고 점수·플레이 횟수와 시작 버튼 */
+function SimpleCard({ g, kind, note, label, played }: { g: GameState; kind: 'slash' | 'hole' | 'gate' | 'plinko'; note: string; label: string; played: number }) {
+  return (
+    <div className="card">
+      <Head k={kind} />
+      <small className="muted">
+        지금 자아 <PersonaBadge persona={g.activePersona} /> · {note} · 최고 {g.arcade[kind].best}점 · {played}번 플레이
+      </small>
+      <StartButton g={g} kind={kind} label={label} onStart={() => startArcade(kind)} />
+    </div>
+  );
+}
+
+function SlashCard({ g }: { g: GameState }) {
+  const dark = g.activePersona === 'dark';
+  return <SimpleCard g={g} kind="slash" label="45초 베기" played={g.counters.slashes} note={dark ? '어둠은 벤 악플이 둘로 쪼개져요(체력 8)' : `체력 ${BALANCE.slash.hp}`} />;
+}
+
+function HoleCard({ g }: { g: GameState }) {
+  const dark = g.activePersona === 'dark';
+  return <SimpleCard g={g} kind="hole" label="60초 먹기" played={g.counters.holes} note={dark ? '어둠은 더 빨리 자라지만 라이벌이 사나워요' : '라이벌 구멍 둘과 겨뤄요'} />;
+}
+
+function GateCard({ g }: { g: GameState }) {
+  const dark = g.activePersona === 'dark';
+  return <SimpleCard g={g} kind="gate" label="행진 시작" played={g.counters.gates} note={dark ? '어둠은 −·÷ 게이트가 많고 ×3이 나와요' : `처음 ${BALANCE.gate.start}명으로 출발`} />;
+}
+
+function PlinkoCard({ g }: { g: GameState }) {
+  const dark = g.activePersona === 'dark';
+  return <SimpleCard g={g} kind="plinko" label="구슬 쏘기" played={g.counters.plinkos} note={dark ? '어둠은 데미지가 세지만 야유 핀이 섞여요' : `괴수 ${BALANCE.plinko.hp.length}마리, 구슬 ${BALANCE.plinko.balls}개씩`} />;
 }
 
 function TowerCard({ g }: { g: GameState }) {

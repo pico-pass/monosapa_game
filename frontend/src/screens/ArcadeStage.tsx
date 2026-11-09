@@ -2,13 +2,17 @@ import { fmt } from '../components/format';
 import { BALANCE } from '../game/balance';
 import { ARCADE_TEXT, LYRIC_CARD_TEXT } from '../game/content';
 import type { ArcadeRun } from '../game/arcade';
+import { GatePlay } from './arcade/GateStage';
+import { HolePlay } from './arcade/HoleStage';
 import { LyricCardFace, LyricPlay } from './arcade/LyricStage';
+import { PlinkoPlay } from './arcade/PlinkoStage';
 import { RhythmPlay } from './arcade/RhythmStage';
+import { SlashPlay } from './arcade/SlashStage';
 import { SurvivalPlay } from './arcade/SurvivalStage';
 import { TicketPlay } from './arcade/TicketStage';
 import { closeArcadeResult, doPickLyricCard, skipLyricDraft, useUi } from '../store/gameStore';
 
-const TITLE = { rhythm: 'rhythm', survival: 'survival', lyric: 'lyric', ticketing: 'ticketing' } as const;
+const TITLE = { rhythm: 'rhythm', survival: 'survival', lyric: 'lyric', ticketing: 'ticketing', slash: 'slash', hole: 'hole', gate: 'gate', plinko: 'plinko' } as const;
 
 /** 아케이드 전체화면. 이 화면이 열려 있는 동안 다른 탭으로 나갈 수 없다. */
 export function ArcadeStage({ run }: { run: ArcadeRun }) {
@@ -24,6 +28,14 @@ export function ArcadeStage({ run }: { run: ArcadeRun }) {
         <SurvivalPlay key={run.id} run={run} />
       ) : run.kind === 'lyric' ? (
         <LyricPlay key={run.id} run={run} />
+      ) : run.kind === 'slash' ? (
+        <SlashPlay key={run.id} run={run} />
+      ) : run.kind === 'hole' ? (
+        <HolePlay key={run.id} run={run} />
+      ) : run.kind === 'gate' ? (
+        <GatePlay key={run.id} run={run} />
+      ) : run.kind === 'plinko' ? (
+        <PlinkoPlay key={run.id} run={run} />
       ) : (
         <TicketPlay key={run.id} run={run} />
       )}

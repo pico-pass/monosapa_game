@@ -19,6 +19,10 @@ export const emptyArcade = (): Arcade => ({
   survival: emptyRecord(),
   lyric: { ...emptyRecord(), cards: { ...BALANCE.lyric.starter }, bonus: 0 },
   ticketing: { ...emptyRecord(), boost: null },
+  slash: emptyRecord(),
+  hole: emptyRecord(),
+  gate: emptyRecord(),
+  plinko: emptyRecord(),
   tower: { week: '', floor: 1, best: 0, claimed: [], cooldownUntil: 0, attempts: 0 },
 });
 export const emptyStats = (): Stats => ({ normalMs: 0, darkMs: 0, nicks: {}, notes: [] });
@@ -182,6 +186,10 @@ export function parseArcade(raw: unknown, singleIds: ReadonlySet<string>): Arcad
     survival: parseRecord(raw.survival, 'arcade.survival'),
     lyric: { ...parseRecord(lyricRaw, 'arcade.lyric'), cards, bonus: lyricRaw.bonus === undefined ? 0 : num(lyricRaw, 'bonus', 0, 1, 'arcade.lyric.bonus') },
     ticketing: { ...parseRecord(ticketRaw, 'arcade.ticketing'), boost },
+    slash: parseRecord(raw.slash, 'arcade.slash'),
+    hole: parseRecord(raw.hole, 'arcade.hole'),
+    gate: parseRecord(raw.gate, 'arcade.gate'),
+    plinko: parseRecord(raw.plinko, 'arcade.plinko'),
     tower,
   };
 }

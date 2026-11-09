@@ -11,8 +11,20 @@ describe('이번 주 보스', () => {
   });
 
   it('약점이 5종 게임에 하나씩 겹치지 않게 걸려 있다', () => {
-    expect(new Set(ROSTER.map((b) => b.weak)).size).toBe(BOSS_KINDS.length);
+    // 보스마다 약점이 서로 다르고 모두 알려진 판 종류다(약점이 안 되는 종류는 데미지만 들어간다)
+    expect(new Set(ROSTER.map((b) => b.weak)).size).toBe(ROSTER.length);
+    for (const b of ROSTER) expect(BOSS_KINDS).toContain(b.weak);
     expect(ROSTER.every((b) => isBossKind(b.weak))).toBe(true);
+  });
+
+  it('아케이드 새 게임 넷도 데미지가 되지만 약점은 아니다', () => {
+    for (const kind of ['slash', 'hole', 'gate', 'plinko'] as const) {
+      expect(isBossKind(kind)).toBe(true);
+      expect(ROSTER.some((b) => b.weak === kind)).toBe(false);
+      const hit = hitDamage(kind, 800, ROSTER[0].weak);
+      expect(hit.weak).toBe(false);
+      expect(hit.damage).toBe(80);
+    }
   });
 
   it('종류 검사는 알려진 문자열만 받는다', () => {

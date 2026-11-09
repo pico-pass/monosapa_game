@@ -927,6 +927,10 @@ export const ACHIEVEMENT_TEXT: Record<string, { name: string; desc: string; icon
   'tower-30': { name: '계단 30층', desc: '무한의 계단 30층을 깼어요.', icon: '🏯', title: '계단 등반가' },
   'tower-60': { name: '계단 60층', desc: '무한의 계단 60층을 깼어요.', icon: '🗼', title: '끝없는 계단' },
   'ticket-1': { name: '첫 피켓팅', desc: '피켓팅에 처음 도전했어요.', icon: '🎟️' },
+  'slash-1': { name: '첫 악플 베기', desc: '악플 베기에 처음 도전했어요.', icon: '🗡️' },
+  'hole-1': { name: '첫 블랙홀', desc: '블랙홀 먹기에 처음 도전했어요.', icon: '🕳️' },
+  'gate-1': { name: '첫 행진', desc: '게이트 행진에 처음 도전했어요.', icon: '🚪' },
+  'plinko-1': { name: '첫 플링코', desc: '음표 플링코에 처음 도전했어요.', icon: '🎱' },
   'ticket-ace': { name: '피켓팅 신', desc: '피켓팅에서 S 등급을 받았어요.', icon: '⚡', title: '피켓팅의 신' },
   'pull-10': { name: '뽑기 입문', desc: '가챠를 10번 뽑았어요.', icon: '🎰' },
   'pull-100': { name: '뽑기 중독', desc: '가챠를 100번 뽑았어요.', icon: '🎲', title: '뽑기 중독' },
@@ -1121,12 +1125,25 @@ export function nurtureFace(persona: Persona, v: { sleeping: boolean; condition:
 
 /* ---------- 콘텐츠 팩 2: 아케이드 ---------- */
 
-export const ARCADE_TEXT: Record<'rhythm' | 'survival' | 'lyric' | 'tower' | 'ticketing', { name: string; icon: string; blurb: string }> = {
+export const ARCADE_TEXT: Record<'rhythm' | 'survival' | 'lyric' | 'tower' | 'ticketing' | 'slash' | 'hole' | 'gate' | 'plinko', { name: string; icon: string; blurb: string }> = {
   rhythm: { name: '리듬 모드', icon: '🎵', blurb: '어둠속성 「정신병자러브」 음원에 맞춰 4개의 레인을 눌러요.' },
   survival: { name: '새벽 생존', icon: '🌙', blurb: '3분 동안 몰려오는 악플을 마이크로 쓸어내요. 레벨업마다 가사 스킬을 골라요.' },
   lyric: { name: '가사 덱', icon: '📝', blurb: '가사 카드로 한 곡을 완성해요. 같은 모음을 이으면 라임 체인!' },
   tower: { name: '무한의 계단', icon: '🪜', blurb: '한 층에 보스 한 명. 직접 움직여 탄을 피하면서 쓰러뜨려요. 전투력이 높을수록 내 탄이 세지고, 약점 자아로 도전하면 더 세져요. 매주 월요일에 1층부터 다시 시작해요.' },
   ticketing: { name: '피켓팅', icon: '🎟️', blurb: '오픈 신호에 누르고 보안문자를 입력해요. 성공하면 다음 공연 코인이 늘어나요.' },
+  slash: { name: '악플 베기', icon: '🗡️', blurb: '45초 동안 튀어 오르는 악플 말풍선을 손가락으로 쓱 그어 베요. 팬 하트는 건드리면 안 돼요. 이어서 벨수록 콤보가 쌓여요.' },
+  hole: { name: '블랙홀 먹기', icon: '🕳️', blurb: '60초 동안 구멍을 끌고 다니며 무대 소품을 삼켜 커져요. 라이벌 구멍보다 작으면 잡아먹히니 조심해요.' },
+  gate: { name: '게이트 행진', icon: '🚪', blurb: '팬 군중을 이끌고 달리며 +·× 게이트로 불리고 −·÷ 게이트와 악플 무리는 피해요. 끝에서 악플 괴수와 맞붙어요.' },
+  plinko: { name: '음표 플링코', icon: '🎱', blurb: '음표 구슬을 쏘아 핀에 튕기며 악플 괴수 셋을 차례로 쓰러뜨려요. 괴수마다 유물을 3택 1해요.' },
+};
+
+/** 음표 플링코 유물 */
+export const RELIC_TEXT: Record<string, { name: string; icon: string; desc: string }> = {
+  big: { name: '큰 음표', icon: '🎵', desc: '구슬이 35% 커져서 핀에 더 잘 닿아요' },
+  dmg: { name: '앰프 증설', icon: '🔊', desc: '모든 데미지 +40%' },
+  boom: { name: '폭죽 첫 타', icon: '🎆', desc: '구슬마다 첫 번째 핀이 주변 핀을 터뜨려요' },
+  extra: { name: '앙코르', icon: '🎤', desc: '괴수마다 구슬 +2' },
+  bin: { name: '객석 앞 마이크', icon: '🎙️', desc: '바닥 칸 데미지 ×2, 가운데 칸이 넓어져요' },
 };
 
 export const GRADE_TEXT: Record<'S' | 'A' | 'B' | 'C', string> = { S: 'S', A: 'A', B: 'B', C: 'C' };

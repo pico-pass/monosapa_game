@@ -4,8 +4,12 @@
  * 서버는 게임 규칙을 검증하지 않으므로 점수 위조는 막지 못한다. 대신 하루 타수와 최소 간격으로 한 사람이 낼 수 있는 데미지를 묶는다.
  */
 
-/** 데미지가 되는 판의 종류: 공연(마이크 타이밍) · 직접 공연(런·블록 같은 미니게임) · 아케이드 3종 */
-export const BOSS_KINDS = ['concert', 'manual', 'rhythm', 'survival', 'lyric'] as const;
+/**
+ * 데미지가 되는 판의 종류: 공연(마이크 타이밍) · 직접 공연(런·블록 같은 미니게임) · 아케이드(피켓팅 빼고 전부).
+ * 약점이 되는 종류는 아래 ROSTER의 다섯 가지뿐이고, 뒤의 넷(악플 베기·블랙홀 먹기·게이트 행진·음표 플링코)은 약점 보너스 없이 데미지만 들어간다.
+ * (보스를 늘리면 주 번호 % 길이로 돌리는 이번 주 보스가 중간에 바뀌므로 ROSTER 길이는 함부로 바꾸지 않는다)
+ */
+export const BOSS_KINDS = ['concert', 'manual', 'rhythm', 'survival', 'lyric', 'slash', 'hole', 'gate', 'plinko'] as const;
 export type BossKind = (typeof BOSS_KINDS)[number];
 export const isBossKind = (v: unknown): v is BossKind => typeof v === 'string' && (BOSS_KINDS as readonly string[]).includes(v);
 

@@ -923,7 +923,7 @@ export async function doClaimFlags(): Promise<boolean> {
 
 /* ---------- 월드 보스 ---------- */
 
-export type BossKind = 'concert' | 'manual' | 'rhythm' | 'survival' | 'lyric';
+export type BossKind = 'concert' | 'manual' | 'rhythm' | 'survival' | 'lyric' | 'slash' | 'hole' | 'gate' | 'plinko';
 
 interface BossHitResult {
   counted: boolean;

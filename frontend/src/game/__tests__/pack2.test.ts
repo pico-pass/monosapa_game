@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { TrackClock, audibleTime, expectedSamples, leadingSamples } from '../../audio/track';
 import { PAD_RATES, defaultPattern, emptyPattern, processSample, stepSeconds } from '../../audio/sampler';
 import { ACHIEVEMENTS, BALANCE, FEAT_IDS, FEAT_LEGACY_IDS, FEAT_NPCS, LYRIC_CARDS, PHOTO_CARD_IDS, photoCardId } from '../balance';
-import { abandonArcade, arcadeBlocked, beginArcade, finishArcade, firstGradeDiamonds, gradeOf } from '../arcade';
+import { ARCADE_KINDS, abandonArcade, arcadeBlocked, arcadeReady, beginArcade, finishArcade, firstGradeDiamonds, gradeOf } from '../arcade';
 import { FEAT_RARITY_NAME, FEAT_TEXT } from '../content';
 import { beginManualConcert, finishManualConcert, releaseSingle, runAutoConcert } from '../commands';
 import { featPull, rollFeat, toggleFeat } from '../featuring';
@@ -732,6 +732,57 @@ describe('아케이드 공통', () => {
     expect(failReason(finishArcade(done.state, done.run, 950))).toBe('session_closed');
     const second = ok(finishArcade({ ...done.state, arcade: { ...done.state.arcade, survival: { ...done.state.arcade.survival, cooldownUntil: 0 } } }, { ...begun.run, id: 'r2' }, 960));
     expect(second.outcome.diamonds).toBeLessThan(done.outcome.diamonds); // 등급 다이아는 처음 한 번뿐
+  });
+
+  it('악플 베기·블랙홀 먹기·게이트 행진·음표 플링코도 같은 규약을 따른다(쿨다운·등급 보상·한 번만 정산)', () => {
+    const kinds = ['slash', 'hole', 'gate', 'plinko'] as const;
+    const counters = { slash: 'slashes', hole: 'holes', gate: 'gates', plinko: 'plinkos' } as const;
+    for (const kind of kinds) {
+      expect(failReason(beginArcade(base(), kind, 'r1'))).toBe('need_single');
+      const s = base({ singles: singles(1), fans: 4000 });
+      const begun = ok(beginArcade(s, kind, 'r1'));
+      expect(begun.run.kind).toBe(kind);
+      expect(begun.state.arcade[kind].cooldownUntil).toBe(T0 + BALANCE.arcade.kinds[kind].cooldownMs);
+      expect(begun.state.counters.arcades).toBe(1);
+      expect(failReason(beginArcade(begun.state, kind, 'r2'))).toBe('cooldown');
+      // 다른 게임의 쿨다운과는 따로 센다
+      expect(arcadeBlocked(begun.state, kind === 'slash' ? 'hole' : 'slash')).toBeNull();
+      const done = ok(finishArcade(begun.state, begun.run, 920));
+      expect(done.outcome.grade).toBe('S');
+      expect(done.outcome.coins).toBeGreaterThan(0);
+      expect(done.outcome.fans).toBe(Math.ceil(4000 * BALANCE.arcade.kinds[kind].fansPct.S));
+      expect(done.outcome.diamonds).toBeGreaterThanOrEqual(BALANCE.arcade.firstDiamonds.A + BALANCE.arcade.firstDiamonds.S);
+      expect(done.state.arcade[kind].best).toBe(920);
+      expect(done.state.counters[counters[kind]]).toBe(1);
+      expect(failReason(finishArcade(done.state, done.run, 920))).toBe('session_closed');
+      // 점수는 0~1000으로 맞춰진다
+      expect(ok(finishArcade(begun.state, { ...begun.run, id: 'r3' }, 5000)).outcome.score).toBe(1000);
+      expect(ok(finishArcade(begun.state, { ...begun.run, id: 'r4' }, -3)).outcome.score).toBe(0);
+    }
+  });
+
+  it('새 아케이드 기록은 저장·불러오기를 거쳐도 그대로고, 없는 예전 저장은 빈 기록으로 읽으며, 범위 밖 점수는 거부한다', () => {
+    let s = base({ singles: singles(2) });
+    s = { ...s, arcade: { ...s.arcade, slash: { cooldownUntil: T0 + 5, best: 640, plays: 3 }, plinko: { cooldownUntil: 0, best: 910, plays: 7 } } };
+    const v = validateState(JSON.parse(JSON.stringify(s)));
+    expect(v.ok).toBe(true);
+    if (v.ok) expect(v.state.arcade).toEqual(s.arcade);
+    const raw = JSON.parse(JSON.stringify(base({ singles: singles(2) })));
+    for (const k of ['slash', 'hole', 'gate', 'plinko']) delete raw.arcade[k];
+    const old = validateState(raw);
+    expect(old.ok).toBe(true);
+    if (old.ok) for (const k of ['slash', 'hole', 'gate', 'plinko'] as const) expect(old.state.arcade[k]).toEqual({ cooldownUntil: 0, best: 0, plays: 0 });
+    const bad = JSON.parse(JSON.stringify(base({ singles: singles(2) })));
+    bad.arcade.hole.best = 1001;
+    expect(validateState(bad).ok).toBe(false);
+  });
+
+  it('쿨다운이 끝난 아케이드 수에 새 게임 넷이 들어간다', () => {
+    const s = base({ singles: singles(1) });
+    // 리듬만 음원 곡이 없어 잠겨 있고 나머지 일곱 가지는 열려 있다
+    expect(arcadeReady(s)).toBe(ARCADE_KINDS.length - 1);
+    const begun = ok(beginArcade(s, 'gate', 'r1'));
+    expect(arcadeReady(begun.state)).toBe(ARCADE_KINDS.length - 2);
   });
 
   it('리듬은 곡별 최고 점수를 기록하고 난이도 배율이 보상에 곱해진다', () => {

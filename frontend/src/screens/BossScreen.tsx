@@ -5,7 +5,7 @@ import { api, errorText } from '../platform/api';
 import { doClaimBoss } from '../store/gameStore';
 import { refreshSummary } from '../store/socialStore';
 
-type BossKind = 'concert' | 'manual' | 'rhythm' | 'survival' | 'lyric';
+type BossKind = 'concert' | 'manual' | 'rhythm' | 'survival' | 'lyric' | 'slash' | 'hole' | 'gate' | 'plinko';
 
 interface BossInfo {
   id: string;
@@ -64,7 +64,7 @@ interface BossOverview {
   last: LastWeek | null;
 }
 
-const KIND_TEXT: Record<BossKind, string> = { concert: '일반 공연', manual: '직접 공연', rhythm: '리듬', survival: '생존', lyric: '가사 덱' };
+const KIND_TEXT: Record<BossKind, string> = { concert: '일반 공연', manual: '직접 공연', rhythm: '리듬', survival: '생존', lyric: '가사 덱', slash: '악플 베기', hole: '블랙홀 먹기', gate: '게이트 행진', plinko: '음표 플링코' };
 const REFRESH_MS = 20_000;
 
 /** 월드 보스: 한 주 동안 모두의 공연·아케이드 점수가 데미지로 쌓여요. 닿은 단계마다 전원이 보상을 받아요. */
@@ -135,7 +135,7 @@ export function BossScreen() {
             <p className="muted">
               오늘 {data.todayHits}/{data.dailyCap}타 · 이번 주 내 데미지 <b>{fmt(data.myDamage)}</b> ({data.myHits}타)
             </p>
-            <p className="fineprint">공연이나 아케이드(리듬·생존·가사 덱)를 끝내면 점수가 자동으로 보스에게 들어가요. 점수가 높을수록, S등급일수록 아파요.</p>
+            <p className="fineprint">공연이나 아케이드(피켓팅 빼고 모두)를 끝내면 점수가 자동으로 보스에게 들어가요. 점수가 높을수록, S등급일수록 아파요.</p>
           </div>
 
           <div className="card">

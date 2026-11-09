@@ -7,9 +7,9 @@ import { track } from './tracking';
 import type { ArcadeKind, CommandResult, Fail, FailReason, GameState, Persona } from './types';
 
 /*
- * 아케이드(리듬·생존·가사 덱·피켓팅) 공통 규칙. 콘서트와 같은 방식이다:
+ * 아케이드(리듬·생존·가사 덱·피켓팅·악플 베기·블랙홀 먹기·게이트 행진·음표 플링코) 공통 규칙. 콘서트와 같은 방식이다:
  *   시작할 때 쿨다운을 확정한다(포기해도 유지) → 끝나면 점수(0~1000)로 등급을 정하고 보상한다 → 같은 실행은 한 번만 정산한다.
- * 점수를 만드는 게임 규칙은 각 게임 파일(rhythm·survival·lyricdeck·ticketing)에 있다.
+ * 점수를 만드는 게임 규칙은 각 게임 파일(rhythm·survival·lyricdeck·ticketing·slash·hole·gate·plinko)에 있다.
  */
 
 export type Grade = 'S' | 'A' | 'B' | 'C';
@@ -99,7 +99,7 @@ export function beginArcade(
   };
 }
 
-const COUNTER = { rhythm: 'rhythms', survival: 'survivals', lyric: 'lyrics', ticketing: 'ticketings' } as const;
+const COUNTER = { rhythm: 'rhythms', survival: 'survivals', lyric: 'lyrics', ticketing: 'ticketings', slash: 'slashes', hole: 'holes', gate: 'gates', plinko: 'plinkos' } as const;
 const clamp01k = (n: number) => Math.max(0, Math.min(1000, Math.round(Number.isFinite(n) ? n : 0)));
 
 /** 이 점수로 처음 닿는 등급의 다이아(그 대상의 이전 최고 점수 기준) */
@@ -152,4 +152,5 @@ export function abandonArcade(run: ArcadeRun): ArcadeRun {
 }
 
 /** 쿨다운이 끝난 아케이드 종류 수 (알림용) */
-export const arcadeReady = (s: GameState): number => (['rhythm', 'survival', 'lyric', 'ticketing'] as const).filter((k) => arcadeBlocked(s, k) === null).length;
+export const ARCADE_KINDS = ['rhythm', 'survival', 'lyric', 'ticketing', 'slash', 'hole', 'gate', 'plinko'] as const satisfies readonly ArcadeKind[];
+export const arcadeReady = (s: GameState): number => ARCADE_KINDS.filter((k) => arcadeBlocked(s, k) === null).length;
