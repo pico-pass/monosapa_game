@@ -31,6 +31,8 @@ export function drawSlash(ctx: CanvasRenderingContext2D, g: SlashGame, trail: { 
   grad.addColorStop(1, bottom);
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, W, H);
+  // 이모지는 단색 fillStyle로 그린다: 그라데이션이 남아 있으면 사파리가 배경과 같은 색 실루엣으로 그려서 악플이 안 보인다
+  ctx.fillStyle = '#fff';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   for (const it of g.items) {

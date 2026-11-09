@@ -10,9 +10,11 @@ import { drawPlinko } from '../arcade/PlinkoStage';
 import { drawSlash } from '../arcade/SlashStage';
 
 /** 그리기 호출을 세는 가짜 2D 컨텍스트: 없는 메서드를 부르거나 값을 잘못 쓰면 그리기 코드가 바로 터진다. */
-function fakeCtx(): { ctx: CanvasRenderingContext2D; calls: Record<string, number>; texts: string[] } {
+function fakeCtx(): { ctx: CanvasRenderingContext2D; calls: Record<string, number>; texts: string[]; textFills: unknown[] } {
   const calls: Record<string, number> = {};
   const texts: string[] = [];
+  /** 글자(이모지)를 그리는 순간의 fillStyle: 사파리는 그라데이션·패턴이면 이모지를 배경색 실루엣으로 그려서 안 보이게 된다 */
+  const textFills: unknown[] = [];
   const gradient = { addColorStop: () => undefined };
   const state: Record<string, unknown> = {};
   const ctx = new Proxy(state, {
@@ -21,7 +23,10 @@ function fakeCtx(): { ctx: CanvasRenderingContext2D; calls: Record<string, numbe
       if (prop === 'createLinearGradient') return () => gradient;
       return (...args: unknown[]) => {
         calls[prop] = (calls[prop] ?? 0) + 1;
-        if (prop === 'fillText') texts.push(String(args[0]));
+        if (prop === 'fillText') {
+          texts.push(String(args[0]));
+          textFills.push(state.fillStyle);
+        }
         for (const a of args) if (typeof a === 'number' && !Number.isFinite(a)) throw new Error(`${prop}에 유한하지 않은 값이 들어갔어요`);
       };
     },
@@ -30,8 +35,11 @@ function fakeCtx(): { ctx: CanvasRenderingContext2D; calls: Record<string, numbe
       return true;
     },
   }) as unknown as CanvasRenderingContext2D;
-  return { ctx, calls, texts };
+  return { ctx, calls, texts, textFills };
 }
+
+/** 글자를 그릴 때 fillStyle이 그라데이션이 아니라 색 문자열이어야 한다 */
+const plainTextFills = (f: { textFills: unknown[] }): boolean => f.textFills.every((s) => typeof s === 'string');
 
 describe('아케이드 캔버스 그리기(가짜 컨텍스트로 터지지 않는지)', () => {
   it('악플 베기: 날아다니는 말풍선·베어진 조각·칼자국을 그린다', () => {
@@ -48,6 +56,7 @@ describe('아케이드 캔버스 그리기(가짜 컨텍스트로 터지지 않�
       expect(f.calls.fillRect).toBe(1);
       expect(f.calls.fillText).toBeGreaterThan(0);
       expect(f.calls.stroke).toBeGreaterThan(0);
+      expect(plainTextFills(f)).toBe(true);
     }
   });
 
@@ -72,11 +81,13 @@ describe('아케이드 캔버스 그리기(가짜 컨텍스트로 터지지 않�
         if (i % 20 === 0) {
           drawGate(f.ctx, g);
           expect(f.calls.fillRect).toBeGreaterThanOrEqual(1);
+          expect(plainTextFills(f)).toBe(true);
         }
       }
       const last = fakeCtx();
       drawGate(last.ctx, g);
       expect(last.texts.length).toBeGreaterThan(0);
+      expect(plainTextFills(last)).toBe(true);
     }
   });
 
@@ -88,6 +99,7 @@ describe('아케이드 캔버스 그리기(가짜 컨텍스트로 터지지 않�
       const a = fakeCtx();
       drawPlinko(a.ctx, g, aim);
       expect(a.calls.arc).toBeGreaterThan(g.pegs.length);
+      expect(plainTextFills(a)).toBe(true);
       g.fire(0.3);
       for (let i = 0; i < 40; i++) {
         g.advance(50);
