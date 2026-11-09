@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from './auth/auth.module.js';
+import { BossModule } from './boss/boss.module.js';
 import { ChallengeModule } from './challenge/challenge.module.js';
 import { ChartModule } from './chart/chart.module.js';
 import { ChatModule } from './chat/chat.module.js';
@@ -17,9 +18,10 @@ import { SavesModule } from './saves/saves.module.js';
 import { SocialModule } from './social/social.module.js';
 import { TradesModule } from './trades/trades.module.js';
 import { UsersModule } from './users/users.module.js';
+import { VillageModule } from './village/village.module.js';
 
 /** 루트 모듈. 기능은 기능별 모듈로 나눠 여기서 가져온다. */
 @Module({
-  imports: [ConfigModule, DatabaseModule, UsersModule, AuthModule, SavesModule, RankingModule, ChatModule, InquiriesModule, ChallengeModule, ChartModule, TradesModule, ProfilesModule, FriendsModule, MailboxModule, DmModule, ReportsModule, SocialModule, HealthModule],
+  imports: [ConfigModule, DatabaseModule, UsersModule, AuthModule, SavesModule, RankingModule, ChatModule, InquiriesModule, ChallengeModule, ChartModule, TradesModule, ProfilesModule, FriendsModule, MailboxModule, DmModule, ReportsModule, VillageModule, BossModule, SocialModule, HealthModule],
 })
 export class AppModule {}

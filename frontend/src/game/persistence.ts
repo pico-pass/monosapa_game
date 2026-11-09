@@ -1,4 +1,4 @@
-import { ACHIEVEMENTS, BALANCE, CAMPAIGN_IDS, COSTUME_IDS, ENDLESS, ENDLESS_MAX_TIER, EQUIPMENT_KINDS, MISSION_METRICS, POST_KINDS, SCHEMA_VERSION, SKILL_IDS, SNACK_IDS, STAGE_IDS, STREAM_PLATFORMS, THEME_IDS, costumePersona } from './balance';
+import { ACHIEVEMENTS, BALANCE, BUILDING_IDS, CAMPAIGN_IDS, COSTUME_IDS, ENDLESS, ENDLESS_MAX_TIER, EQUIPMENT_KINDS, MISSION_METRICS, POST_KINDS, SCHEMA_VERSION, SKILL_IDS, SNACK_IDS, STAGE_IDS, STREAM_PLATFORMS, THEME_IDS, costumePersona } from './balance';
 import { CERT_TIER_COUNT, emptyCerts } from './certs';
 import { albumDefById, albumSeries, mailTemplateById } from './content';
 import { emptyFanMail } from './fanmail';
@@ -10,6 +10,7 @@ import { retroactiveDiamonds } from './selectors';
 import { SKILL_LEVEL_LIMIT, emptySkills } from './skills';
 import { streamSeedFrom, zeroTotals } from './streaming';
 import { COUNTER_KEYS, zeroCounters } from './tracking';
+import { VILLAGE_CELLS, buildingMax, emptyVillage } from './villagedata';
 import type {
   Album,
   Buffs,
@@ -34,6 +35,9 @@ import type {
   StageId,
   Streaming,
   ThemeId,
+  Village,
+  VillageNews,
+  VillageTile,
 } from './types';
 
 export const SAVE_KEY = 'monosapa.save';
@@ -73,6 +77,7 @@ export function createInitialState(now: number, reducedMotion = false): GameStat
     diamondUpgrades: { production: 0, royalty: 0, offline: 0 },
     equipStars: emptyEquipStars(),
     skills: emptySkills(),
+    village: emptyVillage(streamSeedFrom(now + 3), now),
     endless: {},
     buffs: { snack: null, campaign: null },
     cosmetics: { themes: ['default'], theme: 'default', costumes: [], costume: null, darkCostume: null, title: null },
@@ -149,6 +154,57 @@ function parseSkills(raw: unknown): Skills {
   if (!isObj(raw)) return bad('skills가 올바르지 않습니다.');
   for (const id of SKILL_IDS) if (raw[id] !== undefined) out[id] = int(raw, id, 0, SKILL_LEVEL_LIMIT, `skills.${id}`);
   return out;
+}
+
+/** 팬 마을. 없는 예전 저장은 새 마을이고, 건물이 한도를 넘거나 알 수 없는 ID면 그 칸만 비운다. */
+function parseVillage(raw: unknown, seed: number, at: number): Village {
+  const out = emptyVillage(seed, at);
+  if (raw === undefined) return out;
+  if (!isObj(raw)) return bad('village가 올바르지 않습니다.');
+  const V = BALANCE.village;
+  const tiles: (VillageTile | null)[] = Array.from({ length: VILLAGE_CELLS }, () => null);
+  if (raw.tiles !== undefined) {
+    if (!Array.isArray(raw.tiles) || raw.tiles.length > VILLAGE_CELLS) return bad('village.tiles가 올바르지 않습니다.');
+    const used: Record<string, number> = {};
+    raw.tiles.forEach((t: unknown, i: number) => {
+      if (t === null) return;
+      if (!isObj(t)) return bad(`village.tiles[${i}]가 올바르지 않습니다.`);
+      const lv = int(t, 'lv', 1, V.maxLevel, `village.tiles[${i}].lv`);
+      if (!(BUILDING_IDS as readonly unknown[]).includes(t.b)) return;
+      const b = t.b as VillageTile['b'];
+      if ((used[b] ?? 0) >= buildingMax(b)) return;
+      used[b] = (used[b] ?? 0) + 1;
+      tiles[i] = { b, lv };
+    });
+  }
+  const news: VillageNews[] = [];
+  if (raw.news !== undefined) {
+    if (!Array.isArray(raw.news) || raw.news.length > V.news.keep) return bad('village.news가 올바르지 않습니다.');
+    for (const n of raw.news as unknown[]) {
+      if (!isObj(n)) return bad('village.news 항목이 올바르지 않습니다.');
+      news.push({ bucket: int(n, 'bucket', 0, 1e9, 'village.news.bucket'), resident: int(n, 'resident', 0, V.news.residents - 1, 'village.news.resident'), kind: int(n, 'kind', 0, V.news.kinds - 1, 'village.news.kind') });
+    }
+  }
+  const dex: number[] = [];
+  if (raw.dex !== undefined) {
+    if (!Array.isArray(raw.dex) || raw.dex.length > V.news.residents) return bad('village.dex가 올바르지 않습니다.');
+    for (const r of raw.dex as unknown[]) if (typeof r === 'number' && Number.isInteger(r) && r >= 0 && r < V.news.residents && !dex.includes(r)) dex.push(r);
+    dex.sort((a, b) => a - b);
+  }
+  return {
+    seed: raw.seed === undefined ? out.seed : int(raw, 'seed', 0, 4294967295, 'village.seed'),
+    tiles,
+    hearts: raw.hearts === undefined ? out.hearts : num(raw, 'hearts', 0, 1e12, 'village.hearts'),
+    stock: raw.stock === undefined ? 0 : num(raw, 'stock', 0, 1e12, 'village.stock'),
+    at: raw.at === undefined ? at : num(raw, 'at', 0, MAX_TIME, 'village.at'),
+    boostUntil: raw.boostUntil === undefined ? 0 : num(raw, 'boostUntil', 0, MAX_TIME, 'village.boostUntil'),
+    festivalUntil: raw.festivalUntil === undefined ? 0 : num(raw, 'festivalUntil', 0, MAX_TIME, 'village.festivalUntil'),
+    festivalWeek: typeof raw.festivalWeek === 'string' && raw.festivalWeek.length <= 20 ? raw.festivalWeek : '',
+    news,
+    newsBucket: raw.newsBucket === undefined ? 0 : int(raw, 'newsBucket', 0, 1e9, 'village.newsBucket'),
+    dex,
+    paidSteps: raw.paidSteps === undefined ? 0 : int(raw, 'paidSteps', 0, 10_000, 'village.paidSteps'),
+  };
 }
 
 /** 끝없는 업적 단계. 사라진 지표의 항목은 조용히 버린다. */
@@ -420,6 +476,7 @@ export function validateState(input: unknown): Validation {
     const savedAtSeed = num(o, 'savedAt', 0, MAX_TIME);
     const equipStars = parseEquipStars(o.equipStars);
     const skills = parseSkills(o.skills);
+    const village = parseVillage(o.village, streamSeedFrom(savedAtSeed + 3), num(o, 'lastSettledAt', 0, MAX_TIME));
     const endless = parseEndless(o.endless);
     const buffs = parseBuffs(o.buffs);
     const cosmetics = parseCosmetics(o.cosmetics);
@@ -461,6 +518,7 @@ export function validateState(input: unknown): Validation {
       diamondUpgrades,
       equipStars,
       skills,
+      village,
       endless,
       buffs,
       cosmetics,

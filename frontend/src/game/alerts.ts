@@ -4,6 +4,7 @@ import { presentsReady } from './mascot';
 import { readyPosts } from './monogram';
 import { nurtureAlerts } from './nurture';
 import { skillPointsFree } from './skills';
+import { villageAlerts } from './village';
 import type { GameState } from './types';
 
 /** 「더보기」 안에서 지금 할 일이 있는 화면별 개수. 하단 탭과 메뉴의 알림 점에 쓴다. */
@@ -19,6 +20,8 @@ export interface MoreAlerts {
   skills: number;
   /** 받을 수 있는 스트리밍 인증이 있는 플랫폼 수 */
   stats: number;
+  /** 고르지 않은 마을 소식 + 수확할 ❤️가 가득 차 가는 마을 */
+  village: number;
   total: number;
 }
 
@@ -30,5 +33,6 @@ export function moreAlerts(s: GameState): MoreAlerts {
   const nurture = nurtureAlerts(s);
   const skills = skillPointsFree(s) > 0 ? 1 : 0;
   const stats = certsClaimable(s);
-  return { missions, mail, monogram, collect, nurture, skills, stats, total: missions + mail + monogram + collect + nurture + skills + stats };
+  const village = villageAlerts(s);
+  return { missions, mail, monogram, collect, nurture, skills, stats, village, total: missions + mail + monogram + collect + nurture + skills + stats + village };
 }

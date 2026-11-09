@@ -1,4 +1,4 @@
-import type { CampaignId, CardRarity, CostumeId, CounterKey, DarkCostumeId, DiamondUpgradeKind, EquipmentKind, Persona, PostKind, SnackId, SkillId, StageId, StreamPlatform, ThemeId, Vibe } from './types';
+import type { BuildingId, CampaignId, CardRarity, CostumeId, CounterKey, DarkCostumeId, DiamondUpgradeKind, EquipmentKind, Persona, PostKind, SnackId, SkillId, StageId, StreamPlatform, ThemeId, Vibe } from './types';
 
 /**
  * 모든 경제 수치는 이 파일 한 곳에서만 수정한다. (기획서 3~7, 11장)
@@ -1268,6 +1268,69 @@ export const BALANCE = {
     bonusPerTier: 0.01,
   },
   titlePerk: { low: 0.01, mid: 0.015, high: 0.02, top: 0.03, midDiamonds: 8, highDiamonds: 15, topDiamonds: 30 },
+  /**
+   * 팬 마을: 팬들이 사는 8×8 땅의 가운데부터 팬 수에 따라(sides) 4×4 → 6×6 → 8×8로 넓어진다.
+   * 땅은 세로로 세 구역이다(열 0~2 해 드는 거리 = 일반, 3~4 황혼 골목 = 경계, 5~7 지하 골목 = 어둠). 합주실만 구역을 탄다:
+   *   일반 구역은 일반 라임에 100%, 어둠 구역은 어둠 라임에 100%, 황혼 골목은 양쪽에 twilightShare씩.
+   * 건물은 ❤️(마을 안 화폐)로 짓고 올린다. 레벨 n(1~maxLevel)이 되는 비용 = ceil(base × costGrowth^(n−1)).
+   *   철거하면 쓴 ❤️의 refundRate를 돌려받고, 건물을 옮기는 데는 moveCost가 든다.
+   * 팬카페만 ❤️를 만든다(레벨당 시간당 heartsPerHour). 쌓인 ❤️는 접속해서 수확해야 하고, 한도는 기본 capHours시간치(+ 창고).
+   * 효과 배율(인접): 상하좌우로 붙은 건물이 pairs의 짝이면 synergy씩, 쉼터는 레벨당 parkPerLevel씩 더하고 한 건물의 배율은 maxMult가 상한이다.
+   * 영구 보너스는 packdata.ts의 bonuses가 합산한다. 한 갈래의 이론상 최대치는 coin·fan·power 0.16, 라임 0.30 정도(테스트가 확인한다).
+   * 소식: bucketMs마다 카드 한 장(최대 keep장 보관). 고르면 ❤️(그 시점 시간당 생산 heartsHours시간치, 최소 minHearts)나 응원 부스트(boost)를 받고
+   *   주민이 도감에 올라간다. 주민 수 dex[].count를 채울 때마다 다이아 한 번.
+   * 축제: 광장이 있어야 하고 한 주(기기 시간 월요일 기준)에 한 번, 비용은 시간당 생산 costHours시간치(최소 minCost). ms 동안 ❤️ 생산이 mult배.
+   * 건물 레벨 합계가 every의 배수에 닿을 때마다 다이아 amount(평생 한 번씩).
+   * 친구가 꽂아 준 깃발·내가 꽂은 깃발로 받는 ❤️는 서버가 정하는 값이라 서버 상수(village/rules.ts의 FLAG_HEARTS)다.
+   */
+  village: {
+    unlockFans: 30_000,
+    startHearts: 60,
+    sides: [
+      { fans: 30_000, side: 4 },
+      { fans: 1_000_000, side: 6 },
+      { fans: 100_000_000, side: 8 },
+    ],
+    maxLevel: 10,
+    costGrowth: 1.85,
+    refundRate: 0.5,
+    moveCost: 20,
+    heartsPerHour: 10,
+    capHours: 6,
+    boost: { mult: 1.5, ms: 2 * 3600_000 },
+    synergy: 0.2,
+    parkPerLevel: 0.03,
+    maxMult: 2,
+    twilightShare: 0.6,
+    buildings: {
+      cafe: { base: 20, max: 4 },
+      goods: { base: 40, max: 2, perLevel: 0.004 },
+      practice: { base: 40, max: 2, perLevel: 0.004 },
+      gallery: { base: 40, max: 2, perLevel: 0.004 },
+      band: { base: 50, max: 3, perLevel: 0.005 },
+      stall: { base: 30, max: 2, perLevelMs: 4 * 60_000 },
+      storage: { base: 25, max: 2, perLevelHours: 0.5 },
+      park: { base: 30, max: 3 },
+      plaza: { base: 100, max: 1 },
+    },
+    pairs: [
+      ['cafe', 'goods'],
+      ['cafe', 'gallery'],
+      ['cafe', 'storage'],
+      ['practice', 'band'],
+      ['band', 'stall'],
+      ['gallery', 'goods'],
+    ] as readonly (readonly [BuildingId, BuildingId])[],
+    festival: { costHours: 6, minCost: 60, ms: 24 * 3600_000, mult: 2 },
+    levelDiamonds: { every: 10, amount: 1 },
+    news: { bucketMs: 8 * 3600_000, keep: 3, heartsHours: 3, minHearts: 15, residents: 100, kinds: 12 },
+    dex: [
+      { count: 10, diamonds: 1 },
+      { count: 30, diamonds: 2 },
+      { count: 60, diamonds: 3 },
+      { count: 100, diamonds: 5 },
+    ],
+  },
   offline: {
     capMs: 2 * 3600 * 1000,
     efficiency: 0.7,
@@ -1346,6 +1409,7 @@ export const STREAM_PLATFORMS: readonly StreamPlatform[] = ['spotify', 'ytmusic'
 /** 스트리밍 인증 보너스가 올리는 갈래: 스포티파이 라임 생산 · 유튜브 뮤직 팬 획득 · 멜론 인세 · 애플 뮤직 전투력 */
 export const STREAM_CERT_VIBE: Record<StreamPlatform, Vibe> = { spotify: 'rhyme', ytmusic: 'fan', melon: 'coin', applemusic: 'power' };
 export const SKILL_IDS: readonly SkillId[] = ['rhyme', 'coin', 'fan', 'power', 'offline'];
+export const BUILDING_IDS = Object.keys(BALANCE.village.buildings) as BuildingId[];
 
 export const SNACK_IDS = Object.keys(BALANCE.shop.snacks) as SnackId[];
 export const CAMPAIGN_IDS = Object.keys(BALANCE.shop.campaigns) as CampaignId[];

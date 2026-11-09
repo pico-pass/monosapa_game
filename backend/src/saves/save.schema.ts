@@ -51,6 +51,10 @@ export class Save {
   @Prop({ type: Number, default: 0 })
   nurtureXp!: number;
 
+  /** 팬 마을 명성(건물 레벨 합계). 랭킹용으로 state.village 에서 계산해 둔 값이다. 건물이 없으면 0이다. */
+  @Prop({ type: Number, default: 0 })
+  villageFame!: number;
+
   /** 마지막으로 쓴 클라이언트(페이지 로드) 식별자. 응답이 유실돼 같은 클라이언트가 재시도하는 경우를 충돌로 보지 않기 위한 값이다. */
   @Prop({ required: true })
   lastWriter!: string;
@@ -67,3 +71,5 @@ SaveSchema.index({ level: -1, fans: -1 });
 SaveSchema.index({ towerBest: -1 });
 // 육성 랭킹 조회: 레벨 합계 ↓, 성장도 합계 ↓
 SaveSchema.index({ nurtureTotal: -1, nurtureXp: -1 });
+// 마을 랭킹 조회: 명성 ↓
+SaveSchema.index({ villageFame: -1 });

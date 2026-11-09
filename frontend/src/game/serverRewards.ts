@@ -39,3 +39,17 @@ export function applyChartClaim(state: GameState, diamonds: number, no1: boolean
   if (no1) next = track(next, 'chartNo1');
   return { ok: true, state: next, diamonds: d };
 }
+
+/** 마을 깃발로 받는 ❤️(내가 꽂은 것과 친구가 꽂아 준 것). 서버가 하루 한 번만 내주고 값도 서버가 정한다. */
+const MAX_FLAG_HEARTS = 2000;
+
+export function applyVillageHearts(state: GameState, hearts: number): CommandResult<{ hearts: number }> {
+  const h = Math.max(0, Math.min(MAX_FLAG_HEARTS, Math.floor(Number.isFinite(hearts) ? hearts : 0)));
+  return { ok: true, state: { ...state, village: { ...state.village, hearts: state.village.hearts + h } }, hearts: h };
+}
+
+/** 월드 보스 단계·순위 보상 */
+export function applyBossClaim(state: GameState, diamonds: number): CommandResult<{ diamonds: number }> {
+  const d = cap(diamonds);
+  return { ok: true, state: { ...state, diamonds: clampResource(state.diamonds + d) }, diamonds: d };
+}

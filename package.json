@@ -10,6 +10,7 @@
     "test": "npm run test -w frontend && npm run test -w backend",
     "typecheck": "npm run typecheck -w frontend && npm run typecheck -w backend",
     "sim": "npm run sim -w frontend",
-    "sim:nurture": "npm run sim:nurture -w frontend"
+    "sim:nurture": "npm run sim:nurture -w frontend",
+    "sim:village": "npm run sim:village -w frontend"
   }
 }

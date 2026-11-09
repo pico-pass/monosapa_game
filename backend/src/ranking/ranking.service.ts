@@ -5,7 +5,7 @@ import { Save, type SaveDocument } from '../saves/save.schema.js';
 import { rankFieldsOf } from '../saves/saves.service.js';
 import { PERSON_FIELDS, toPerson, type PersonDto } from '../users/person.js';
 import { User } from '../users/user.schema.js';
-import type { NurtureRankingDto, NurtureRankingEntryDto, RankingDto, RankingEntryDto, TowerRankingDto, TowerRankingEntryDto } from './dto/ranking.dto.js';
+import type { NurtureRankingDto, NurtureRankingEntryDto, RankingDto, RankingEntryDto, TowerRankingDto, TowerRankingEntryDto, VillageRankingDto, VillageRankingEntryDto } from './dto/ranking.dto.js';
 
 export const RANKING_SIZE = 20;
 
@@ -18,10 +18,10 @@ export class RankingService implements OnModuleInit {
     @InjectModel(User.name) private readonly users: Model<User>,
   ) {}
 
-  /** 랭킹 필드(팬 수·레벨·계단 최고 층·육성 레벨)가 생기기 전에 저장된 문서에 값을 채운다. (이미 채워진 문서는 건드리지 않는다) */
+  /** 랭킹 필드(팬 수·레벨·계단 최고 층·육성 레벨·마을 명성)가 생기기 전에 저장된 문서에 값을 채운다. (이미 채워진 문서는 건드리지 않는다) */
   async onModuleInit(): Promise<void> {
     const old = await this.saves
-      .find({ $or: [{ level: { $exists: false } }, { towerBest: { $exists: false } }, { nurtureTotal: { $exists: false } }] })
+      .find({ $or: [{ level: { $exists: false } }, { towerBest: { $exists: false } }, { nurtureTotal: { $exists: false } }, { villageFame: { $exists: false } }] })
       .exec();
     for (const doc of old) await this.saves.updateOne({ _id: doc._id }, { $set: rankFieldsOf(doc.state) }).exec();
     if (old.length > 0) this.log.log(`랭킹 필드 채움: ${old.length}개`);
@@ -107,6 +107,26 @@ export class RankingService implements OnModuleInit {
           ],
         })
         .exec();
+      mineEntry = entry(mine, ahead + 1);
+    }
+    return { entries: docs.map((d, i) => entry(d, i + 1)), mine: mineEntry, total };
+  }
+  /** 팬 마을 명성 랭킹: 건물 레벨 합계가 높은 순, 같으면 먼저 가입한 쪽. 건물이 하나도 없는 계정은 오르지 않는다. */
+  async villageTop(viewerId: string): Promise<VillageRankingDto> {
+    const viewer = new Types.ObjectId(viewerId);
+    const built = { villageFame: { $gt: 0 } };
+    const [docs, total, mine] = await Promise.all([
+      this.saves.find(built).sort({ villageFame: -1, _id: 1 }).limit(RANKING_SIZE).exec(),
+      this.saves.countDocuments(built).exec(),
+      this.saves.findOne({ userId: viewer }).exec(),
+    ]);
+    const profileOf = await this.profiles([...docs.map((d) => d.userId), ...(mine ? [mine.userId] : [])]);
+
+    const entry = (d: SaveDocument, rank: number): VillageRankingEntryDto => ({ ...this.who(d, rank, profileOf, viewerId), fame: d.villageFame, level: d.level });
+
+    let mineEntry: VillageRankingEntryDto | null = null;
+    if (mine && mine.villageFame > 0) {
+      const ahead = await this.saves.countDocuments({ $or: [{ villageFame: { $gt: mine.villageFame } }, { villageFame: mine.villageFame, _id: { $lt: mine._id } }] }).exec();
       mineEntry = entry(mine, ahead + 1);
     }
     return { entries: docs.map((d, i) => entry(d, i + 1)), mine: mineEntry, total };

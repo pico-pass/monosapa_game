@@ -59,3 +59,17 @@ export class NurtureRankingDto {
   /** 랭킹에 오른 전체 계정 수 */
   total!: number;
 }
+
+export class VillageRankingEntryDto extends RankingWhoDto {
+  /** 마을 명성(건물 레벨 합계) */
+  fame!: number;
+  level!: number;
+}
+
+export class VillageRankingDto {
+  entries!: VillageRankingEntryDto[];
+  /** 내 순위(아직 건물이 없으면 null) */
+  mine!: VillageRankingEntryDto | null;
+  /** 랭킹에 오른 전체 계정 수 */
+  total!: number;
+}

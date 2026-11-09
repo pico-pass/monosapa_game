@@ -3,7 +3,7 @@ import { useAuth } from '../store/authStore';
 import { setTab, useUi, type TabId } from '../store/gameStore';
 import { friendBadge, mailBadge, useSocial } from '../store/socialStore';
 
-const ITEMS: { id: TabId; icon: string; name: string; desc: string; alert?: 'missions' | 'mail' | 'monogram' | 'collect' | 'nurture' | 'skills' | 'stats'; social?: 'postbox' | 'friends' }[] = [
+const ITEMS: { id: TabId; icon: string; name: string; desc: string; alert?: 'missions' | 'mail' | 'monogram' | 'collect' | 'nurture' | 'skills' | 'stats' | 'village'; social?: 'postbox' | 'friends' | 'village' | 'boss' }[] = [
   { id: 'shop', icon: '🛒', name: '상점', desc: '간식·홍보 캠페인·테마' },
   { id: 'missions', icon: '📅', name: '미션·출석', desc: '일일·주간 미션 보상', alert: 'missions' },
   { id: 'achievements', icon: '🏅', name: '업적·칭호', desc: '달성하고 칭호를 달아요 · 끝없는 업적' },
@@ -11,6 +11,8 @@ const ITEMS: { id: TabId; icon: string; name: string; desc: string; alert?: 'mis
   { id: 'mail', icon: '💌', name: '팬 DM', desc: '응원·공감·안티 메시지', alert: 'mail' },
   { id: 'monogram', icon: '📸', name: '모노그램', desc: '게시물로 팬을 모아요', alert: 'monogram' },
   { id: 'collect', icon: '🃏', name: '수집', desc: '곡 카드·포토카드·피처링·마스코트', alert: 'collect' },
+  { id: 'village', icon: '🏘️', name: '팬 마을', desc: '건물을 지어 ❤️와 영구 보너스를 모아요', alert: 'village', social: 'village' },
+  { id: 'boss', icon: '👹', name: '월드 보스', desc: '모두 함께 이번 주 보스를 쓰러뜨려요', social: 'boss' },
   { id: 'nurture', icon: '🍼', name: '모노사파 육성', desc: '밥·놀이·술로 키우고 레벨로 강해져요', alert: 'nurture' },
   { id: 'arcade', icon: '🎮', name: '아케이드', desc: '리듬·생존·가사 덱·계단·피켓팅' },
   { id: 'challenge', icon: '#️⃣', name: '해시태그 챌린지', desc: '주간 주제로 한 줄 가사' },
@@ -37,7 +39,8 @@ export function MoreScreen() {
       <h2 className="section-title">더보기</h2>
       <div className="more-grid">
         {items.map((it) => {
-          const n = it.alert ? alerts[it.alert] : it.social === 'postbox' ? mailBadge(summary) : it.social === 'friends' ? friendBadge(summary) : 0;
+          const social = it.social === 'postbox' ? mailBadge(summary) : it.social === 'friends' ? friendBadge(summary) : it.social === 'village' ? summary.villageFlags : it.social === 'boss' ? summary.bossClaimable : 0;
+          const n = (it.alert ? alerts[it.alert] : 0) + social;
           return (
             <button key={it.id} type="button" className="more-item" onClick={() => setTab(it.id)}>
               <span className="more-icon" aria-hidden>

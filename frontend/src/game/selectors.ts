@@ -65,7 +65,7 @@ export function shopPrice(base: number, fans: number): number {
 /** 오프라인 정산으로 인정하는 최대 시간(ms). 기본 2시간 + 다이아 업그레이드. */
 export function offlineCapMs(s: Pick<GameState, 'diamondUpgrades'> & Partial<BonusState>): number {
   const u = BALANCE.diamond.upgrade.offline;
-  const extra = s.cards && s.photo && s.feat && s.mascot && s.nurture && s.singles && s.skills && s.streaming && s.cosmetics ? bonuses(s as BonusState).offlineMs : 0;
+  const extra = s.cards && s.photo && s.feat && s.mascot && s.nurture && s.singles && s.skills && s.streaming && s.cosmetics && s.village ? bonuses(s as BonusState).offlineMs : 0;
   return BALANCE.offline.capMs + u.perLevelMs * s.diamondUpgrades.offline + extra;
 }
 

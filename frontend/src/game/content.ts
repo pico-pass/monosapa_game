@@ -1,4 +1,4 @@
-import type { AlbumType, CampaignId, CardRarity, CostumeId, DialogueTone, Persona, PostKind, SnackId, StageId, StreamPlatform, SkillId, ThemeId, Vibe, VirtualComment } from './types';
+import type { AlbumType, BuildingId, CampaignId, CardRarity, CostumeId, DialogueTone, Persona, PostKind, SnackId, StageId, StreamPlatform, SkillId, ThemeId, Vibe, VirtualComment } from './types';
 
 /* 대사·제목·댓글·공연장 이름. 모두 게임용 창작 문구이며 실제 인물의 곡·발언이 아니다.
    가상의 상대·자기디스·황당한 상황만 다루고, 현실 이용자나 실제 인물을 겨냥하지 않는다. */
@@ -1177,3 +1177,46 @@ export const DIFFICULTY_TEXT: Record<'easy' | 'normal' | 'hard' | 'brutal', stri
   hard: '어려움',
   brutal: '매우 어려움',
 };
+
+/* ---------- 팬 마을 ---------- */
+
+export const BUILDING_TEXT: Record<BuildingId, { name: string; icon: string; effect: string }> = {
+  cafe: { name: '팬카페', icon: '☕', effect: '❤️를 만들어요. 레벨이 높을수록 많이 쌓여요.' },
+  goods: { name: '굿즈샵', icon: '🛍️', effect: '인세(코인)가 늘어요.' },
+  practice: { name: '연습실', icon: '🎤', effect: '미니게임·계단 전투력이 올라요.' },
+  gallery: { name: '팬아트 갤러리', icon: '🖼️', effect: '싱글·앨범·모노그램 팬 획득이 늘어요.' },
+  band: { name: '합주실', icon: '🎸', effect: '라임 생산이 늘어요. 구역의 자아에게만 100%예요.' },
+  stall: { name: '포장마차', icon: '🍢', effect: '오프라인 정산 시간 상한이 늘어요.' },
+  storage: { name: '창고', icon: '📦', effect: '❤️를 더 오래 쌓아 둘 수 있어요.' },
+  park: { name: '쉼터', icon: '🌳', effect: '붙어 있는 건물의 효과를 키워요.' },
+  plaza: { name: '광장', icon: '🎪', effect: '주 1회 마을 축제를 열 수 있어요.' },
+};
+
+export const ZONE_TEXT: Record<'normal' | 'twilight' | 'dark', { name: string; line: string }> = {
+  normal: { name: '해 드는 거리', line: '일반 자아의 구역' },
+  twilight: { name: '황혼 골목', line: '두 자아의 경계' },
+  dark: { name: '지하 골목', line: '어둠 자아의 구역' },
+};
+
+/** 주민 이름 = 앞말 × 뒷말 (10 × 10 = 100명) */
+const RESIDENT_HEAD = ['민트', '새벽', '네온', '솜사탕', '고양이', '야근', '편의점', '옥상', '보름달', '이어폰'];
+const RESIDENT_TAIL = ['덕후', '지박령', '파수꾼', '요정', '수집가', '통역사', '제보자', '서포터', '기록관', '집사'];
+export const residentName = (n: number): string => `${RESIDENT_HEAD[n % 10]} ${RESIDENT_TAIL[Math.floor(n / 10) % 10]}`;
+
+/** 소식 사건 문구. {name}이 주민 이름이다. */
+export const NEWS_TEXT: readonly string[] = [
+  '{name}님이 직접 그린 팬아트를 두고 갔어요.',
+  '{name}님이 새벽 내내 줄을 서서 굿즈를 사 갔어요.',
+  '{name}님이 팬카페에 응원 글을 길게 남겼어요.',
+  '{name}님이 이어폰을 한쪽만 끼고 노래를 따라 부르고 있어요.',
+  '{name}님이 마을 어귀에 현수막을 걸었어요.',
+  '{name}님이 지하 골목에서 몰래 합주를 들었대요.',
+  '{name}님이 첫 직관 후기를 올려서 마을이 들썩여요.',
+  '{name}님이 비 오는 날 우산을 나눠 주고 있어요.',
+  '{name}님이 포장마차에서 어묵을 돌렸어요.',
+  '{name}님이 응원법을 새로 만들어 왔어요.',
+  '{name}님이 오래된 앨범을 안고 찾아왔어요.',
+  '{name}님이 보름달 아래서 소원을 빌고 있어요.',
+];
+
+export const NEWS_CHOICE_TEXT = { hearts: '❤️ 받기', boost: '📣 응원 부스트' } as const;

@@ -16,6 +16,10 @@ export interface SocialSummary {
   friendRequests: number;
   /** 안 읽은 개인채팅 메시지 수 */
   dmUnread: number;
+  /** 친구가 꽂아 줘서 아직 받지 않은 마을 깃발 수 */
+  villageFlags: number;
+  /** 월드 보스에서 받을 수 있는 보상(이번 주 단계 + 지난주 순위) 수 */
+  bossClaimable: number;
 }
 
 /** 신고창이 가리키는 대상 */
@@ -36,7 +40,7 @@ interface SocialState {
   dmWith: string | null;
 }
 
-export const EMPTY_SUMMARY: SocialSummary = { mailUnread: 0, mailClaimable: 0, friendRequests: 0, dmUnread: 0 };
+export const EMPTY_SUMMARY: SocialSummary = { mailUnread: 0, mailClaimable: 0, friendRequests: 0, dmUnread: 0, villageFlags: 0, bossClaimable: 0 };
 
 let state: SocialState = { summary: EMPTY_SUMMARY, profile: null, report: null, dmWith: null };
 const listeners = new Set<() => void>();
@@ -56,7 +60,7 @@ export const mailBadge = (s: SocialSummary): number => Math.max(s.mailUnread, s.
 /** 친구 알림: 받은 요청 + 안 읽은 개인채팅 */
 export const friendBadge = (s: SocialSummary): number => s.friendRequests + s.dmUnread;
 /** 더보기 탭의 알림 점에 더해지는 개수 */
-export const socialTotal = (s: SocialSummary): number => mailBadge(s) + friendBadge(s);
+export const socialTotal = (s: SocialSummary): number => mailBadge(s) + friendBadge(s) + s.villageFlags + s.bossClaimable;
 
 /** 새 소식 개수를 다시 가져온다. 실패하면 이전 값을 그대로 둔다. */
 export async function refreshSummary(): Promise<void> {

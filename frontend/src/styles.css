@@ -4995,3 +4995,151 @@ span.rar {
   font-size: 12.5px;
   border-left: 2px solid var(--line);
 }
+
+/* 팬 마을 */
+.village-grid {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0;
+}
+.vcell {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 0;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  color: var(--text);
+  font-family: inherit;
+  cursor: pointer;
+}
+.vcell:disabled {
+  cursor: default;
+  opacity: 1;
+}
+.vz-normal {
+  background: #fdf3d6;
+}
+.vz-twilight {
+  background: #e6ddf5;
+}
+.vz-dark {
+  background: #3a2349;
+  color: #f3eaf8;
+}
+.vcell-built {
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.vcell-sel {
+  border-color: var(--accent);
+}
+.vcell-target {
+  border-color: var(--good);
+  border-style: dashed;
+}
+.vcell-icon {
+  font-size: 26px;
+  line-height: 1;
+}
+.vcell-lv {
+  font-size: 11px;
+  font-weight: 700;
+}
+.vcell-plus {
+  font-size: 16px;
+  opacity: 0.35;
+}
+.village-palette,
+.village-news,
+.village-friends {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.village-palette li,
+.village-friends li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.village-palette p {
+  margin: 2px 0 0;
+}
+.village-friends li span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.village-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* 월드 보스 */
+.boss-bar {
+  position: relative;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  overflow: hidden;
+  margin: 8px 0 4px;
+}
+.boss-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--danger), var(--warn));
+  transition: width 0.4s;
+}
+.boss-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--line);
+}
+.boss-tick-hit {
+  background: var(--good);
+}
+.boss-tiers,
+.boss-top,
+.boss-feed {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.boss-tiers li,
+.boss-top li,
+.boss-feed li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: var(--panel-soft);
+}
+.boss-tiers li span,
+.boss-top .boss-name,
+.boss-feed li span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.boss-tier-hit {
+  outline: 1px solid var(--good);
+}

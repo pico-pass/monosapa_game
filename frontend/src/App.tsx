@@ -52,6 +52,8 @@ import { SamplerScreen } from './screens/SamplerScreen';
 import { SettingsSheet } from './screens/SettingsSheet';
 import { ShopScreen } from './screens/ShopScreen';
 import { SkillScreen } from './screens/SkillScreen';
+import { VillageScreen } from './screens/VillageScreen';
+import { BossScreen } from './screens/BossScreen';
 import { StatsScreen } from './screens/StatsScreen';
 import { TowerStage } from './screens/TowerStage';
 import { StudioScreen } from './screens/StudioScreen';
@@ -109,6 +111,8 @@ const SUB_TITLE: Partial<Record<TabId, string>> = {
   dm: '개인 채팅',
   postbox: '우편함',
   skills: '레벨 스킬',
+  village: '팬 마을',
+  boss: '월드 보스',
   admin: '관리자',
 };
 
@@ -200,6 +204,8 @@ function Game() {
         {ui.tab === 'dm' && <DmScreen />}
         {ui.tab === 'postbox' && <MailboxScreen />}
         {ui.tab === 'skills' && <SkillScreen />}
+        {ui.tab === 'village' && <VillageScreen />}
+        {ui.tab === 'boss' && <BossScreen />}
         {ui.tab === 'admin' && <AdminScreen />}
       </main>
       <nav className="tabs" aria-label="메인 메뉴">

@@ -32,15 +32,16 @@ import { evaluateAchievements, setTitle } from '../game/achievements';
 import { claimCert } from '../game/certs';
 import { evaluateEndless } from '../game/endless';
 import { buySkill, respecSkills } from '../game/skills';
+import { buildTile, chooseNews, demolishTile, harvestVillage, moveTile, startFestival, upgradeTile, type NewsChoice } from '../game/village';
 import { featPull, toggleFeat, type FeatPullResult } from '../game/featuring';
 import { addLyricCard, draftChoices, trimLyricCard } from '../game/lyricdeck';
 import { claimPresent, feedMascot, giftMascot, playMascot } from '../game/mascot';
 import { nurtureAct, nurtureWake } from '../game/nurture';
 import { buyTickets, craftPhoto, dismantlePhoto, giveCard, photoPull, takeCard, type PhotoPullResult } from '../game/photocards';
-import { applyChallengeClaim, applyChallengePosted, applyChartClaim, applyMailClaim } from '../game/serverRewards';
+import { applyBossClaim, applyChallengeClaim, applyChallengePosted, applyChartClaim, applyMailClaim, applyVillageHearts } from '../game/serverRewards';
 import { remasterCard, toggleDeck } from '../game/songcards';
 import { abandonTower, beginTower, finishTower, rollTower, type TowerOutcome, type TowerRun } from '../game/tower';
-import { ACHIEVEMENT_TEXT, CAMPAIGN_TEXT, COSTUME_TEXT, SNACK_TEXT, STAGE_TEXT, THEME_TEXT, pickLine, type Situation } from '../game/content';
+import { ACHIEVEMENT_TEXT, CAMPAIGN_TEXT, COSTUME_TEXT, SNACK_TEXT, STAGE_TEXT, THEME_TEXT, pickLine, residentName, type Situation } from '../game/content';
 import { replyMail, rollMail } from '../game/fanmail';
 import { claimAttendance, claimMission, rollMissions } from '../game/missions';
 import { buySlot, collectPost, startPost } from '../game/monogram';
@@ -72,6 +73,7 @@ import type {
   AlbumType,
   CampaignId,
   CommandResult,
+  BuildingId,
   CostumeId,
   DiamondUpgradeKind,
   EngineEvent,
@@ -119,9 +121,11 @@ export type TabId =
   | 'dm'
   | 'postbox'
   | 'skills'
+  | 'village'
+  | 'boss'
   | 'admin';
 /** 하단 탭의 「더보기」 안에 있는 화면들 */
-export const MORE_TABS: readonly TabId[] = ['stats', 'ranking', 'collection', 'shop', 'missions', 'achievements', 'mail', 'monogram', 'chat', 'inquiry', 'collect', 'nurture', 'arcade', 'challenge', 'chart', 'wrapped', 'sampler', 'friends', 'dm', 'postbox', 'skills', 'admin'];
+export const MORE_TABS: readonly TabId[] = ['stats', 'ranking', 'collection', 'shop', 'missions', 'achievements', 'mail', 'monogram', 'chat', 'inquiry', 'collect', 'nurture', 'arcade', 'challenge', 'chart', 'wrapped', 'sampler', 'friends', 'dm', 'postbox', 'skills', 'village', 'boss', 'admin'];
 export type Phase = 'booting' | 'ready' | 'readonly' | 'corrupt';
 
 export interface Bubble {
@@ -264,6 +268,13 @@ const FAIL_TEXT: Record<FailReason, string> = {
   care_cooldown: '이 행동은 1분에 한 번만 할 수 있어요. 잠시 뒤에 해 주세요.',
   no_points: '쓸 수 있는 스킬 포인트가 없어요. 플레이어 레벨이 오르면 생겨요.',
   need_max_level: '장비를 최대 레벨까지 올린 뒤에 한계를 돌파할 수 있어요.',
+  village_locked: '팬 3만 명부터 마을이 열려요.',
+  tile_invalid: '아직 열리지 않은 땅이에요.',
+  tile_taken: '이미 건물이 있는 칸이에요.',
+  building_limit: '이 건물은 더 지을 수 없어요.',
+  insufficient_hearts: '❤️가 부족해요.',
+  need_plaza: '광장을 지어야 축제를 열 수 있어요.',
+  festival_used: '축제는 한 주에 한 번만 열 수 있어요.',
 };
 
 /* ---------- 런타임(저장하지 않는) 변수 ---------- */
@@ -807,6 +818,149 @@ export function doClaimCert(platform: StreamPlatform): void {
   saveNow();
 }
 
+/* ---------- 팬 마을 ---------- */
+
+function villageDiamondToast(diamonds: number): void {
+  if (diamonds > 0) toast(`🎁 마을 이정표! 💎 +${diamonds}`, 'good');
+}
+
+export function doBuildTile(idx: number, b: BuildingId): void {
+  const r = exec((s) => buildTile(s, idx, b));
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  sfx.buy();
+  villageDiamondToast(r.diamonds);
+  saveNow();
+}
+
+export function doUpgradeTile(idx: number): void {
+  const r = exec((s) => upgradeTile(s, idx));
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  sfx.buy();
+  toast(`🏘️ ${r.level}레벨! (❤️ ${fmt(r.cost)})`, 'good');
+  villageDiamondToast(r.diamonds);
+  saveNow();
+}
+
+export function doDemolishTile(idx: number): void {
+  const r = exec((s) => demolishTile(s, idx));
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  toast(`🧹 철거했어요. ❤️ ${fmt(r.refund)}를 돌려받았어요.`, 'info');
+  saveNow();
+}
+
+export function doMoveTile(from: number, to: number): void {
+  const r = exec((s) => moveTile(s, from, to));
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  sfx.buy();
+  saveNow();
+}
+
+export function doHarvestVillage(): void {
+  const r = exec(harvestVillage);
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  sfx.unlock();
+  toast(`❤️ +${fmt(r.hearts)} 수확!`, 'good');
+  saveNow();
+}
+
+export function doChooseNews(bucket: number, choice: NewsChoice): void {
+  const r = exec((s) => chooseNews(s, bucket, choice));
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  sfx.buy();
+  toast(`${residentName(r.resident)}${r.isNew ? ' · 도감에 새로 올랐어요!' : ''}${r.hearts > 0 ? ` ❤️ +${fmt(r.hearts)}` : ' 📣 응원 부스트 시작'}`, 'good');
+  villageDiamondToast(r.diamonds);
+  saveNow();
+}
+
+export function doStartFestival(): void {
+  const r = exec(startFestival);
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  sfx.album();
+  toast(`🎪 마을 축제 시작! 하루 동안 ❤️ 생산이 두 배예요. (❤️ ${fmt(r.cost)})`, 'good');
+  saveNow();
+}
+
+/** 친구 마을에 응원 깃발을 꽂는다. ❤️는 서버가 하루 한 번만 내준다. */
+export async function doSendFlag(uid: string): Promise<boolean> {
+  try {
+    const res = await api<{ hearts: number }>(`village/${uid}/flag`, { method: 'POST' });
+    const r = exec((s) => applyVillageHearts(s, res.hearts));
+    if (r?.ok) {
+      sfx.unlock();
+      toast(`🚩 응원 깃발을 꽂았어요! ❤️ +${r.hearts}`, 'good');
+      saveNow(true);
+    }
+    return true;
+  } catch (e) {
+    toast(errorText(e), 'warn');
+    return false;
+  }
+}
+
+/** 친구들이 내 마을에 꽂아 준 깃발의 ❤️를 받는다. */
+export async function doClaimFlags(): Promise<boolean> {
+  try {
+    const res = await api<{ count: number; hearts: number }>('village/flags/claim', { method: 'POST' });
+    const r = exec((s) => applyVillageHearts(s, res.hearts));
+    if (r?.ok) {
+      sfx.unlock();
+      toast(`🚩 깃발 ${res.count}개에서 ❤️ +${r.hearts}`, 'good');
+      saveNow(true);
+    }
+    return true;
+  } catch (e) {
+    toast(errorText(e), 'warn');
+    return false;
+  }
+}
+
+/* ---------- 월드 보스 ---------- */
+
+export type BossKind = 'concert' | 'manual' | 'rhythm' | 'survival' | 'lyric';
+
+interface BossHitResult {
+  counted: boolean;
+  damage: number;
+  weak: boolean;
+  crit: boolean;
+  bossName: string;
+  reason: 'duplicate' | 'too_fast' | 'daily_cap' | null;
+}
+
+/** 끝난 판의 점수를 이번 주 보스에게 알린다. 서버가 하루 상한·중복을 걸러 주니 실패해도 게임에는 영향이 없다. */
+export function reportBossHit(kind: BossKind, score: number, runId: string): void {
+  void api<BossHitResult>('boss/hit', { method: 'POST', body: { kind, score, runId } })
+    .then((res) => {
+      if (res.counted) toast(`💥 ${res.bossName}에게 ${res.damage}${res.crit ? ' (크리티컬)' : ''}${res.weak ? ' · 약점!' : ''}`, 'good');
+      else if (res.reason === 'daily_cap') toast('오늘은 보스를 더 때릴 수 없어요. 내일 다시 와요.', 'info');
+    })
+    .catch(() => undefined);
+}
+
+/** 보스 단계 보상(이번 주) 또는 지난주 순위 보상을 받는다. */
+export async function doClaimBoss(last: boolean): Promise<boolean> {
+  try {
+    const res = await api<{ diamonds: number; label: string }>(last ? 'boss/claim-last' : 'boss/claim', { method: 'POST' });
+    const r = exec((s) => applyBossClaim(s, res.diamonds));
+    if (r?.ok) {
+      sfx.album();
+      toast(`🏆 ${res.label} 💎 +${r.diamonds}`, 'good');
+      saveNow(true);
+    }
+    return true;
+  } catch (e) {
+    toast(errorText(e), 'warn');
+    return false;
+  }
+}
+
 /* ---------- 상점·꾸미기 ---------- */
 
 export function doBuySnack(id: SnackId): void {
@@ -964,6 +1118,7 @@ export function finishManualConcertRun(runId: string, score: number, extra: Conc
   if (!r.ok) return failToast(r.reason);
   set({ concertRun: r.run });
   onConcertDone({ ...r.outcome }, extra);
+  if (r.outcome.score !== null) reportBossHit(run.game === 'timing' ? 'concert' : 'manual', r.outcome.score, run.id);
 }
 
 function onConcertDone(outcome: ConcertOutcome, extra: ConcertExtra = {}): void {
@@ -1144,6 +1299,7 @@ export function finishArcadeRun(runId: string, score: number): void {
   set({ arcadeRun: r.run, arcadeResult: { outcome: r.outcome, run: r.run }, lyricDraft: run.kind === 'lyric' ? draftChoices(run.seed) : null });
   sfx.finish(r.outcome.grade !== 'C');
   saveNow();
+  if (run.kind !== 'ticketing') reportBossHit(run.kind, r.outcome.score, run.id);
 }
 
 export function abandonArcadeRun(): void {

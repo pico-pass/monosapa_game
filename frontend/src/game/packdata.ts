@@ -3,6 +3,7 @@ import { nurtureBonus } from './nurturedata';
 import { mulberry32 } from './runner';
 import { mix } from './streaming';
 import type { CardRarity, GameState, Mascot, Persona, Single, SongCards, Vibe } from './types';
+import { villageEffects } from './villagedata';
 
 /*
  * 콘텐츠 팩 2의 순수 데이터 규칙: 곡 카드 파생, 포토카드 ID, 마스코트 단계·기분, 그리고 영구 보너스 합산.
@@ -182,9 +183,9 @@ export interface Bonuses {
   offlineMs: number;
 }
 
-export type BonusState = Pick<GameState, 'cards' | 'photo' | 'feat' | 'mascot' | 'nurture' | 'singles' | 'lastSettledAt' | 'skills' | 'streaming' | 'cosmetics'>;
+export type BonusState = Pick<GameState, 'cards' | 'photo' | 'feat' | 'mascot' | 'nurture' | 'singles' | 'lastSettledAt' | 'skills' | 'streaming' | 'cosmetics' | 'village'>;
 
-/** 수집품·레벨 스킬·스트리밍 인증·칭호가 주는 영구 보너스. 아무것도 없으면 전부 0이라 곱하는 쪽은 ×1이다. 마스코트 기분은 lastSettledAt 시점 기준이다. */
+/** 수집품·레벨 스킬·스트리밍 인증·칭호·팬 마을이 주는 영구 보너스. 아무것도 없으면 전부 0이라 곱하는 쪽은 ×1이다. 마스코트 기분은 lastSettledAt 시점 기준이다. */
 export function bonuses(s: BonusState): Bonuses {
   const b: Bonuses = { rhyme: { normal: 0, dark: 0 }, coin: 0, coinBy: { normal: 0, dark: 0 }, fan: 0, power: 0, offlineMs: 0 };
   const add = (vibe: Vibe, v: number, persona?: Persona) => {
@@ -230,6 +231,14 @@ export function bonuses(s: BonusState): Bonuses {
   // 칭호 효과: 달고 있는 칭호 하나
   const perk = titlePerkOf(s.cosmetics.title);
   if (perk) add(perk.vibe, perk.value);
+  // 팬 마을: 지어 둔 건물이 주는 효과(합주실은 구역의 자아에만)
+  const village = villageEffects(s.village);
+  add('coin', village.coin);
+  add('fan', village.fan);
+  add('power', village.power);
+  b.rhyme.normal += village.rhyme.normal;
+  b.rhyme.dark += village.rhyme.dark;
+  b.offlineMs += village.offlineMs;
   for (const p of ['normal', 'dark'] as const) {
     b.rhyme[p] += mascotBonus(s.mascot[p], s.lastSettledAt);
     // 모노사파 육성 레벨: 그 자아의 라임·인세, 이정표 레벨은 일반이 팬 획득, 어둠이 전투력

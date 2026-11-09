@@ -34,6 +34,52 @@ export type EquipStars = Record<Persona, Equipment>;
 export type SkillId = 'rhyme' | 'coin' | 'fan' | 'power' | 'offline';
 export type Skills = Record<SkillId, number>;
 
+/* ---------- 팬 마을 ---------- */
+
+/** 마을 건물. cafe 하트 생산 · goods 인세 · practice 전투력 · gallery 팬 획득 · band 라임(구역 자아) · stall 오프라인 상한 · storage 하트 저장 한도 · park 이웃 증폭 · plaza 축제 */
+export type BuildingId = 'cafe' | 'goods' | 'practice' | 'gallery' | 'band' | 'stall' | 'storage' | 'park' | 'plaza';
+
+export interface VillageTile {
+  b: BuildingId;
+  /** 1부터 BALANCE.village.maxLevel까지 */
+  lv: number;
+}
+
+/** 마을 소식 카드. 주민과 사건은 (씨앗, 시간 구간)으로만 정해지므로 번호만 저장한다. */
+export interface VillageNews {
+  /** 카드가 나온 시간 구간 번호(= floor(시각 / 구간 길이)). 카드의 ID이기도 하다. */
+  bucket: number;
+  /** 주민 번호 0~99 */
+  resident: number;
+  /** 사건 종류 번호 */
+  kind: number;
+}
+
+/** 팬들이 사는 마을. 8×8 땅(인덱스 = y×8 + x)의 가운데부터 팬 수에 따라 열린다. 규칙은 villagedata.ts·village.ts. */
+export interface Village {
+  /** 소식 카드를 정하는 씨앗 */
+  seed: number;
+  tiles: (VillageTile | null)[];
+  /** 마을 화폐 ❤️ */
+  hearts: number;
+  /** 수확을 기다리는 ❤️(소수 가능)와 그 값을 기록한 시각 */
+  stock: number;
+  at: number;
+  /** 응원 부스트(소식 선택)와 축제가 끝나는 시각. 지났으면 꺼진 것이다. */
+  boostUntil: number;
+  festivalUntil: number;
+  /** 마지막으로 축제를 연 주(weekKey) */
+  festivalWeek: string;
+  /** 아직 고르지 않은 소식 카드(오래된 것부터) */
+  news: VillageNews[];
+  /** 소식 카드를 마지막으로 만든 시간 구간 번호 */
+  newsBucket: number;
+  /** 만난 주민 번호(오름차순, 중복 없음) */
+  dex: number[];
+  /** 건물 레벨 합계 마일스톤 다이아를 지금까지 받은 횟수 */
+  paidSteps: number;
+}
+
 /** 스트리밍이 기록되는 음원 플랫폼 */
 export type StreamPlatform = 'spotify' | 'ytmusic' | 'melon' | 'applemusic';
 
@@ -344,6 +390,8 @@ export interface GameState {
   equipStars: EquipStars;
   /** 레벨 스킬 포인트를 찍은 단계. 쓸 수 있는 포인트는 플레이어 레벨에서 계산한다(skills.ts). */
   skills: Skills;
+  /** 팬 마을: 건물·하트·소식 */
+  village: Village;
   /** 끝없는 업적: 지표 ID → 지금까지 받은 단계 수 */
   endless: Record<string, number>;
   /** 간식·홍보 캠페인 버프 */
@@ -422,6 +470,14 @@ export type FailReason =
   // 성장 요소 확장
   | 'no_points'
   | 'need_max_level'
+  // 팬 마을
+  | 'village_locked'
+  | 'tile_invalid'
+  | 'tile_taken'
+  | 'building_limit'
+  | 'insufficient_hearts'
+  | 'need_plaza'
+  | 'festival_used'
   // 모노사파 육성
   | 'nurture_locked'
   | 'level_low'

@@ -41,6 +41,17 @@ interface TowerEntry {
   seenAgoMs: number | null;
   me: boolean;
 }
+interface VillageEntry {
+  rank: number;
+  uid: string;
+  name: string;
+  picture: string | null;
+  avatar: AvatarKind;
+  fame: number;
+  level: number;
+  seenAgoMs: number | null;
+  me: boolean;
+}
 interface Board<E> {
   entries: E[];
   mine: E | null;
@@ -81,7 +92,7 @@ function useBoard<E>(path: string): { data: Board<E> | null; error: boolean } {
   return { data, error };
 }
 
-type Kind = 'level' | 'tower' | 'nurture';
+type Kind = 'level' | 'tower' | 'nurture' | 'village';
 
 /** 랭킹. 서버에 저장된 진행 데이터 기준이라 내 기록은 저장이 올라간 뒤(최대 10초) 반영돼요. */
 export function RankingScreen() {
@@ -100,9 +111,13 @@ export function RankingScreen() {
         <button type="button" aria-pressed={kind === 'nurture'} onClick={() => setKind('nurture')}>
           육성
         </button>
+        <button type="button" aria-pressed={kind === 'village'} onClick={() => setKind('village')}>
+          마을
+        </button>
       </div>
       {kind === 'level' && <LevelBoard level={playerLevel(g.fans)} />}
       {kind === 'tower' && <TowerBoard best={g.arcade.tower.best} />}
+      {kind === 'village' && <VillageBoard fame={g.village.tiles.reduce((sum, t) => sum + (t?.lv ?? 0), 0)} />}
       {kind === 'nurture' && <NurtureBoard normal={nurtureLevel(g.nurture.normal.xp)} dark={nurtureLevel(g.nurture.dark.xp)} trained={g.nurture.normal.xp + g.nurture.dark.xp > 0} />}
     </section>
   );
@@ -224,6 +239,42 @@ export function NurtureBoard({ normal, dark, trained }: { normal: number; dark: 
             </>
           )}
           <p className="fineprint">육성을 시작한 {fmt(data.total)}명 · 30초마다 새로 불러와요</p>
+        </>
+      )}
+    </>
+  );
+}
+
+export function VillageBoard({ fame }: { fame: number }) {
+  const { data, error } = useBoard<VillageEntry>('ranking/village');
+  const inList = data?.entries.some((e) => e.me) ?? false;
+  const row = (e: VillageEntry) => <RankRow key={e.rank} e={e} main={<b>명성 {e.fame}</b>} sub={`Lv.${e.level}`} />;
+  return (
+    <>
+      <p className="muted">
+        팬 마을 명성 순위예요. 건물 레벨을 모두 더한 값이 높은 순이고, 같으면 먼저 가입한 쪽이 앞서요. {fame > 0 ? `지금 내 마을 명성은 ${fame}이에요.` : '건물을 하나라도 지으면 순위에 올라요.'}
+      </p>
+      <Status data={data} error={error} />
+      {data && (
+        <>
+          {data.entries.length === 0 ? (
+            <p className="muted">아직 마을을 지은 계정이 없어요.</p>
+          ) : (
+            <ol className="rank-list" aria-label={`마을 상위 ${data.entries.length}명`}>
+              {data.entries.map(row)}
+            </ol>
+          )}
+          {data.mine && !inList && (
+            <>
+              <p className="rank-gap" aria-hidden>
+                ⋮
+              </p>
+              <ol className="rank-list" start={data.mine.rank}>
+                {row(data.mine)}
+              </ol>
+            </>
+          )}
+          <p className="fineprint">마을을 지은 {fmt(data.total)}명 · 저장이 올라간 뒤 반영돼요 · 30초마다 새로 불러와요</p>
         </>
       )}
     </>

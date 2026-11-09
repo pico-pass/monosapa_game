@@ -47,6 +47,8 @@ async function render(tab: TabId, game: GameState): Promise<string> {
     studio: () => import('../StudioScreen'),
     stats: () => import('../StatsScreen'),
     skills: () => import('../SkillScreen'),
+    village: () => import('../VillageScreen'),
+    boss: () => import('../BossScreen'),
     release: () => import('../ReleaseScreen'),
     nurture: () => import('../NurtureScreen'),
     friends: () => import('../FriendsScreen'),
@@ -1107,5 +1109,53 @@ describe('성장 요소 확장 화면', () => {
     const other = await render('achievements', { ...s, cosmetics: { ...s.cosmetics, title: null } });
     expect(other).toContain('「라임 기계」 달기');
     expect(other).toContain('✍️ 라임 +1.5%');
+  });
+});
+
+describe('팬 마을·월드 보스 화면', () => {
+  const tile = (b: string, lv: number) => ({ b, lv });
+  const grid = (placed: Record<number, [string, number]>) => {
+    const t: ({ b: string; lv: number } | null)[] = Array.from({ length: 64 }, () => null);
+    for (const [i, [b, lv]] of Object.entries(placed)) t[Number(i)] = tile(b, lv);
+    return t;
+  };
+
+  it('더보기: 팬 마을과 월드 보스 메뉴', async () => {
+    const html = await render('more', createInitialState(T0));
+    expect(html).toContain('팬 마을');
+    expect(html).toContain('월드 보스');
+  });
+
+  it('팬 마을: 팬이 모자라면 열리는 조건을 알려 준다', async () => {
+    const html = await render('village', { ...createInitialState(T0), fans: 100 });
+    expect(html).toContain('팬이 30,000명이 되면');
+    expect(html).not.toContain('village-grid');
+  });
+
+  it('팬 마을: 열리면 땅·하트·수확·소식·축제·도감이 그려진다', async () => {
+    const s = createInitialState(T0);
+    const html = await render('village', { ...s, fans: 30_000, village: { ...s.village, tiles: grid({ 18: ['cafe', 2], 19: ['goods', 1] }) as never } });
+    expect(html).toContain('village-grid');
+    expect(html).toContain('팬카페 2레벨');
+    expect(html).toContain('굿즈샵 1레벨');
+    expect(html).toContain('❤️ 60'); // 시작 하트
+    expect(html).toContain('수확 대기');
+    expect(html).toContain('마을 소식');
+    expect(html).toContain('마을 축제');
+    expect(html).toContain('광장을 먼저 지어 주세요');
+    expect(html).toContain('주민 도감');
+    expect(html).toContain('내 마을');
+    expect(html).toContain('친구 마을');
+  });
+
+  it('팬 마을: 팬카페가 없으면 수확 버튼이 안내 문구다', async () => {
+    const html = await render('village', { ...createInitialState(T0), fans: 30_000 });
+    expect(html).toContain('팬카페를 지으면 ❤️가 쌓여요');
+  });
+
+  it('월드 보스: 불러오는 동안 제목과 안내만 보인다', async () => {
+    const html = await render('boss', createInitialState(T0));
+    expect(html).toContain('월드 보스');
+    expect(html).toContain('불러오는 중');
   });
 });
