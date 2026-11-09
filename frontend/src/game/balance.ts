@@ -1228,7 +1228,7 @@ export const BALANCE = {
    * 성장 요소 확장(수치는 모두 제안값이라 여기서 조정한다).
    *
    * 레벨 스킬: 플레이어 레벨 levelsPerPoint마다 포인트 1개를 받아 다섯 갈래(라임·인세·팬·전투력·오프라인)에 찍는다.
-   *   갈래마다 maxLevel까지, 한 단계에 perLevel(오프라인은 offlinePerLevelMs)만큼 영구 보너스. 포인트는 팬 수에서 계산하니 저장하지 않고,
+   *   갈래마다 최대 단계는 없고(포인트가 있는 만큼 찍는다), 한 단계에 perLevel(오프라인은 offlinePerLevelMs)만큼 영구 보너스. 포인트는 팬 수에서 계산하니 저장하지 않고,
    *   다이아 respecCost로 모두 돌려받아 다시 찍을 수 있다.
    * 장비 한계 돌파(★): 최대 레벨(20)인 장비를 코인으로 ★ max까지 더 올린다. ★n은 레벨 extraLevels[n−1]개를 더 올린 것처럼 계산된다.
    *   비용 = 그 장비의 최대 레벨 가격 × costMult[속성][n−1] (어둠 장비는 이미 비싸서 배수가 작다).
@@ -1241,9 +1241,8 @@ export const BALANCE = {
    */
   skills: {
     levelsPerPoint: 2,
-    maxLevel: 20,
     respecCost: 30,
-    perLevel: 0.015,
+    perLevel: 0.005,
     offlinePerLevelMs: 10 * 60_000,
   },
   equipStars: {

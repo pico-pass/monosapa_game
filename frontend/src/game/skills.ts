@@ -12,6 +12,9 @@ const fail = (state: GameState, reason: FailReason): Fail => ({ ok: false, reaso
 
 export const emptySkills = (): Skills => ({ rhyme: 0, coin: 0, fan: 0, power: 0, offline: 0 });
 
+/** 저장 검증이 받아들이는 갈래별 단계 상한. 포인트는 팬 수(재화 상한 1e15)에서 나와 약 350만을 넘지 못하니, 이는 이상한 값을 거르는 용도다. */
+export const SKILL_LEVEL_LIMIT = 1e7;
+
 /** 지금까지 받은 포인트 */
 export const skillPointsEarned = (fans: number): number => Math.floor((playerLevel(fans) - 1) / BALANCE.skills.levelsPerPoint);
 
@@ -31,11 +34,10 @@ export function levelsToNextPoint(fans: number): number {
 /** 한 갈래의 단계 하나가 올려 주는 값 (오프라인은 ms, 나머지는 비율) */
 export const skillPerLevel = (id: SkillId): number => (id === 'offline' ? BALANCE.skills.offlinePerLevelMs : BALANCE.skills.perLevel);
 
-/** 포인트 1개를 그 갈래에 찍는다. 포인트가 없으면 no_points, 갈래가 가득이면 max_level. */
+/** 포인트 1개를 그 갈래에 찍는다. 갈래마다 최대 단계는 없다. 포인트가 없으면 no_points. */
 export function buySkill(state: GameState, id: SkillId): CommandResult<{ level: number }> {
   if (!SKILL_IDS.includes(id)) return fail(state, 'not_found');
   const level = state.skills[id] ?? 0;
-  if (level >= BALANCE.skills.maxLevel) return fail(state, 'max_level');
   if (skillPointsFree(state) < 1) return fail(state, 'no_points');
   return { ok: true, state: { ...state, skills: { ...state.skills, [id]: level + 1 } }, level: level + 1 };
 }

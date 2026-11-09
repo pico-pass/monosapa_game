@@ -20,7 +20,7 @@ import {
   productionMultiplier,
   royaltyBreakdown,
 } from '../selectors';
-import { buySkill, emptySkills, levelsToNextPoint, respecSkills, skillPointsEarned, skillPointsFree, skillPointsSpent } from '../skills';
+import { SKILL_LEVEL_LIMIT, buySkill, emptySkills, levelsToNextPoint, respecSkills, skillPointsEarned, skillPointsFree, skillPointsSpent } from '../skills';
 import type { Album, GameState } from '../types';
 
 const T0 = 1_700_000_000_000;
@@ -67,11 +67,16 @@ describe('레벨 스킬', () => {
     expect(failReason(buySkill(r.state, 'coin'))).toBe('no_points');
   });
 
-  it('갈래마다 최대 단계가 있고 찍은 포인트는 합산된다', () => {
-    const maxed = base({ fans: RICH_FANS, skills: { ...emptySkills(), power: BALANCE.skills.maxLevel } });
-    expect(failReason(buySkill(maxed, 'power'))).toBe('max_level');
-    expect(skillPointsSpent(maxed.skills)).toBe(BALANCE.skills.maxLevel);
-    expect(skillPointsFree(maxed)).toBe(skillPointsEarned(RICH_FANS) - BALANCE.skills.maxLevel);
+  it('갈래마다 최대 단계가 없어 포인트가 있는 만큼 한 갈래에 몰아 찍을 수 있다', () => {
+    const earned = skillPointsEarned(RICH_FANS);
+    expect(earned).toBeGreaterThan(100);
+    let s = base({ fans: RICH_FANS });
+    for (let i = 0; i < earned; i++) s = ok(buySkill(s, 'power')).state;
+    expect(s.skills.power).toBe(earned);
+    expect(skillPointsSpent(s.skills)).toBe(earned);
+    expect(skillPointsFree(s)).toBe(0);
+    expect(failReason(buySkill(s, 'power'))).toBe('no_points');
+    expect(bonuses(s).power).toBeCloseTo(earned * BALANCE.skills.perLevel);
   });
 
   it('다시 찍기: 다이아를 내고 모두 돌려받는다', () => {
@@ -101,8 +106,13 @@ describe('레벨 스킬', () => {
   it('범위를 벗어난 단계는 저장 검증에서 거부하고, 없던 저장은 0으로 읽는다', () => {
     expect(roundTrip(base({ skills: { ...emptySkills(), coin: 7 } })).skills.coin).toBe(7);
     const raw = JSON.parse(JSON.stringify(base()));
-    raw.skills = { rhyme: BALANCE.skills.maxLevel + 1 };
+    raw.skills = { rhyme: SKILL_LEVEL_LIMIT + 1 };
     expect(validateState(raw).ok).toBe(false);
+    raw.skills = { rhyme: -1 };
+    expect(validateState(raw).ok).toBe(false);
+    raw.skills = { rhyme: 250 }; // 예전의 최대 단계(20)를 넘어도 받아들인다
+    const big = validateState(raw);
+    expect(big.ok && big.state.skills.rhyme).toBe(250);
     delete raw.skills;
     const v = validateState(raw);
     expect(v.ok && v.state.skills).toEqual(emptySkills());

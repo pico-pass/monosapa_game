@@ -7,7 +7,7 @@ import { emptyMonogram } from './monogram';
 import { Invalid, MAX_TIME, bad, bool, int, isObj, num, persona, str, type Obj } from './parse';
 import { emptyArcade, emptyCards, emptyFeat, emptyMascots, emptyNurtures, emptyPhoto, emptyStats, packSeeds, parseArcade, parseCards, parseFeat, parseMascots, parseNurtures, parsePhoto, parseStats } from './pack-state';
 import { retroactiveDiamonds } from './selectors';
-import { emptySkills } from './skills';
+import { SKILL_LEVEL_LIMIT, emptySkills } from './skills';
 import { streamSeedFrom, zeroTotals } from './streaming';
 import { COUNTER_KEYS, zeroCounters } from './tracking';
 import type {
@@ -147,7 +147,7 @@ function parseSkills(raw: unknown): Skills {
   const out = emptySkills();
   if (raw === undefined) return out;
   if (!isObj(raw)) return bad('skills가 올바르지 않습니다.');
-  for (const id of SKILL_IDS) if (raw[id] !== undefined) out[id] = int(raw, id, 0, BALANCE.skills.maxLevel, `skills.${id}`);
+  for (const id of SKILL_IDS) if (raw[id] !== undefined) out[id] = int(raw, id, 0, SKILL_LEVEL_LIMIT, `skills.${id}`);
   return out;
 }
 

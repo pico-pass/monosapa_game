@@ -1,4 +1,3 @@
-import { Progress } from '../components/parts';
 import { BALANCE, SKILL_IDS } from '../game/balance';
 import { LEVEL_SKILL_TEXT } from '../game/content';
 import { playerLevel } from '../game/selectors';
@@ -23,7 +22,7 @@ export function SkillScreen() {
     <section className="screen" aria-label="레벨 스킬">
       <h2 className="section-title">레벨 스킬</h2>
       <p className="muted">
-        플레이어 레벨이 {S.levelsPerPoint}오를 때마다 포인트 1개를 받아요. 갈래마다 최대 {S.maxLevel}단계까지 찍을 수 있고, 효과는 두 자아 모두에 적용돼요.
+        플레이어 레벨이 {S.levelsPerPoint}오를 때마다 포인트 1개를 받아요. 갈래마다 최대 단계는 없고, 효과는 두 자아 모두에 적용돼요.
       </p>
 
       <div className="stat-grid stat-grid-3">
@@ -46,26 +45,20 @@ export function SkillScreen() {
       {SKILL_IDS.map((id) => {
         const t = LEVEL_SKILL_TEXT[id];
         const level = g.skills[id] ?? 0;
-        const maxed = level >= S.maxLevel;
         return (
           <div key={id} className="card equip-card">
             <div className="card-row">
               <h3>
-                <span aria-hidden>{t.icon}</span> {t.name} <small>{level}/{S.maxLevel}</small>
+                <span aria-hidden>{t.icon}</span> {t.name} <small>{level}단계</small>
               </h3>
               <strong>{totalText(id, level)}</strong>
             </div>
-            <Progress value={level} max={S.maxLevel} label={`${t.name} 단계`} />
             <p className="muted">
               {t.effect} ({perLevelText(id)} / 단계)
             </p>
-            {maxed ? (
-              <p className="maxed">최대 단계 ✨</p>
-            ) : (
-              <button type="button" className="btn btn-primary btn-wide" disabled={free < 1} onClick={() => doBuySkill(id)}>
-                {free >= 1 ? `포인트 1개 찍기 (${totalText(id, level)} → ${totalText(id, level + 1)})` : '포인트가 없어요'}
-              </button>
-            )}
+            <button type="button" className="btn btn-primary btn-wide" disabled={free < 1} onClick={() => doBuySkill(id)}>
+              {free >= 1 ? `포인트 1개 찍기 (${totalText(id, level)} → ${totalText(id, level + 1)})` : '포인트가 없어요'}
+            </button>
           </div>
         );
       })}

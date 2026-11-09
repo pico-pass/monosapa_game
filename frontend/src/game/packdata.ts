@@ -216,9 +216,9 @@ export function bonuses(s: BonusState): Bonuses {
       for (const v of VIBES) add(v, sb.value);
     } else add(sb.kind, sb.value);
   }
-  // 레벨 스킬: 갈래마다 찍은 단계(최대 maxLevel)만큼
+  // 레벨 스킬: 갈래마다 찍은 단계만큼 (최대 단계는 없다)
   for (const id of SKILL_IDS) {
-    const lv = Math.min(Math.max(0, s.skills[id] ?? 0), BALANCE.skills.maxLevel);
+    const lv = Math.max(0, s.skills[id] ?? 0);
     if (id === 'offline') b.offlineMs += lv * BALANCE.skills.offlinePerLevelMs;
     else add(id, lv * BALANCE.skills.perLevel);
   }
