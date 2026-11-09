@@ -34,7 +34,7 @@ export const ROSTER: readonly BossDef[] = [
 export const bossOf = (week: number): BossDef => ROSTER[((week % ROSTER.length) + ROSTER.length) % ROSTER.length];
 
 /** 단계 수와 단계별 전원 보상(다이아). 단계 i(1부터)는 총 데미지가 목표의 i/TIER_COUNT에 닿으면 열린다. */
-export const TIER_REWARDS: readonly number[] = [1, 1, 2, 2, 4];
+export const TIER_REWARDS: readonly number[] = [10, 20, 30, 40, 50];
 export const TIER_COUNT = TIER_REWARDS.length;
 
 /** 한 사람이 하루에 인정받는 타수, 타 사이의 최소 간격 */

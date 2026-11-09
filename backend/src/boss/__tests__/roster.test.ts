@@ -76,11 +76,11 @@ describe('목표와 단계', () => {
   });
 
   it('단계 보상 합은 받은 단계부터 닿은 단계 직전까지다', () => {
-    expect(TIER_REWARDS).toEqual([1, 1, 2, 2, 4]);
-    expect(tierRewardSum(0, 5)).toBe(10);
-    expect(tierRewardSum(2, 4)).toBe(4);
+    expect(TIER_REWARDS).toEqual([10, 20, 30, 40, 50]);
+    expect(tierRewardSum(0, 5)).toBe(150);
+    expect(tierRewardSum(2, 4)).toBe(70);
     expect(tierRewardSum(3, 3)).toBe(0);
-    expect(tierRewardSum(0, 99)).toBe(10);
+    expect(tierRewardSum(0, 99)).toBe(150);
   });
 });
 
