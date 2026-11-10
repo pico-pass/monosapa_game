@@ -13,6 +13,7 @@ const ITEMS: { id: TabId; icon: string; name: string; desc: string; alert?: 'mis
   { id: 'collect', icon: '🃏', name: '수집', desc: '곡 카드·포토카드·피처링·마스코트', alert: 'collect' },
   { id: 'village', icon: '🏘️', name: '팬 마을', desc: '건물을 지어 ❤️와 영구 보너스를 모아요', alert: 'village', social: 'village' },
   { id: 'boss', icon: '👹', name: '월드 보스', desc: '모두 함께 이번 주 보스를 쓰러뜨려요', social: 'boss' },
+  { id: 'live', icon: '🎤', name: '라이브 대전', desc: '가사 빈칸 속도전·팬덤 모으기를 다른 팬과 실시간으로' },
   { id: 'nurture', icon: '🍼', name: '모노사파 육성', desc: '밥·놀이·술로 키우고 레벨로 강해져요', alert: 'nurture' },
   { id: 'arcade', icon: '🎮', name: '아케이드', desc: '리듬·생존·가사 덱·계단·피켓팅' },
   { id: 'challenge', icon: '#️⃣', name: '해시태그 챌린지', desc: '주간 주제로 한 줄 가사' },

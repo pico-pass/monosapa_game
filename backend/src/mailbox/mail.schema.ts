@@ -1,8 +1,8 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Types, type HydratedDocument } from 'mongoose';
 
-/** 우편의 종류: 친구의 선물 · 운영자가 보낸 우편 · 운영 경고·이용 제한 안내 · 신고 처리 결과 */
-export const MAIL_KINDS = ['gift', 'admin', 'warning', 'report'] as const;
+/** 우편의 종류: 친구의 선물 · 운영자가 보낸 우편 · 운영 경고·이용 제한 안내 · 신고 처리 결과 · 라이브 미니게임 보상 */
+export const MAIL_KINDS = ['gift', 'admin', 'warning', 'report', 'live'] as const;
 export type MailKind = (typeof MAIL_KINDS)[number];
 
 /** 우편이 남아 있는 기간. 지나면 MongoDB TTL 인덱스가 지운다(받지 않은 다이아도 함께 사라진다). */

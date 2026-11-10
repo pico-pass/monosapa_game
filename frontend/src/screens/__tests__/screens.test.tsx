@@ -905,6 +905,26 @@ describe('콘텐츠 팩 2 화면', () => {
     expect(await renderNamed(loader, 'NurtureBoard', 'ranking', g, {}, { normal: 1, dark: 1, trained: false })).toContain('한 번이라도 돌보면 순위에 올라요');
   });
 
+  it('더보기: 라이브 대전 항목이 있고 라이브 탭이 더보기 안에 있다', async () => {
+    const g = packState();
+    const html = await renderNamed(() => import('../MoreScreen'), 'MoreScreen', 'more', g);
+    expect(html).toContain('라이브 대전');
+    const store = await import('../../store/gameStore');
+    expect(store.MORE_TABS).toContain('live');
+  });
+
+  it('랭킹: 싱글 탭에서 일반·어둠을 고르고 내 발매 수를 안내한다', async () => {
+    const g = packState();
+    const loader = () => import('../RankingScreen');
+    expect(await renderNamed(loader, 'RankingScreen', 'ranking', g)).toContain('싱글');
+    const mine = await renderNamed(loader, 'SinglesBoard', 'ranking', g, {}, { normal: 12, dark: 3 });
+    expect(mine).toContain('일반');
+    expect(mine).toContain('어둠');
+    expect(mine).toContain('지금 내 일반 싱글은 12곡');
+    expect(mine).toContain('불러오는 중');
+    expect(await renderNamed(loader, 'SinglesBoard', 'ranking', g, {}, { normal: 0, dark: 3 })).toContain('일반 싱글을 하나라도 발매하면 순위에 올라요');
+  });
+
   it('프로필 접속 상태: 접속 중 또는 n분 전 접속', async () => {
     const g = packState();
     const loader = () => import('../../components/parts');

@@ -4,6 +4,7 @@ import { Types, type Model } from 'mongoose';
 import type { PutSaveDto, PutSaveResultDto, SaveDto } from './dto/save.dto.js';
 import { villageFameOf } from '../village/rules.js';
 import { Save, type SaveDocument } from './save.schema.js';
+import { singleCountsOf } from './singles.js';
 
 const MAX_STATE_BYTES = 1_000_000;
 const MAX_DEPTH = 8;
@@ -61,9 +62,12 @@ export interface RankFields {
   nurtureXp: number;
   /** 팬 마을 명성(건물 레벨 합계) */
   villageFame: number;
+  /** 일반·어둠 싱글 발매 수 */
+  singlesNormal: number;
+  singlesDark: number;
 }
 
-/** 저장된 state 에서 랭킹용 팬 수·레벨·계단 최고 층·육성 레벨·마을 명성을 뽑는다. 이상한 값은 0명(레벨 1)·0층·육성 1레벨로 본다. */
+/** 저장된 state 에서 랭킹용 팬 수·레벨·계단 최고 층·육성 레벨·마을 명성·싱글 발매 수를 뽑는다. 이상한 값은 0명(레벨 1)·0층·육성 1레벨·0곡으로 본다. */
 export function rankFieldsOf(state: Record<string, unknown>): RankFields {
   const raw = state.fans;
   const fans = typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? Math.min(raw, 1e15) : 0;
@@ -74,7 +78,19 @@ export function rankFieldsOf(state: Record<string, unknown>): RankFields {
   const darkXp = nurtureXpOf(nurture.dark);
   const nurtureNormal = nurtureLevelOf(normalXp);
   const nurtureDark = nurtureLevelOf(darkXp);
-  return { fans, level: 1 + Math.floor(Math.sqrt(fans / FANS_PER_LEVEL_STEP)), towerBest, nurtureNormal, nurtureDark, nurtureTotal: nurtureNormal + nurtureDark, nurtureXp: normalXp + darkXp, villageFame: villageFameOf(state) };
+  const singles = singleCountsOf(state);
+  return {
+    fans,
+    level: 1 + Math.floor(Math.sqrt(fans / FANS_PER_LEVEL_STEP)),
+    towerBest,
+    nurtureNormal,
+    nurtureDark,
+    nurtureTotal: nurtureNormal + nurtureDark,
+    nurtureXp: normalXp + darkXp,
+    villageFame: villageFameOf(state),
+    singlesNormal: singles.normal,
+    singlesDark: singles.dark,
+  };
 }
 
 const toDto = (d: SaveDocument): SaveDto => ({ state: d.state, version: d.version, savedAt: d.savedAt });

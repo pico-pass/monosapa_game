@@ -55,6 +55,13 @@ export class Save {
   @Prop({ type: Number, default: 0 })
   villageFame!: number;
 
+  /** 일반·어둠 싱글 발매 수. 랭킹용으로 state.singles 에서 자아별로 세어 둔 값이다. */
+  @Prop({ type: Number, default: 0 })
+  singlesNormal!: number;
+
+  @Prop({ type: Number, default: 0 })
+  singlesDark!: number;
+
   /** 마지막으로 쓴 클라이언트(페이지 로드) 식별자. 응답이 유실돼 같은 클라이언트가 재시도하는 경우를 충돌로 보지 않기 위한 값이다. */
   @Prop({ required: true })
   lastWriter!: string;
@@ -73,3 +80,6 @@ SaveSchema.index({ towerBest: -1 });
 SaveSchema.index({ nurtureTotal: -1, nurtureXp: -1 });
 // 마을 랭킹 조회: 명성 ↓
 SaveSchema.index({ villageFame: -1 });
+// 싱글 발매 수 랭킹 조회: 자아별 발매 수 ↓
+SaveSchema.index({ singlesNormal: -1 });
+SaveSchema.index({ singlesDark: -1 });

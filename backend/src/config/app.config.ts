@@ -25,4 +25,7 @@ export class AppConfig {
   readonly sessionTtlDays: number = Number(process.env.SESSION_TTL_DAYS ?? 30);
 
   readonly sessionCookieName = 'monosapa_session';
+
+  /** 소켓 서버(realtime)와 나누는 비밀 값. 비어 있으면 라이브 미니게임 보상 주소(/api/internal/live-reward)는 꺼진다. */
+  readonly realtimeSecret: string = (process.env.REALTIME_SECRET ?? '').trim();
 }

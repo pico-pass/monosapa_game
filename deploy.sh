@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 모노사파 키우기 배포: 테스트 → 빌드 → 백업 → 정적 파일 교체(nginx) → 백엔드 재시작(pm2, 바뀐 경우만) → 검증.
+# 모노사파 키우기 배포: 테스트 → 빌드 → 백업 → 정적 파일 교체(nginx) → 백엔드·소켓 서버 재시작(pm2, 바뀐 경우만) → 검증.
 #
 #   ./deploy.sh                    배포
 #   ./deploy.sh --skip-tests       테스트를 건너뛰고 배포
@@ -7,13 +7,15 @@
 #   ./deploy.sh rollback [폴더]    프런트를 백업으로 되돌린다 (폴더를 안 주면 가장 최근 백업)
 #
 # nginx 설정은 이 스크립트가 관리하지 않는다(정적 파일만 바뀌므로 reload도 필요 없다).
-# 환경 변수로 바꿀 수 있다: WEB_ROOT, DOMAIN, PM2_NAME, BACKUP_ROOT, KEEP_BACKUPS
+# 라이브 미니게임 소켓 서버(realtime/, pm2 이름 monosapa-realtime, 127.0.0.1:3001)는 nginx 의 /rt 웹소켓 프록시가 있어야 바깥에서 닿는다(README 「라이브 대전」).
+# 환경 변수로 바꿀 수 있다: WEB_ROOT, DOMAIN, PM2_NAME, PM2_RT_NAME, BACKUP_ROOT, KEEP_BACKUPS
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WEB_ROOT="${WEB_ROOT:-/var/www/monosapa}"
 DOMAIN="${DOMAIN:-monogame69.net}"
 PM2_NAME="${PM2_NAME:-monosapa-backend}"
+PM2_RT_NAME="${PM2_RT_NAME:-monosapa-realtime}"
 BACKUP_ROOT="${BACKUP_ROOT:-$HOME/deploy-backup}"
 KEEP_BACKUPS="${KEEP_BACKUPS:-10}"
 
@@ -98,6 +100,14 @@ backend_hash() {
   fi
 }
 
+realtime_hash() {
+  if [ -d realtime/dist ]; then
+    (cd realtime/dist && find . -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)
+  else
+    echo none
+  fi
+}
+
 log "배포 대상: $(git rev-parse --short HEAD 2>/dev/null || echo '?') → https://$DOMAIN"
 if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
   warn "커밋하지 않은 변경이 있어요. 작업 폴더의 현재 상태가 그대로 배포돼요."
@@ -110,8 +120,10 @@ fi
 
 log "빌드"
 before="$(backend_hash)"
+rt_before="$(realtime_hash)"
 npm run build
 after="$(backend_hash)"
+rt_after="$(realtime_hash)"
 [ -f frontend/dist/index.html ] || die "frontend/dist/index.html 이 없어요. 빌드를 확인해 주세요."
 expect_js="$(grep -o 'assets/index-[A-Za-z0-9_-]*\.js' frontend/dist/index.html | head -1)"
 [ -n "$expect_js" ] || die "index.html 에서 번들 경로를 찾지 못했어요."
@@ -124,6 +136,14 @@ elif [ -z "$backend_pid" ] || [ "$backend_pid" = 0 ]; then
   restart_backend=1
 fi
 
+rt_pid="$(pm2 pid "$PM2_RT_NAME" 2>/dev/null | tr -d '[:space:]' || true)"
+restart_realtime=0
+if [ "$rt_before" != "$rt_after" ]; then
+  restart_realtime=1
+elif [ -z "$rt_pid" ] || [ "$rt_pid" = 0 ]; then
+  restart_realtime=1
+fi
+
 if [ "$dry_run" = 1 ]; then
   log "dry-run: 프런트 변경 목록 (서버는 건드리지 않았어요)"
   # 내용(체크섬)이 다른 파일만 나온다. 권한·소유자는 비교하지 않는다. (>f+++ 새 파일, >f.c 내용 변경, *deleting 삭제)
@@ -131,6 +151,7 @@ if [ "$dry_run" = 1 ]; then
   echo "${changes:-  (바뀐 파일 없음)}"
   echo "  새 번들: $expect_js"
   echo "  백엔드 재시작: $([ "$restart_backend" = 1 ] && echo '필요해요' || echo '필요 없어요 (변경 없음, 실행 중)')"
+  echo "  소켓 서버 재시작: $([ "$restart_realtime" = 1 ] && echo '필요해요' || echo '필요 없어요 (변경 없음, 실행 중)')"
   exit 0
 fi
 
@@ -158,13 +179,40 @@ else
   log "백엔드: 변경 없음, 실행 중이라 그대로 둬요."
 fi
 
+if [ "$restart_realtime" = 1 ]; then
+  log "소켓 서버 재시작: $PM2_RT_NAME"
+  if pm2 describe "$PM2_RT_NAME" >/dev/null 2>&1; then
+    pm2 restart "$PM2_RT_NAME" --update-env
+  else
+    pm2 start dist/main.js --name "$PM2_RT_NAME" --cwd "$ROOT/realtime"
+  fi
+  pm2 save >/dev/null
+else
+  log "소켓 서버: 변경 없음, 실행 중이라 그대로 둬요."
+fi
+
 if "${SUDO[@]}" nginx -t >/dev/null 2>&1; then
   echo "  nginx 설정 검사 통과"
 else
   warn "nginx -t 를 확인하지 못했어요(권한이나 설정 문제일 수 있어요)."
 fi
 
+# 소켓 서버는 nginx 의 /rt 프록시가 있어야 닿는다. 실패해도 배포를 되돌리지는 않고 알려만 준다.
+verify_realtime() {
+  local i
+  for i in 1 2 3 4 5; do
+    if curl -fsS --max-time 10 "https://$DOMAIN/rt/health" 2>/dev/null | grep -q '"status":"ok"'; then
+      echo "  /rt/health 정상(소켓 서버)"
+      return 0
+    fi
+    sleep 1
+  done
+  warn "https://$DOMAIN/rt/health 에 닿지 않아요. nginx 에 /rt 웹소켓 프록시가 있는지, pm2 의 $PM2_RT_NAME 이 떠 있는지 확인해 주세요."
+  return 0
+}
+
 if verify_live "$expect_js"; then
+  verify_realtime
   # 오래된 백업 정리 (최근 KEEP_BACKUPS 개만 남긴다)
   ls -1d "$BACKUP_ROOT"/monosapa-* 2>/dev/null | sort | head -n -"$KEEP_BACKUPS" | xargs -r -d '\n' rm -rf
   log "배포 완료 ✔  https://$DOMAIN"

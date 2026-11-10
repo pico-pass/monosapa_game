@@ -52,6 +52,17 @@ interface VillageEntry {
   seenAgoMs: number | null;
   me: boolean;
 }
+interface SinglesEntry {
+  rank: number;
+  uid: string;
+  name: string;
+  picture: string | null;
+  avatar: AvatarKind;
+  count: number;
+  level: number;
+  seenAgoMs: number | null;
+  me: boolean;
+}
 interface Board<E> {
   entries: E[];
   mine: E | null;
@@ -92,7 +103,7 @@ function useBoard<E>(path: string): { data: Board<E> | null; error: boolean } {
   return { data, error };
 }
 
-type Kind = 'level' | 'tower' | 'nurture' | 'village';
+type Kind = 'level' | 'tower' | 'nurture' | 'village' | 'singles';
 
 /** 랭킹. 서버에 저장된 진행 데이터 기준이라 내 기록은 저장이 올라간 뒤(최대 10초) 반영돼요. */
 export function RankingScreen() {
@@ -101,7 +112,7 @@ export function RankingScreen() {
   return (
     <section className="screen" aria-label="랭킹">
       <h2 className="section-title">랭킹</h2>
-      <div className="seg" role="group" aria-label="랭킹 종류">
+      <div className="seg seg-tight" role="group" aria-label="랭킹 종류">
         <button type="button" aria-pressed={kind === 'level'} onClick={() => setKind('level')}>
           레벨
         </button>
@@ -114,10 +125,14 @@ export function RankingScreen() {
         <button type="button" aria-pressed={kind === 'village'} onClick={() => setKind('village')}>
           마을
         </button>
+        <button type="button" aria-pressed={kind === 'singles'} onClick={() => setKind('singles')}>
+          싱글
+        </button>
       </div>
       {kind === 'level' && <LevelBoard level={playerLevel(g.fans)} />}
       {kind === 'tower' && <TowerBoard best={g.arcade.tower.best} />}
       {kind === 'village' && <VillageBoard fame={g.village.tiles.reduce((sum, t) => sum + (t?.lv ?? 0), 0)} />}
+      {kind === 'singles' && <SinglesBoard normal={g.singles.filter((s) => s.persona === 'normal').length} dark={g.singles.filter((s) => s.persona === 'dark').length} />}
       {kind === 'nurture' && <NurtureBoard normal={nurtureLevel(g.nurture.normal.xp)} dark={nurtureLevel(g.nurture.dark.xp)} trained={g.nurture.normal.xp + g.nurture.dark.xp > 0} />}
     </section>
   );
@@ -275,6 +290,57 @@ export function VillageBoard({ fame }: { fame: number }) {
             </>
           )}
           <p className="fineprint">마을을 지은 {fmt(data.total)}명 · 저장이 올라간 뒤 반영돼요 · 30초마다 새로 불러와요</p>
+        </>
+      )}
+    </>
+  );
+}
+
+/** 싱글 발매 수 랭킹: 일반·어둠 중 한 쪽을 골라 본다. normal·dark는 내가 그 자아로 발매한 싱글 수. */
+export function SinglesBoard({ normal, dark }: { normal: number; dark: number }) {
+  const [side, setSide] = useState<'normal' | 'dark'>('normal');
+  const { data, error } = useBoard<SinglesEntry>(`ranking/singles/${side}`);
+  const inList = data?.entries.some((e) => e.me) ?? false;
+  const label = side === 'dark' ? '어둠' : '일반';
+  const mine = side === 'dark' ? dark : normal;
+  const row = (e: SinglesEntry) => <RankRow key={e.rank} e={e} main={<b>{fmt(e.count)}곡</b>} sub={`Lv.${e.level}`} />;
+  return (
+    <>
+      <div className="seg" role="group" aria-label="싱글 자아">
+        <button type="button" aria-pressed={side === 'normal'} onClick={() => setSide('normal')}>
+          일반
+        </button>
+        <button type="button" aria-pressed={side === 'dark'} onClick={() => setSide('dark')}>
+          어둠
+        </button>
+      </div>
+      <p className="muted">
+        {label} 싱글 발매 수 순위예요. 그 자아로 발매한 싱글이 많은 순이고, 같으면 먼저 가입한 쪽이 앞서요.{' '}
+        {mine > 0 ? `지금 내 ${label} 싱글은 ${fmt(mine)}곡이에요.` : `${label} 싱글을 하나라도 발매하면 순위에 올라요.`}
+      </p>
+      <Status data={data} error={error} />
+      {data && (
+        <>
+          {data.entries.length === 0 ? (
+            <p className="muted">아직 {label} 싱글을 발매한 계정이 없어요.</p>
+          ) : (
+            <ol className="rank-list" aria-label={`${label} 싱글 상위 ${data.entries.length}명`}>
+              {data.entries.map(row)}
+            </ol>
+          )}
+          {data.mine && !inList && (
+            <>
+              <p className="rank-gap" aria-hidden>
+                ⋮
+              </p>
+              <ol className="rank-list" start={data.mine.rank}>
+                {row(data.mine)}
+              </ol>
+            </>
+          )}
+          <p className="fineprint">
+            {label} 싱글을 발매한 {fmt(data.total)}명 · 저장이 올라간 뒤 반영돼요 · 30초마다 새로 불러와요
+          </p>
         </>
       )}
     </>

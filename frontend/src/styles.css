@@ -1281,6 +1281,11 @@ button {
   color: var(--accent-ink);
   font-weight: 700;
 }
+/* 탭이 다섯 개인 랭킹 종류: 좁은 폰(375px)에서 마지막 탭이 잘리지 않게 좌우 여백을 줄이고 남는 폭을 나눈다 */
+.seg-tight button {
+  flex: 1 1 auto;
+  padding: 0 8px;
+}
 
 /* ---------- 직접 공연 ---------- */
 .stage-overlay {
@@ -5147,4 +5152,155 @@ span.rar {
 }
 .boss-tier-hit {
   outline: 1px solid var(--good);
+}
+
+/* ---------- 라이브 대전(가사 빈칸 속도전·팬덤 모으기) ---------- */
+.live-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.live-timer {
+  height: 6px;
+  border-radius: 6px;
+  background: var(--panel-soft);
+  overflow: hidden;
+}
+.live-timer i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.25s linear;
+}
+.live-line {
+  margin: 4px 0;
+  font-size: 20px;
+  line-height: 1.7;
+  font-weight: 700;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.live-blank {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin: 0 4px;
+  vertical-align: middle;
+}
+.live-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.3em;
+  height: 1.5em;
+  border-bottom: 3px solid var(--accent);
+  background: var(--panel-soft);
+  border-radius: 6px 6px 0 0;
+  font-style: normal;
+  color: var(--accent);
+}
+.live-answer {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-radius: 6px;
+  padding: 0 4px;
+}
+.live-form {
+  display: flex;
+  gap: 8px;
+}
+.live-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 12px;
+  font-size: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-soft);
+  color: inherit;
+}
+.live-players,
+.live-feed,
+.live-board,
+.live-lb {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.live-players li,
+.live-feed li,
+.live-board li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--panel-soft);
+}
+.live-board .live-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.live-me {
+  outline: 1px solid var(--accent);
+}
+.live-me em {
+  margin-left: 6px;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--accent);
+}
+.live-reward {
+  margin: 0;
+  font-weight: 700;
+  color: var(--good);
+}
+.live-field {
+  position: relative;
+}
+.live-hud {
+  position: absolute;
+  inset: 8px 8px auto 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+.live-hud strong {
+  display: block;
+  font-size: 18px;
+}
+.live-hud small {
+  font-size: 12px;
+}
+.live-lb {
+  gap: 2px;
+  font-size: 12px;
+  text-align: right;
+}
+.live-over {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px;
+  text-align: center;
+  background: rgba(10, 8, 24, 0.82);
+  color: #fff;
+}
+.live-boost {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }

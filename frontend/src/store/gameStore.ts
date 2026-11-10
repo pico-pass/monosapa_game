@@ -123,9 +123,10 @@ export type TabId =
   | 'skills'
   | 'village'
   | 'boss'
+  | 'live'
   | 'admin';
 /** 하단 탭의 「더보기」 안에 있는 화면들 */
-export const MORE_TABS: readonly TabId[] = ['stats', 'ranking', 'collection', 'shop', 'missions', 'achievements', 'mail', 'monogram', 'chat', 'inquiry', 'collect', 'nurture', 'arcade', 'challenge', 'chart', 'wrapped', 'sampler', 'friends', 'dm', 'postbox', 'skills', 'village', 'boss', 'admin'];
+export const MORE_TABS: readonly TabId[] = ['stats', 'ranking', 'collection', 'shop', 'missions', 'achievements', 'mail', 'monogram', 'chat', 'inquiry', 'collect', 'nurture', 'arcade', 'challenge', 'chart', 'wrapped', 'sampler', 'friends', 'dm', 'postbox', 'skills', 'village', 'boss', 'live', 'admin'];
 export type Phase = 'booting' | 'ready' | 'readonly' | 'corrupt';
 
 export interface Bubble {

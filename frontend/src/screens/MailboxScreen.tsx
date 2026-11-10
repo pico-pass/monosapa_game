@@ -4,7 +4,7 @@ import { api, errorText } from '../platform/api';
 import { doClaimMail, toast } from '../store/gameStore';
 import { refreshSummary } from '../store/socialStore';
 
-type Kind = 'gift' | 'admin' | 'warning' | 'report';
+type Kind = 'gift' | 'admin' | 'warning' | 'report' | 'live';
 interface Mail {
   id: string;
   kind: Kind;
@@ -23,7 +23,7 @@ interface Mailbox {
   claimable: number;
 }
 
-const KIND_ICON: Record<Kind, string> = { gift: '🎁', admin: '📢', warning: '⚠️', report: '📝' };
+const KIND_ICON: Record<Kind, string> = { gift: '🎁', admin: '📢', warning: '⚠️', report: '📝', live: '🎤' };
 const DAY_MS = 86_400_000;
 const daysLeft = (expiresAt: number, now: number) => Math.max(0, Math.ceil((expiresAt - now) / DAY_MS));
 

@@ -73,3 +73,18 @@ export class VillageRankingDto {
   /** 랭킹에 오른 전체 계정 수 */
   total!: number;
 }
+
+export class SinglesRankingEntryDto extends RankingWhoDto {
+  /** 그 자아로 발매한 싱글 수 */
+  count!: number;
+  level!: number;
+}
+
+/** GET /api/ranking/singles/normal·dark 응답. 그 자아로 싱글을 한 장이라도 발매한 계정만 오른다. */
+export class SinglesRankingDto {
+  entries!: SinglesRankingEntryDto[];
+  /** 내 순위(아직 그 자아로 발매한 싱글이 없으면 null) */
+  mine!: SinglesRankingEntryDto | null;
+  /** 랭킹에 오른 전체 계정 수 */
+  total!: number;
+}

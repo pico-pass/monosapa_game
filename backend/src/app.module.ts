@@ -10,6 +10,7 @@ import { DmModule } from './dm/dm.module.js';
 import { FriendsModule } from './friends/friends.module.js';
 import { HealthModule } from './health/health.module.js';
 import { InquiriesModule } from './inquiries/inquiries.module.js';
+import { LiveModule } from './live/live.module.js';
 import { MailboxModule } from './mailbox/mailbox.module.js';
 import { ProfilesModule } from './profiles/profiles.module.js';
 import { RankingModule } from './ranking/ranking.module.js';
@@ -22,6 +23,6 @@ import { VillageModule } from './village/village.module.js';
 
 /** 루트 모듈. 기능은 기능별 모듈로 나눠 여기서 가져온다. */
 @Module({
-  imports: [ConfigModule, DatabaseModule, UsersModule, AuthModule, SavesModule, RankingModule, ChatModule, InquiriesModule, ChallengeModule, ChartModule, TradesModule, ProfilesModule, FriendsModule, MailboxModule, DmModule, ReportsModule, VillageModule, BossModule, SocialModule, HealthModule],
+  imports: [ConfigModule, DatabaseModule, UsersModule, AuthModule, SavesModule, RankingModule, ChatModule, InquiriesModule, ChallengeModule, ChartModule, TradesModule, ProfilesModule, FriendsModule, MailboxModule, DmModule, ReportsModule, VillageModule, BossModule, LiveModule, SocialModule, HealthModule],
 })
 export class AppModule {}
