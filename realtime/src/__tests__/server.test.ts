@@ -53,6 +53,11 @@ interface Client {
 
 const settle = (ms = 40): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
+/** 조건이 참이 될 때까지(최대 ms) 기다린다. 한 번에 많이 몰아 보낸 메시지가 소켓을 지나가는 시간이 기계마다 달라서 고정 대기 대신 쓴다. */
+async function until(cond: () => unknown, ms = 3000): Promise<void> {
+  for (let waited = 0; waited < ms && !cond(); waited += 20) await settle(20);
+}
+
 async function connect(user: string | null, opts: { origin?: string; path?: string } = {}): Promise<Client> {
   const headers: Record<string, string> = { origin: opts.origin ?? `http://127.0.0.1:${port}` };
   if (user) headers.cookie = `u=${user}`;
@@ -140,11 +145,12 @@ describe('가사 빈칸 속도전(소켓)', () => {
     expect(a.last('l.lobby')?.players.map((p) => p.name)).toEqual(['에이', '비']);
     expect(app.hub.stats.rooms).toBe(1);
 
-    const rounds = Math.min(QUIZ.rounds, LINES.length);
+    // 문제 수에 끝이 없다: 맞히는 동안 이어지다가, 아무도 못 맞힌 문제가 나오면 끝난다
+    const solvedRounds = 3;
     clock += QUIZ.lobbyMs;
     app.hub.tick(clock);
     await settle();
-    for (let r = 0; r < rounds; r++) {
+    for (let r = 0; r < solvedRounds; r++) {
       expect(a.last('l.q')?.round).toBe(r + 1);
       a.send({ t: 'ans', text: '틀린 답' });
       await settle();
@@ -162,7 +168,17 @@ describe('가사 빈칸 속도전(소켓)', () => {
       app.hub.tick(clock);
       await settle();
     }
+    expect(a.last('l.end')).toBeUndefined();
+    expect(a.last('l.q')?.round).toBe(solvedRounds + 1);
+    clock += QUIZ.answerMs; // 이번 문제는 아무도 못 맞힌다
+    app.hub.tick(clock);
+    await settle();
+    expect(a.last('l.reveal')).toMatchObject({ last: true });
+    clock += QUIZ.revealMs;
+    app.hub.tick(clock);
+    await settle();
     const end = a.last('l.end')!;
+    expect(end.rounds).toBe(solvedRounds + 1);
     expect(end.rewarded).toBe(true);
     expect(end.rows[0]).toMatchObject({ name: '에이', rank: 1, reward: QUIZ.rewards[0] });
     expect(end.rows[1]).toMatchObject({ name: '비', rank: 2, reward: QUIZ.rewards[1] });
@@ -237,7 +253,7 @@ describe('팬덤 모으기(소켓)', () => {
       clock += FANDOM.stepMs;
       app.hub.tick(clock);
     }
-    await settle();
+    await until(() => a.last('f.over'));
     const over = a.last('f.over')!;
     expect(['dead', 'time']).toContain(over.why);
     expect(over.peak).toBeGreaterThanOrEqual(over.fans);

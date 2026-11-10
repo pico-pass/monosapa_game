@@ -1,6 +1,8 @@
 /*
  * 가사 빈칸 속도전 방(순수 상태 기계). 시간·난수·보내기를 밖에서 받아서 테스트에서 시계를 마음대로 돌릴 수 있다.
- * 흐름: 대기실(lobby) → 문제(question) × 라운드 → 정답 공개(reveal) … → 결과(result) → 닫힘(closed).
+ * 흐름: 대기실(lobby) → 문제(question) → 정답 공개(reveal) → 다음 문제 … → 결과(result) → 닫힘(closed).
+ * 문제 수에 끝이 없다: 한 문제에서 한 명이라도 맞히면 계속 이어지고, 아무도 못 맞힌 문제가 나오면 그 공개 뒤에 결과로 넘어간다.
+ * 출제 목록을 한 바퀴 다 돌면 다시 섞어서 이어 낸다(같은 줄이라도 비우는 구간은 새로 정한다).
  * 점수는 서버가 문제를 내고 정답을 판정하므로 위조할 수 없다. 방은 시작하면 새로 들어올 수 없다.
  */
 import type { BoardRow, EndRow, PlayerRow, ServerMsg } from '../protocol.js';
@@ -9,7 +11,6 @@ import { isCorrect, makeBlank, type Blank } from './blank.js';
 
 export const QUIZ = {
   capacity: 8,
-  rounds: 8,
   /** 첫 사람이 들어온 뒤 시작까지 기다리는 시간 */
   lobbyMs: 12_000,
   /** 정원이 다 차면 이 시간 뒤에 바로 시작 */
@@ -55,10 +56,14 @@ interface Player extends PlayerRow {
 export class LyricRoom {
   phase: QuizPhase = 'lobby';
   private readonly players = new Map<string, Player>();
-  private readonly order: number[];
-  readonly rounds: number;
-  private round = -1;
+  /** 이번 바퀴에 낼 줄 번호 순서와 다음에 낼 자리 */
+  private order: number[];
+  private cursor = 0;
+  /** 지금까지 낸 문제 수(진행 중인 문제 포함) */
+  private round = 0;
   private blank: Blank | null = null;
+  /** 방금 끝난 문제를 한 명이라도 맞혔는가(아니면 이 공개 뒤에 끝난다) */
+  private lastSolved = true;
   private startAt = 0;
   private questionAt = 0;
   private phaseEnd = 0;
@@ -74,11 +79,26 @@ export class LyricRoom {
     private readonly out: QuizOut,
   ) {
     this.rng = rng;
-    this.order = shuffled(
-      lines.map((_, i) => i),
-      rng,
+    this.order = this.shuffledOrder();
+  }
+
+  private shuffledOrder(): number[] {
+    return shuffled(
+      this.lines.map((_, i) => i),
+      this.rng,
     );
-    this.rounds = Math.min(QUIZ.rounds, lines.length);
+  }
+
+  /** 다음에 낼 줄. 한 바퀴를 다 돌면 다시 섞되, 방금 낸 줄이 바로 또 나오지는 않게 한다. */
+  private nextLine(): string {
+    if (this.cursor >= this.order.length) {
+      const prev = this.order[this.order.length - 1];
+      let next = this.shuffledOrder();
+      if (next.length > 1 && next[0] === prev) next = [...next.slice(1), next[0]];
+      this.order = next;
+      this.cursor = 0;
+    }
+    return this.lines[this.order[this.cursor++]];
   }
 
   get size(): number {
@@ -173,7 +193,7 @@ export class LyricRoom {
       }
       case 'reveal':
         if (now >= this.phaseEnd) {
-          if (this.round + 1 >= this.rounds || this.size === 0) this.finish(now);
+          if (!this.lastSolved || this.size === 0) this.finish(now);
           else this.beginRound(now);
         }
         break;
@@ -192,7 +212,7 @@ export class LyricRoom {
 
   private beginRound(now: number): void {
     this.round++;
-    this.blank = makeBlank(this.lines[this.order[this.round]], this.rng);
+    this.blank = makeBlank(this.nextLine(), this.rng);
     this.phase = 'question';
     this.questionAt = now;
     this.phaseEnd = now + QUIZ.answerMs;
@@ -203,7 +223,7 @@ export class LyricRoom {
       p.gain = 0;
     }
     const { before, after, len } = this.blank;
-    this.out.all({ t: 'l.q', round: this.round + 1, rounds: this.rounds, before, after, len, endsInMs: QUIZ.answerMs });
+    this.out.all({ t: 'l.q', round: this.round, before, after, len, endsInMs: QUIZ.answerMs });
   }
 
   private reveal(now: number): void {
@@ -211,7 +231,8 @@ export class LyricRoom {
     if (!b) return;
     this.phase = 'reveal';
     this.phaseEnd = now + QUIZ.revealMs;
-    this.out.all({ t: 'l.reveal', line: (b.before + b.answer + b.after).trim(), answer: b.answer.trim(), board: this.board(), nextInMs: QUIZ.revealMs });
+    this.lastSolved = this.places > 0;
+    this.out.all({ t: 'l.reveal', line: (b.before + b.answer + b.after).trim(), answer: b.answer.trim(), board: this.board(), nextInMs: QUIZ.revealMs, last: !this.lastSolved });
   }
 
   private finish(now: number): void {
@@ -223,7 +244,7 @@ export class LyricRoom {
       const reward = !rewarded || p.correct === 0 ? 0 : (QUIZ.rewards[i] ?? QUIZ.participation);
       return { uid: p.uid, name: p.name, score: p.score, rank, reward };
     });
-    this.out.all({ t: 'l.end', rows, rewarded });
+    this.out.all({ t: 'l.end', rows, rewarded, rounds: this.round });
     this.out.finish(rows, rewarded);
   }
 }

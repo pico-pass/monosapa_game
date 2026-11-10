@@ -30,6 +30,15 @@ function answerOf(log: Log, lines = LINES): string {
   return line.slice(q.before.length, line.length - q.after.length);
 }
 
+/** 지금 문제가 어느 가사 줄인지 */
+function lineOf(log: Log, lines = LINES): string {
+  const q = [...log.all].reverse().find((m) => m.t === 'l.q');
+  if (!q || q.t !== 'l.q') throw new Error('문제가 없어요');
+  const line = lines.find((l) => l.startsWith(q.before) && l.endsWith(q.after) && l.length > q.before.length + q.after.length);
+  if (!line) throw new Error('줄을 못 찾았어요');
+  return line;
+}
+
 describe('가사 빈칸 속도전 방', () => {
   it('대기실: 들어오면 목록이 가고 정원이 차면 곧 시작하며, 시간이 되면 시작한다', () => {
     const { room, log } = setup();
@@ -62,7 +71,8 @@ describe('가사 빈칸 속도전 방', () => {
     room.join('b', 'B', 0);
     room.advance(QUIZ.lobbyMs);
     const q = log.all.find((m) => m.t === 'l.q');
-    expect(q).toMatchObject({ t: 'l.q', round: 1, rounds: QUIZ.rounds, endsInMs: QUIZ.answerMs });
+    expect(q).toMatchObject({ t: 'l.q', round: 1, endsInMs: QUIZ.answerMs });
+    expect(q).not.toHaveProperty('rounds'); // 문제 수에 끝이 없다
     const ans = answerOf(log);
     const t0 = QUIZ.lobbyMs;
     expect(room.answer('a', ans, t0)).toBe(true);
@@ -75,7 +85,7 @@ describe('가사 빈칸 속도전 방', () => {
     room.advance(t0 + 10_001);
     expect(room.phase).toBe('reveal');
     const rev = log.all.find((m) => m.t === 'l.reveal');
-    expect(rev).toMatchObject({ t: 'l.reveal', nextInMs: QUIZ.revealMs });
+    expect(rev).toMatchObject({ t: 'l.reveal', nextInMs: QUIZ.revealMs, last: false });
     if (rev?.t === 'l.reveal') {
       expect(rev.board.map((r) => r.uid)).toEqual(['a', 'b']);
       expect(rev.answer).toBe(ans.trim());
@@ -98,28 +108,91 @@ describe('가사 빈칸 속도전 방', () => {
     expect(log.all.filter((m) => m.t === 'l.ok')).toHaveLength(1);
   });
 
-  it('시간이 다 되면 공개로 넘어가고, 공개가 끝나면 다음 문제가 나온다. 힌트는 한 번만 간다', () => {
+  it('힌트는 한 번만 가고, 맞히면 공개를 거쳐 다음 문제가 나온다', () => {
     const { room, log } = setup();
     room.join('a', 'A', 0);
     room.advance(QUIZ.lobbyMs);
     room.advance(QUIZ.lobbyMs + QUIZ.hintMs);
     room.advance(QUIZ.lobbyMs + QUIZ.hintMs + 100);
     expect(log.all.filter((m) => m.t === 'l.hint')).toHaveLength(1);
-    room.advance(QUIZ.lobbyMs + QUIZ.answerMs);
+    room.answer('a', answerOf(log), QUIZ.lobbyMs + QUIZ.hintMs + 200);
+    room.advance(QUIZ.lobbyMs + QUIZ.hintMs + 300);
     expect(room.phase).toBe('reveal');
-    room.advance(QUIZ.lobbyMs + QUIZ.answerMs + QUIZ.revealMs);
+    room.advance(QUIZ.lobbyMs + QUIZ.hintMs + 300 + QUIZ.revealMs);
     expect(room.phase).toBe('question');
     expect(log.all.filter((m) => m.t === 'l.q')).toHaveLength(2);
+    expect(log.all.filter((m) => m.t === 'l.hint')).toHaveLength(1);
   });
 
-  it('끝까지 하면 결과가 나가고 순위대로 보상이 정해지며, 시간이 지나면 닫힌다', () => {
+  it('한 명이라도 맞히면 나머지가 못 맞혀도 시간이 다 된 뒤 다음 문제로 이어진다', () => {
+    const { room, log } = setup();
+    room.join('a', 'A', 0);
+    room.join('b', 'B', 0);
+    let t = QUIZ.lobbyMs;
+    room.advance(t);
+    room.answer('a', answerOf(log), t + 100);
+    room.advance(t + QUIZ.answerMs - 1);
+    expect(room.phase).toBe('question'); // b 가 아직 안 맞혔으니 시간이 다 될 때까지 기다린다
+    room.advance(t + QUIZ.answerMs);
+    expect(room.phase).toBe('reveal');
+    expect(log.all.find((m) => m.t === 'l.reveal')).toMatchObject({ last: false });
+    t += QUIZ.answerMs + QUIZ.revealMs;
+    room.advance(t);
+    expect(room.phase).toBe('question');
+    expect(log.all.filter((m) => m.t === 'l.q').at(-1)).toMatchObject({ round: 2 });
+  });
+
+  it('아무도 못 맞힌 문제가 나오면 그 공개를 끝으로 결과가 나온다(문제 수 제한은 없다)', () => {
+    const { room, log } = setup();
+    room.join('a', 'A', 0);
+    room.join('b', 'B', 0);
+    let t = QUIZ.lobbyMs;
+    room.advance(t);
+    // 20문제를 계속 맞혀도 끝나지 않는다
+    for (let r = 0; r < 20; r++) {
+      const ans = answerOf(log);
+      room.answer('a', ans, t + 100);
+      room.answer('b', ans, t + 200);
+      room.advance(t + 300);
+      expect(room.phase).toBe('reveal');
+      t += 300 + QUIZ.revealMs;
+      room.advance(t);
+      expect(room.phase).toBe('question');
+    }
+    expect(log.finished).toHaveLength(0);
+    // 21번째 문제를 아무도 못 맞힌다
+    room.advance(t + QUIZ.answerMs);
+    expect(room.phase).toBe('reveal');
+    expect(log.all.at(-1)).toMatchObject({ t: 'l.reveal', last: true });
+    t += QUIZ.answerMs;
+    room.advance(t + QUIZ.revealMs - 1);
+    expect(room.phase).toBe('reveal');
+    room.advance(t + QUIZ.revealMs);
+    expect(room.phase).toBe('result');
+    expect(log.all.at(-1)).toMatchObject({ t: 'l.end', rounds: 21 });
+    expect(log.finished).toHaveLength(1);
+  });
+
+  it('첫 문제를 아무도 못 맞히면 바로 끝나고 보상은 없다', () => {
+    const { room, log } = setup();
+    room.join('a', 'A', 0);
+    room.join('b', 'B', 0);
+    room.advance(QUIZ.lobbyMs);
+    room.advance(QUIZ.lobbyMs + QUIZ.answerMs);
+    room.advance(QUIZ.lobbyMs + QUIZ.answerMs + QUIZ.revealMs);
+    expect(room.phase).toBe('result');
+    expect(log.all.at(-1)).toMatchObject({ t: 'l.end', rounds: 1 });
+    expect(log.finished[0].rows.every((r) => r.reward === 0)).toBe(true);
+  });
+
+  it('끝나면 순위대로 보상이 정해지고, 시간이 지나면 닫힌다', () => {
     const { room, log } = setup();
     room.join('a', 'A', 0);
     room.join('b', 'B', 0);
     room.join('c', 'C', 0);
     let t = QUIZ.lobbyMs;
     room.advance(t);
-    for (let r = 0; r < room.rounds; r++) {
+    for (let r = 0; r < 3; r++) {
       const ans = answerOf(log);
       room.answer('a', ans, t + 200); // a 는 항상 가장 빨리
       if (r % 2 === 0) room.answer('b', ans, t + 5000);
@@ -128,6 +201,11 @@ describe('가사 빈칸 속도전 방', () => {
       room.advance(t + QUIZ.revealMs);
       t += QUIZ.revealMs;
     }
+    expect(room.phase).toBe('question'); // 계속 맞혔으니 아직 안 끝났다
+    room.advance(t + QUIZ.answerMs); // 4번째 문제는 아무도 못 맞힘
+    t += QUIZ.answerMs;
+    room.advance(t + QUIZ.revealMs);
+    t += QUIZ.revealMs;
     expect(room.phase).toBe('result');
     const end = log.finished[0];
     expect(end.rewarded).toBe(true);
@@ -136,7 +214,7 @@ describe('가사 빈칸 속도전 방', () => {
       ['b', 2, QUIZ.rewards[1]],
       ['c', 3, 0], // 한 문제도 못 맞히면 참가 보상도 없다
     ]);
-    expect(log.all.at(-1)).toMatchObject({ t: 'l.end', rewarded: true });
+    expect(log.all.at(-1)).toMatchObject({ t: 'l.end', rewarded: true, rounds: 4 });
     room.advance(t + QUIZ.resultMs);
     expect(room.phase).toBe('closed');
   });
@@ -147,13 +225,15 @@ describe('가사 빈칸 속도전 방', () => {
     ids.forEach((u) => room.join(u, u.toUpperCase(), 0));
     let t = QUIZ.lobbyMs;
     room.advance(t);
-    for (let r = 0; r < room.rounds; r++) {
+    for (let r = 0; r < 2; r++) {
       const ans = answerOf(log);
       ids.forEach((u, i) => room.answer(u, ans, t + 100 + i * 1000));
       room.advance(t + 6000);
       t += 6000 + QUIZ.revealMs;
       room.advance(t);
     }
+    room.advance(t + QUIZ.answerMs); // 3번째 문제는 아무도 못 맞힘 → 끝
+    room.advance(t + QUIZ.answerMs + QUIZ.revealMs);
     const rows = log.finished[0].rows;
     expect(rows.map((r) => r.reward)).toEqual([...QUIZ.rewards, QUIZ.participation]);
   });
@@ -163,35 +243,53 @@ describe('가사 빈칸 속도전 방', () => {
     room.join('a', 'A', 0);
     let t = QUIZ.lobbyMs;
     room.advance(t);
-    for (let r = 0; r < room.rounds; r++) {
+    for (let r = 0; r < 2; r++) {
       room.answer('a', answerOf(log), t + 100);
       room.advance(t + 200);
       t += 200 + QUIZ.revealMs;
       room.advance(t);
     }
+    room.advance(t + QUIZ.answerMs);
+    room.advance(t + QUIZ.answerMs + QUIZ.revealMs);
     expect(room.phase).toBe('result');
     expect(log.finished[0].rewarded).toBe(false);
     expect(log.finished[0].rows[0].reward).toBe(0);
   });
 
-  it('줄이 라운드 수보다 적으면 줄 수만큼만 한다. 줄이 겹치지 않는다', () => {
-    const { room, log } = setup(['하나 둘 셋', '넷 다섯 여섯', '일곱 여덟 아홉']);
-    expect(room.rounds).toBe(3);
+  it('줄이 한 바퀴 돌 때까지는 겹치지 않고, 다 돌면 다시 섞어 이어 내며 같은 줄이 연달아 나오지 않는다', () => {
+    const three = ['하나 둘 셋', '넷 다섯 여섯', '일곱 여덟 아홉'];
+    for (let seed = 1; seed <= 25; seed++) {
+      const { room, log } = setup(three, seed);
+      room.join('a', 'A', 0);
+      let t = QUIZ.lobbyMs;
+      room.advance(t);
+      const seen: string[] = [];
+      for (let r = 0; r < 12; r++) {
+        seen.push(lineOf(log, three));
+        room.answer('a', answerOf(log, three), t + 100);
+        room.advance(t + 200);
+        t += 200 + QUIZ.revealMs;
+        room.advance(t);
+      }
+      expect(room.phase).toBe('question');
+      for (let k = 0; k < 12; k += 3) expect(new Set(seen.slice(k, k + 3)).size).toBe(3); // 한 바퀴마다 세 줄이 한 번씩
+      for (let k = 1; k < seen.length; k++) expect(seen[k]).not.toBe(seen[k - 1]);
+    }
+  });
+
+  it('줄이 하나뿐이어도 계속 이어진다', () => {
+    const { room, log } = setup(['하나 둘 셋'], 3);
     room.join('a', 'A', 0);
-    room.join('b', 'B', 0);
     let t = QUIZ.lobbyMs;
     room.advance(t);
-    const seen = new Set<string>();
-    for (let r = 0; r < room.rounds; r++) {
-      const q = [...log.all].reverse().find((m) => m.t === 'l.q');
-      if (q?.t === 'l.q') seen.add(q.before + '|' + q.after);
-      t += QUIZ.answerMs;
-      room.advance(t);
-      t += QUIZ.revealMs;
+    for (let r = 0; r < 5; r++) {
+      room.answer('a', answerOf(log, ['하나 둘 셋']), t + 100);
+      room.advance(t + 200);
+      t += 200 + QUIZ.revealMs;
       room.advance(t);
     }
-    expect(seen.size).toBe(3);
-    expect(room.phase).toBe('result');
+    expect(room.phase).toBe('question');
+    expect(log.all.filter((m) => m.t === 'l.q')).toHaveLength(6);
   });
 
   it('나간 사람은 결과에서 빠지고, 모두 나가면 방이 닫힌다', () => {

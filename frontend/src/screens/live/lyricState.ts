@@ -14,9 +14,11 @@ export interface Solved {
 export type LyricView =
   | { k: 'wait' }
   | { k: 'lobby'; players: PlayerRow[]; startsAt: number; solo: boolean }
-  | { k: 'question'; round: number; rounds: number; before: string; after: string; len: number; endsAt: number; totalMs: number; hint: string | null; solved: Solved[]; me: { ok: boolean; gain: number } | null; wrong: number }
-  | { k: 'reveal'; round: number; rounds: number; line: string; answer: string; board: BoardRow[]; nextAt: number }
-  | { k: 'end'; rows: EndRow[]; rewarded: boolean };
+  | { k: 'question'; round: number; before: string; after: string; len: number; endsAt: number; totalMs: number; hint: string | null; solved: Solved[]; me: { ok: boolean; gain: number } | null; wrong: number }
+  /** last: 아무도 못 맞힌 문제라 이 공개 뒤에 게임이 끝난다 */
+  | { k: 'reveal'; round: number; line: string; answer: string; board: BoardRow[]; nextAt: number; last: boolean }
+  /** rounds: 이어진 문제 수 */
+  | { k: 'end'; rows: EndRow[]; rewarded: boolean; rounds: number };
 
 export interface LyricState {
   view: LyricView;
@@ -39,7 +41,7 @@ export function lyricReduce(s: LyricState, m: ServerMsg, at: number): LyricState
     case 'l.lobby':
       return { ...s, error: null, reward: null, view: { k: 'lobby', players: m.players, startsAt: at + m.startsInMs, solo: m.solo } };
     case 'l.q':
-      return { ...s, error: null, view: { k: 'question', round: m.round, rounds: m.rounds, before: m.before, after: m.after, len: m.len, endsAt: at + m.endsInMs, totalMs: m.endsInMs, hint: null, solved: [], me: null, wrong: 0 } };
+      return { ...s, error: null, view: { k: 'question', round: m.round, before: m.before, after: m.after, len: m.len, endsAt: at + m.endsInMs, totalMs: m.endsInMs, hint: null, solved: [], me: null, wrong: 0 } };
     case 'l.hint':
       return v.k === 'question' ? { ...s, view: { ...v, hint: m.first } } : s;
     case 'l.ok':
@@ -49,11 +51,10 @@ export function lyricReduce(s: LyricState, m: ServerMsg, at: number): LyricState
       return { ...s, view: m.ok ? { ...v, me: { ok: true, gain: m.gain } } : { ...v, wrong: v.wrong + 1 } };
     case 'l.reveal': {
       const round = v.k === 'question' ? v.round : 0;
-      const rounds = v.k === 'question' ? v.rounds : 0;
-      return { ...s, view: { k: 'reveal', round, rounds, line: m.line, answer: m.answer, board: m.board, nextAt: at + m.nextInMs } };
+      return { ...s, view: { k: 'reveal', round, line: m.line, answer: m.answer, board: m.board, nextAt: at + m.nextInMs, last: m.last } };
     }
     case 'l.end':
-      return { ...s, view: { k: 'end', rows: m.rows, rewarded: m.rewarded } };
+      return { ...s, view: { k: 'end', rows: m.rows, rewarded: m.rewarded, rounds: m.rounds } };
     case 'reward':
       return { ...s, reward: { diamonds: m.diamonds, capped: m.capped } };
     case 'left':

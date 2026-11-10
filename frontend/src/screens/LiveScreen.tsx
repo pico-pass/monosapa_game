@@ -5,7 +5,7 @@ import { LyricLive } from './live/LyricLive';
 type Game = 'lyric' | 'fandom' | null;
 
 const GAMES = [
-  { id: 'lyric' as const, icon: '🎤', name: '가사 빈칸 속도전', desc: '가사 한 줄에서 서버가 비운 빈칸을 가장 빨리 채워요. 최대 8명, 8문제.', hint: '다른 팬과 함께하면 순위 보상' },
+  { id: 'lyric' as const, icon: '🎤', name: '가사 빈칸 속도전', desc: '가사 한 줄에서 서버가 비운 빈칸을 가장 빨리 채워요. 최대 8명, 아무도 못 맞힐 때까지 문제가 계속 나와요.', hint: '다른 팬과 함께하면 순위 보상' },
   { id: 'fandom' as const, icon: '🐍', name: '팬덤 모으기', desc: '팬 점을 먹어 행렬을 키우고 남의 행렬을 끊어요. 한 판 최대 3분, 봇이 같이 달려요.', hint: '팬을 모을수록 보상' },
 ];
 

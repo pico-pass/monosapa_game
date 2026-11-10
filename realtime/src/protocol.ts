@@ -69,12 +69,15 @@ export type ServerMsg =
   /** 보상 우편이 나갔다. diamonds가 0이면 하루 한도에 걸렸거나 보상이 꺼져 있다. */
   | { t: 'reward'; diamonds: number; capped: boolean }
   | { t: 'l.lobby'; players: PlayerRow[]; startsInMs: number; solo: boolean }
-  | { t: 'l.q'; round: number; rounds: number; before: string; after: string; len: number; endsInMs: number }
+  /** round 는 지금까지 낸 문제 수(문제 수에 끝이 없다) */
+  | { t: 'l.q'; round: number; before: string; after: string; len: number; endsInMs: number }
   | { t: 'l.hint'; first: string }
   | { t: 'l.ok'; uid: string; name: string; gain: number; place: number }
   | { t: 'l.me'; ok: boolean; gain: number }
-  | { t: 'l.reveal'; line: string; answer: string; board: BoardRow[]; nextInMs: number }
-  | { t: 'l.end'; rows: EndRow[]; rewarded: boolean }
+  /** last 가 참이면 아무도 못 맞힌 문제라 이 공개 뒤에 게임이 끝난다 */
+  | { t: 'l.reveal'; line: string; answer: string; board: BoardRow[]; nextInMs: number; last: boolean }
+  /** rounds 는 이어진 문제 수 */
+  | { t: 'l.end'; rows: EndRow[]; rewarded: boolean; rounds: number }
   | { t: 'f.go'; id: number; w: number; h: number; runMs: number }
   | { t: 'f.roster'; list: FandomRosterRow[] }
   | FandomSnapshot

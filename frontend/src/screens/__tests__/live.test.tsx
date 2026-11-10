@@ -36,17 +36,17 @@ describe('가사 빈칸 속도전 상태', () => {
     let s = lyricReduce(initialLyric, { t: 'hello', uid: 'a', name: '에이' }, 0);
     s = lyricReduce(s, { t: 'l.lobby', players, startsInMs: 12_000, solo: false }, 1000);
     expect(s.view).toMatchObject({ k: 'lobby', startsAt: 13_000, solo: false });
-    s = lyricReduce(s, { t: 'l.q', round: 1, rounds: 8, before: '하나 ', after: ' 셋', len: 2, endsInMs: 20_000 }, 14_000);
+    s = lyricReduce(s, { t: 'l.q', round: 1, before: '하나 ', after: ' 셋', len: 2, endsInMs: 20_000 }, 14_000);
     expect(s.view).toMatchObject({ k: 'question', round: 1, endsAt: 34_000, totalMs: 20_000, hint: null, wrong: 0, me: null });
     s = lyricReduce(s, { t: 'l.hint', first: '둘' }, 20_000);
     s = lyricReduce(s, { t: 'l.me', ok: false, gain: 0 }, 21_000);
     s = lyricReduce(s, { t: 'l.ok', uid: 'b', name: '비', gain: 130, place: 1 }, 22_000);
     s = lyricReduce(s, { t: 'l.me', ok: true, gain: 115 }, 23_000);
     expect(s.view).toMatchObject({ hint: '둘', wrong: 1, me: { ok: true, gain: 115 }, solved: [{ uid: 'b', place: 1 }] });
-    s = lyricReduce(s, { t: 'l.reveal', line: '하나 둘 셋', answer: '둘', board: [{ uid: 'a', name: '에이', score: 115, gain: 115 }], nextInMs: 5000 }, 24_000);
-    expect(s.view).toMatchObject({ k: 'reveal', round: 1, rounds: 8, answer: '둘', nextAt: 29_000 });
-    s = lyricReduce(s, { t: 'l.end', rows: [{ uid: 'a', name: '에이', score: 900, rank: 1, reward: 5 }], rewarded: true }, 99_000);
-    expect(s.view).toMatchObject({ k: 'end', rewarded: true });
+    s = lyricReduce(s, { t: 'l.reveal', line: '하나 둘 셋', answer: '둘', board: [{ uid: 'a', name: '에이', score: 115, gain: 115 }], nextInMs: 5000, last: false }, 24_000);
+    expect(s.view).toMatchObject({ k: 'reveal', round: 1, answer: '둘', nextAt: 29_000, last: false });
+    s = lyricReduce(s, { t: 'l.end', rows: [{ uid: 'a', name: '에이', score: 900, rank: 1, reward: 5 }], rewarded: true, rounds: 9 }, 99_000);
+    expect(s.view).toMatchObject({ k: 'end', rewarded: true, rounds: 9 });
     s = lyricReduce(s, { t: 'reward', diamonds: 5, capped: false }, 99_500);
     expect(s.reward).toEqual({ diamonds: 5, capped: false });
     // 같은 방에서 다시 시작하면 보상 표시는 지워진다
@@ -59,7 +59,7 @@ describe('가사 빈칸 속도전 상태', () => {
     expect(lyricReduce(initialLyric, { t: 'l.ok', uid: 'b', name: '비', gain: 1, place: 1 }, 0)).toBe(initialLyric);
     expect(lyricReduce(initialLyric, { t: 'err', code: 'full' }, 0).error).toContain('자리가 없어요');
     expect(lyricReduce(initialLyric, { t: 'err', code: 'bad' }, 0).error).toBeNull();
-    expect(lyricReduce({ ...initialLyric, view: { k: 'end', rows: [], rewarded: false } }, { t: 'left' }, 0).view).toEqual({ k: 'wait' });
+    expect(lyricReduce({ ...initialLyric, view: { k: 'end', rows: [], rewarded: false, rounds: 1 } }, { t: 'left' }, 0).view).toEqual({ k: 'wait' });
   });
 });
 
@@ -78,9 +78,10 @@ describe('가사 빈칸 속도전 화면', () => {
   });
 
   it('문제: 빈칸 칸 수만큼 상자와 입력창, 맞히면 점수', () => {
-    let s = lyricReduce(base, { t: 'l.q', round: 3, rounds: 8, before: '하나 ', after: ' 셋', len: 3, endsInMs: 20_000 }, 0);
+    let s = lyricReduce(base, { t: 'l.q', round: 3, before: '하나 ', after: ' 셋', len: 3, endsInMs: 20_000 }, 0);
     let t = render(s, 5000);
-    expect(t).toContain('3/8 문제');
+    expect(t).toContain('3번째 문제');
+    expect(t).not.toContain('/8');
     expect(t).toContain('15초');
     expect((t.match(/class="live-box"/g) ?? []).length).toBe(3);
     expect(t).toContain('정답 입력');
@@ -96,17 +97,22 @@ describe('가사 빈칸 속도전 화면', () => {
   });
 
   it('공개와 결과: 정답을 표시하고 순위·보상 안내를 보여 준다', () => {
-    let s = lyricReduce(base, { t: 'l.q', round: 1, rounds: 8, before: '하나 ', after: ' 셋', len: 1, endsInMs: 20_000 }, 0);
-    s = lyricReduce(s, { t: 'l.reveal', line: '하나 둘 셋', answer: '둘', board: [{ uid: 'a', name: '에이', score: 130, gain: 130 }], nextInMs: 5000 }, 0);
+    let s = lyricReduce(base, { t: 'l.q', round: 1, before: '하나 ', after: ' 셋', len: 1, endsInMs: 20_000 }, 0);
+    s = lyricReduce(s, { t: 'l.reveal', line: '하나 둘 셋', answer: '둘', board: [{ uid: 'a', name: '에이', score: 130, gain: 130 }], nextInMs: 5000, last: false }, 0);
     const rev = render(s, 1000);
     expect(rev).toContain('<mark class="live-answer">둘</mark>');
     expect(rev).toContain('4초 뒤 다음');
-    const end = lyricReduce(s, { t: 'l.end', rows: [{ uid: 'a', name: '에이', score: 900, rank: 1, reward: 5 }, { uid: 'b', name: '비', score: 100, rank: 2, reward: 0 }], rewarded: true }, 0);
+    expect(rev).not.toContain('여기서 끝나요');
+    const lastRev = lyricReduce(s, { t: 'l.reveal', line: '하나 둘 셋', answer: '둘', board: [{ uid: 'a', name: '에이', score: 130, gain: 0 }], nextInMs: 5000, last: true }, 0);
+    expect(render(lastRev, 1000)).toContain('4초 뒤 결과');
+    expect(render(lastRev, 1000)).toContain('아무도 못 맞혀서 여기서 끝나요');
+    const end = lyricReduce(s, { t: 'l.end', rows: [{ uid: 'a', name: '에이', score: 900, rank: 1, reward: 5 }, { uid: 'b', name: '비', score: 100, rank: 2, reward: 0 }], rewarded: true, rounds: 7 }, 0);
+    expect(render(end)).toContain('7문제까지 이어졌어요');
     expect(render(end)).toContain('보상 💎5을 우편함으로 보내는 중');
     expect(render(lyricReduce(end, { t: 'reward', diamonds: 5, capped: false }, 0))).toContain('보상 💎5을 우편함으로 보냈어요');
     expect(render(lyricReduce(end, { t: 'reward', diamonds: 0, capped: true }, 0))).toContain('오늘 라이브 보상 한도');
     expect(render(lyricReduce(end, { t: 'reward', diamonds: 3, capped: true }, 0))).toContain('오늘 한도까지만');
-    const solo = lyricReduce(s, { t: 'l.end', rows: [{ uid: 'a', name: '에이', score: 900, rank: 1, reward: 0 }], rewarded: false }, 0);
+    const solo = lyricReduce(s, { t: 'l.end', rows: [{ uid: 'a', name: '에이', score: 900, rank: 1, reward: 0 }], rewarded: false, rounds: 2 }, 0);
     expect(render(solo)).toContain('혼자 시작한 판은 보상이 없어요');
     expect(render(end)).toContain('한 판 더');
   });

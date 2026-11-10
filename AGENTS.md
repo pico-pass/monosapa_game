@@ -38,6 +38,7 @@ npm run sim:fandom    # 팬덤 모으기 보상 구간용 봇 시뮬레이션 (r
 - 메시지는 JSON 한 덩어리(`t`가 종류, 가사 빈칸 속도전 `l.`·팬덤 모으기 `f.`)이고 모양은 `src/protocol.ts`가 정한다. 프런트(`platform/live.ts`·`screens/live/*`)는 이 파일의 **타입만** `import type`으로 가져다 쓴다(런타임 코드를 가져오지 않는다). 메시지를 바꾸면 양쪽을 같이 고친다.
 - 서버가 방·시간·점수·충돌을 모두 계산한다(권위 서버). 규칙은 순수 클래스(`lyric/blank.ts`·`lyric/quiz.ts`·`fandom/world.ts`)라서 시계·난수·보내기를 밖에서 받고, 테스트에서 시계를 마음대로 돌린다. 팬덤 세계는 고정 50ms 걸음과 씨앗 난수만 쓴다. `hub.ts`가 사람을 방에 이어 주고 `server.ts`가 업그레이드(로그인·Origin 확인)·속도 제한·한 계정 한 접속·끊김 정리를 맡는다. 메인 서버와는 `remote.ts`로만 이야기한다: 로그인 확인은 쿠키를 `GET /api/auth/me`에 넘기고, 보상은 `POST /api/internal/live-reward`(헤더 `x-realtime-secret`)로 요청한다.
 - 보상은 소켓 서버가 양을 정하고(`lyric/quiz.ts`의 `QUIZ.rewards`, `fandom/world.ts`의 `FANDOM.rewardTiers`), 메인 서버 `backend/src/live/`가 하루 한도(`rules.ts`의 `LIVE_DAILY_CAP`, 한국 시간 하루)와 같은 `ref`의 중복 지급 방지를 책임지고 `live` 종류 우편으로 보낸다(`live_rewards` 장부 7일·`live_daily` 3일 뒤 삭제). 보상 안내 문구(`screens/live/text.ts`)의 수치는 프런트 테스트(`live.test.tsx`)가 서버 값과 비교한다. 새 보상 게임을 더하면 `LIVE_GAMES`(백엔드 `rules.ts`)·`protocol.ts`의 `LiveGame`·허브·화면을 같이 맞춘다.
+- 가사 빈칸 속도전은 문제 수에 끝이 없다: 한 명이라도 맞히면 이어지고 아무도 못 맞힌 문제가 나오면 그 공개 뒤에 끝난다(`l.reveal.last`, `l.end.rounds`; `l.q`에는 전체 문제 수가 없다). 목록을 한 바퀴 돌면 다시 섞는다. 보상은 순위로만 정해진다.
 - 출제 목록은 `src/lyric/lines.ts`의 배열 한 곳이다(줄을 더하면 되고 앞뒤·연속 공백과 중복은 읽을 때 걸러진다). 방은 메모리에만 있으므로 재시작하면 진행 중인 판이 사라진다.
 - 배포(`deploy.sh`)가 `realtime/dist`가 바뀌었거나 pm2 프로세스가 없으면 재시작하고 `/rt/health`를 확인한다(실패해도 되돌리지는 않는다). `deploy.sh --dry-run`이나 `npm run build`를 먼저 돌리면 dist가 이미 최신이라 재시작이 안 되니, 소켓 서버나 백엔드를 바꿨다면 해당 `dist` 폴더를 지우고 배포한다.
 

@@ -87,9 +87,7 @@ export function LyricBoard({ state, now, onAnswer, onAgain, onExit }: BoardProps
     return (
       <div className="card live-card">
         <div className="card-row">
-          <h3>
-            {v.round}/{v.rounds} 문제
-          </h3>
+          <h3>{v.round}번째 문제</h3>
           <strong>{secLeft(v.endsAt, now)}초</strong>
         </div>
         <div className="live-timer" role="progressbar" aria-label="남은 시간" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)}>
@@ -139,9 +137,10 @@ export function LyricBoard({ state, now, onAnswer, onAgain, onExit }: BoardProps
         <div className="card-row">
           <h3>정답 공개</h3>
           <small className="muted">
-            {v.round}/{v.rounds} · {secLeft(v.nextAt, now)}초 뒤 다음
+            {v.round}번째 · {secLeft(v.nextAt, now)}초 뒤 {v.last ? '결과' : '다음'}
           </small>
         </div>
+        {v.last && <p className="muted">아무도 못 맞혀서 여기서 끝나요.</p>}
         <p className="live-line">
           {a >= 0 ? (
             <>
@@ -174,6 +173,7 @@ export function LyricBoard({ state, now, onAnswer, onAgain, onExit }: BoardProps
         <h3>결과</h3>
         {mine && <strong>{mine.rank}위</strong>}
       </div>
+      <p className="muted">{v.rounds}문제까지 이어졌어요. 마지막 문제는 아무도 못 맞혔어요.</p>
       <ol className="live-board">
         {v.rows.map((r) => (
           <li key={r.uid} className={r.uid === state.myUid ? 'live-me' : ''}>
