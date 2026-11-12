@@ -768,11 +768,39 @@ describe('공연', () => {
 });
 
 describe('입력 상한', () => {
-  it('초당 최대 3회만 인정', () => {
+  it('몰아서 눌러도 평균 초당 3회만 인정하고 한꺼번에 받지 않는다', () => {
     const lim = new InputLimiter();
-    const accepted = [0, 10, 20, 30, 40, 500, 999].map((t) => lim.accept(t));
-    expect(accepted).toEqual([true, true, true, false, false, false, false]);
-    expect(lim.accept(1001)).toBe(true);
+    // 쉬었다가 한꺼번에 눌러도 바로 여러 번 받지 않는다(예전에는 처음 3번을 몰아서 받았다)
+    expect([0, 10, 20, 30, 40].map((t) => lim.accept(t))).toEqual([true, false, false, false, false]);
+    // 1초 동안 8회/초로 연타해도 5초 동안 인정은 15회 안팎(평균 3회/초 + 처음 한 번 덤)
+    const long = new InputLimiter();
+    let n = 0;
+    for (let t = 0; t < 5000; t += 125) if (long.accept(t)) n++;
+    expect(n).toBeGreaterThanOrEqual(14);
+    expect(n).toBeLessThanOrEqual(16);
+  });
+
+  it('빠르게 연타해도 인정되는 입력 사이가 고르다(0.5초 넘게 끊기지 않는다)', () => {
+    for (const hz of [6, 8, 12]) {
+      const lim = new InputLimiter();
+      const got: number[] = [];
+      // 손가락 간격이 ±25% 흔들리는 연타
+      let seed = 11;
+      const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+      for (let t = 0; t < 20_000; t += (1000 / hz) * (1 + (rnd() - 0.5) * 0.5)) if (lim.accept(t)) got.push(t);
+      const gaps = got.slice(1).map((x, i) => x - got[i]);
+      expect(Math.max(...gaps), `${hz}회/초`).toBeLessThan(500);
+      expect(got.length / 20).toBeGreaterThan(2.8);
+      expect(got.length / 20).toBeLessThanOrEqual(3.1);
+    }
+  });
+
+  it('상한보다 느리게 누르면 전부 인정하고, reset 하면 처음처럼 받는다', () => {
+    const lim = new InputLimiter();
+    expect([0, 400, 800, 1200, 1600].map((t) => lim.accept(t))).toEqual([true, true, true, true, true]);
+    expect(lim.accept(1610)).toBe(false);
+    lim.reset();
+    expect(lim.accept(1611)).toBe(true);
   });
 
   it('작업하기는 지금 자아의 장비 생산배율만 곱한다', () => {
