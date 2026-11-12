@@ -27,9 +27,14 @@ export function applyChallengeClaim(state: GameState, diamonds: number, rank: nu
 /** 우편함에서 받은 다이아(친구 선물·운영 우편). 서버가 우편마다 한 번만 내주고, 한꺼번에 받을 수도 있어 상한이 넉넉하다. */
 const MAX_MAIL_DIAMONDS = 100_000;
 
-export function applyMailClaim(state: GameState, diamonds: number): CommandResult<{ diamonds: number }> {
+/** 우편 하나·한꺼번에 받는 코인의 상한(서버 `MAX_MAIL_COINS`는 우편 하나, 이 값은 여러 통 합계) */
+const MAX_MAIL_COINS = 100_000_000_000;
+
+/** 우편으로 받은 다이아·코인(친구 선물·운영 우편·라이브 보상·출시 보상)을 반영한다. 코인은 정식 출시 보상 같은 우편에만 붙는다. */
+export function applyMailClaim(state: GameState, diamonds: number, coins = 0): CommandResult<{ diamonds: number; coins: number }> {
   const d = Math.max(0, Math.min(MAX_MAIL_DIAMONDS, Math.floor(Number.isFinite(diamonds) ? diamonds : 0)));
-  return { ok: true, state: { ...state, diamonds: clampResource(state.diamonds + d) }, diamonds: d };
+  const c = Math.max(0, Math.min(MAX_MAIL_COINS, Math.floor(Number.isFinite(coins) ? coins : 0)));
+  return { ok: true, state: { ...state, diamonds: clampResource(state.diamonds + d), coins: clampResource(state.coins + c) }, diamonds: d, coins: c };
 }
 
 /** 음원 차트 순위 보상 */

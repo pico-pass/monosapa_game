@@ -1,4 +1,4 @@
-import { SAVE_KEY, type StorageLike } from '../game/persistence';
+import { BACKUP_KEY, CORRUPT_KEY, SAVE_KEY, type StorageLike } from '../game/persistence';
 
 /*
  * 계정 저장(서버)과의 동기화. 게임은 계속 localStorage 에 먼저 저장하고(동기, 항상 성공 시도),
@@ -13,6 +13,11 @@ export interface RemoteSave {
 }
 
 const VERSION_KEY = 'monosapa.sync.version';
+/**
+ * 저장 세대. 정식 출시 같은 전체 초기화마다 서버가 올린다. 이 기기의 세대가 서버와 다르면 로컬 저장은 초기화 전 진행이라 버린다
+ * (버리지 않으면 서버로 올라가 초기화가 되돌려진다). 서버도 옛 세대의 저장은 받지 않는다.
+ */
+const EPOCH_KEY = 'monosapa.sync.epoch';
 /** 계정 전용 저장이 생기기 전(이 기기에만 있던) 진행 데이터를 처음 로그인한 계정 하나에 넘겼는지 표시한다. */
 const ADOPTED_KEY = 'monosapa.save.adoptedBy';
 const TIMEOUT_MS = 8000;
@@ -29,6 +34,28 @@ function readVersion(storage: StorageLike): number {
   const n = Number(storage.getItem(VERSION_KEY));
   return Number.isInteger(n) && n >= 0 ? n : 0;
 }
+function readEpoch(storage: StorageLike): number {
+  const n = Number(storage.getItem(EPOCH_KEY));
+  return Number.isInteger(n) && n >= 0 ? n : 0;
+}
+
+/** 초기화 전 로컬 진행(저장·백업·손상본·서버 버전)을 지우고 새 세대를 기록한다. */
+export function resetLocalProgress(storage: StorageLike, epoch: number): void {
+  for (const key of [SAVE_KEY, BACKUP_KEY, CORRUPT_KEY, VERSION_KEY]) {
+    try {
+      storage.removeItem(key);
+    } catch {
+      /* 못 지우면 다음에 다시 시도된다. 세대가 기록되지 않으므로 다시 지우려 한다. */
+      return;
+    }
+  }
+  try {
+    storage.setItem(EPOCH_KEY, String(epoch));
+  } catch {
+    /* 세대를 기록하지 못하면 다음 시작 때 다시 지운다(서버 저장이 있으면 그걸 따른다). */
+  }
+}
+
 function writeVersion(storage: StorageLike, version: number): void {
   try {
     storage.setItem(VERSION_KEY, String(version));
@@ -63,12 +90,26 @@ const asRemote = (v: unknown): RemoteSave | null => {
  */
 export async function reconcileOnBoot(account: StorageLike, device: StorageLike, userId: string): Promise<void> {
   let remote: RemoteSave | null;
+  let epoch: number | null;
   try {
     const r = await request('GET');
     if (r.status !== 200) return;
     remote = asRemote((r.body as Json | null)?.save);
+    const e = (r.body as Json | null)?.epoch;
+    epoch = typeof e === 'number' && Number.isInteger(e) && e >= 0 ? e : null;
   } catch {
     return;
+  }
+
+  // 서버가 초기화된 뒤(세대가 올라감)의 첫 시작: 이 기기에 남은 초기화 전 진행은 버린다.
+  if (epoch !== null && epoch !== readEpoch(account)) {
+    resetLocalProgress(account, epoch);
+    // 계정 저장이 생기기 전의 기기 저장(옛 진행)이 새 게임으로 넘어오지 못하게 한다.
+    try {
+      if (device.getItem(ADOPTED_KEY) === null) device.setItem(ADOPTED_KEY, 'reset');
+    } catch {
+      /* 막혀 있으면 기기 저장이 없는 것과 같다 */
+    }
   }
 
   if (remote) {
@@ -97,12 +138,13 @@ export async function reconcileOnBoot(account: StorageLike, device: StorageLike,
   }
 }
 
-export type PushResult = { status: 'ok'; version: number } | { status: 'conflict'; remote: RemoteSave } | { status: 'error' };
+export type PushResult = { status: 'ok'; version: number } | { status: 'conflict'; remote: RemoteSave } | { status: 'reset'; epoch: number } | { status: 'error' };
 
 /** 로컬 저장이 끝날 때마다 불러 준다. 한 번에 하나만 보내고, 보내는 동안 쌓인 저장은 가장 최근 것 하나로 합친다. */
 export class CloudSync {
   private storage: StorageLike | null = null;
   private onConflict: (remote: RemoteSave) => void = () => {};
+  private onReset: (epoch: number) => void = () => {};
   private writerId = Math.random().toString(36).slice(2) + Date.now().toString(36);
   private latest: unknown = null;
   private dirty = false;
@@ -112,9 +154,10 @@ export class CloudSync {
   private stopped = true;
 
   /** 로그인한 계정의 로컬 저장소를 연결하고 동기화를 시작한다. */
-  start(storage: StorageLike, onConflict: (remote: RemoteSave) => void): void {
+  start(storage: StorageLike, onConflict: (remote: RemoteSave) => void, onReset: (epoch: number) => void = () => {}): void {
     this.storage = storage;
     this.onConflict = onConflict;
+    this.onReset = onReset;
     this.stopped = false;
   }
 
@@ -165,12 +208,18 @@ export class CloudSync {
       this.onConflict(result.remote);
       return;
     }
+    if (result.status === 'reset') {
+      // 서버가 초기화됐다. 이 기기의 진행은 옛 세대라 올리지 않고 버린다.
+      this.dirty = false;
+      this.onReset(result.epoch);
+      return;
+    }
     if (result.status === 'error') this.dirty = true; // 다음 저장 때, 없으면 일정 시간 뒤 다시 보낸다.
     if (this.dirty) this.schedule();
   }
 
   private async push(storage: StorageLike, state: unknown, keepalive: boolean): Promise<PushResult> {
-    const r = await request('PUT', { state, baseVersion: readVersion(storage), writerId: this.writerId }, keepalive);
+    const r = await request('PUT', { state, baseVersion: readVersion(storage), writerId: this.writerId, epoch: readEpoch(storage) }, keepalive);
     if (r.status === 200) {
       const version = (r.body as Json | null)?.version;
       if (typeof version !== 'number') return { status: 'error' };
@@ -178,7 +227,9 @@ export class CloudSync {
       return { status: 'ok', version };
     }
     if (r.status === 409) {
-      const remote = asRemote((r.body as Json | null)?.save);
+      const body = r.body as Json | null;
+      if (body?.reset === true && typeof body.epoch === 'number' && Number.isInteger(body.epoch)) return { status: 'reset', epoch: body.epoch };
+      const remote = asRemote(body?.save);
       if (remote) return { status: 'conflict', remote };
     }
     return { status: 'error' };

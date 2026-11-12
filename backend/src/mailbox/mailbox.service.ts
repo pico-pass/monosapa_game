@@ -11,8 +11,15 @@ export const MAIL_TITLE_MAX = 30;
 export const MAIL_BODY_MAX = 500;
 /** 운영자가 한 번에 붙일 수 있는 다이아의 상한 */
 export const ADMIN_MAIL_MAX_DIAMONDS = 500;
+/** 우편 하나에 붙일 수 있는 코인의 상한(이상한 값 방지) */
+export const MAX_MAIL_COINS = 10_000_000_000;
 const LIST_LIMIT = 100;
 const DAY_MS = 86_400_000;
+
+/** 받을 보상(다이아 또는 코인)이 붙은 우편. 예전 우편은 coins 필드가 없어서 $gt 로만 본다. */
+const HAS_REWARD = { $or: [{ diamonds: { $gt: 0 } }, { coins: { $gt: 0 } }] };
+/** 받을 것이 없거나 이미 받아서 지워도 되는 우편 */
+const DISPOSABLE = { $or: [{ claimed: true }, { diamonds: { $not: { $gt: 0 } }, coins: { $not: { $gt: 0 } } }] };
 
 const toDto = (m: MailDocument): MailDto => ({
   id: String(m._id),
@@ -20,6 +27,7 @@ const toDto = (m: MailDocument): MailDto => ({
   title: m.title,
   body: m.body,
   diamonds: m.diamonds,
+  coins: m.coins ?? 0,
   claimed: m.claimed,
   read: m.read,
   fromName: m.fromName,
@@ -32,8 +40,13 @@ export interface NewMail {
   title: string;
   body?: string;
   diamonds?: number;
+  coins?: number;
   fromUid?: string | null;
   fromName?: string | null;
+  /** 같은 우편을 두 번 만들지 않게 하는 키(출시 보상 등) */
+  ref?: string;
+  /** 우편이 남아 있는 기간(기본 MAIL_RETENTION_DAYS) */
+  retentionDays?: number;
 }
 
 @Injectable()
@@ -55,9 +68,11 @@ export class MailboxService {
       title: mail.title,
       body: mail.body ?? '',
       diamonds: Math.max(0, Math.floor(mail.diamonds ?? 0)),
+      coins: Math.min(MAX_MAIL_COINS, Math.max(0, Math.floor(mail.coins ?? 0))),
       fromUid: mail.fromUid ? new Types.ObjectId(mail.fromUid) : null,
       fromName: mail.fromName ?? null,
-      expiresAt: new Date(now + MAIL_RETENTION_DAYS * DAY_MS),
+      ...(mail.ref ? { ref: mail.ref } : {}),
+      expiresAt: new Date(now + (mail.retentionDays ?? MAIL_RETENTION_DAYS) * DAY_MS),
     };
   }
 
@@ -67,11 +82,11 @@ export class MailboxService {
     return { mails: docs.map(toDto), ...counts };
   }
 
-  /** 안 읽은 우편 수와 받지 않은 다이아가 붙은 우편 수 */
+  /** 안 읽은 우편 수와 받지 않은 보상(다이아·코인)이 붙은 우편 수 */
   async counts(uid: Types.ObjectId): Promise<{ unread: number; claimable: number }> {
     const [unread, claimable] = await Promise.all([
       this.mails.countDocuments({ userId: uid, read: false }).exec(),
-      this.mails.countDocuments({ userId: uid, diamonds: { $gt: 0 }, claimed: false }).exec(),
+      this.mails.countDocuments({ userId: uid, claimed: false, ...HAS_REWARD }).exec(),
     ]);
     return { unread, claimable };
   }
@@ -80,48 +95,50 @@ export class MailboxService {
     await this.mails.updateMany({ userId: new Types.ObjectId(user.id), read: false }, { $set: { read: true } }).exec();
   }
 
-  /** 다이아를 받은 것으로 표시하고 양을 돌려준다. 반영은 클라이언트가 한다. 한 우편은 한 번만 받는다. */
+  /** 보상(다이아·코인)을 받은 것으로 표시하고 양을 돌려준다. 반영은 클라이언트가 한다. 한 우편은 한 번만 받는다. */
   async claim(user: UserDto, id: string): Promise<MailClaimDto> {
     if (!isValidObjectId(id)) throw new NotFoundException('우편을 찾을 수 없어요.');
     const uid = new Types.ObjectId(user.id);
-    const taken = await this.mails.findOneAndUpdate({ _id: id, userId: uid, diamonds: { $gt: 0 }, claimed: false }, { $set: { claimed: true, read: true } }, { returnDocument: 'after' }).exec();
-    if (taken) return { diamonds: taken.diamonds, count: 1 };
+    const taken = await this.mails.findOneAndUpdate({ _id: id, userId: uid, claimed: false, ...HAS_REWARD }, { $set: { claimed: true, read: true } }, { returnDocument: 'after' }).exec();
+    if (taken) return { diamonds: taken.diamonds, coins: taken.coins ?? 0, count: 1 };
     const doc = await this.mails.findOne({ _id: id, userId: uid }).exec();
     if (!doc) throw new NotFoundException('우편을 찾을 수 없어요.');
-    throw new ConflictException(doc.diamonds > 0 ? '이미 받았어요.' : '받을 다이아가 없는 우편이에요.');
+    throw new ConflictException(doc.diamonds > 0 || (doc.coins ?? 0) > 0 ? '이미 받았어요.' : '받을 보상이 없는 우편이에요.');
   }
 
-  /** 받지 않은 다이아를 한꺼번에 받는다. */
+  /** 받지 않은 보상(다이아·코인)을 한꺼번에 받는다. */
   async claimAll(user: UserDto): Promise<MailClaimDto> {
     const uid = new Types.ObjectId(user.id);
-    const open = await this.mails.find({ userId: uid, diamonds: { $gt: 0 }, claimed: false }, '_id').limit(LIST_LIMIT).exec();
+    const open = await this.mails.find({ userId: uid, claimed: false, ...HAS_REWARD }, '_id').limit(LIST_LIMIT).exec();
     let diamonds = 0;
+    let coins = 0;
     let count = 0;
     for (const m of open) {
       const taken = await this.mails.findOneAndUpdate({ _id: m._id, userId: uid, claimed: false }, { $set: { claimed: true, read: true } }, { returnDocument: 'after' }).exec();
       if (taken) {
         diamonds += taken.diamonds;
+        coins += taken.coins ?? 0;
         count++;
       }
     }
-    if (count === 0) throw new NotFoundException('받을 다이아가 없어요.');
-    return { diamonds, count };
+    if (count === 0) throw new NotFoundException('받을 보상이 없어요.');
+    return { diamonds, coins, count };
   }
 
-  /** 우편 하나를 지운다. 받지 않은 다이아가 붙은 우편은 지울 수 없다. */
+  /** 우편 하나를 지운다. 받지 않은 보상이 붙은 우편은 지울 수 없다. */
   async remove(user: UserDto, id: string): Promise<void> {
     if (!isValidObjectId(id)) throw new NotFoundException('우편을 찾을 수 없어요.');
     const uid = new Types.ObjectId(user.id);
-    const gone = await this.mails.deleteOne({ _id: id, userId: uid, $or: [{ diamonds: 0 }, { claimed: true }] }).exec();
+    const gone = await this.mails.deleteOne({ _id: id, userId: uid, ...DISPOSABLE }).exec();
     if (gone.deletedCount === 1) return;
     const doc = await this.mails.findOne({ _id: id, userId: uid }).exec();
     if (!doc) throw new NotFoundException('우편을 찾을 수 없어요.');
-    throw new ConflictException('받지 않은 다이아가 있어서 지울 수 없어요. 먼저 받아 주세요.');
+    throw new ConflictException('받지 않은 보상이 있어서 지울 수 없어요. 먼저 받아 주세요.');
   }
 
   /** 읽었고 받을 것도 없는 우편을 모두 지운다. */
   async removeDone(user: UserDto): Promise<void> {
-    await this.mails.deleteMany({ userId: new Types.ObjectId(user.id), read: true, $or: [{ diamonds: 0 }, { claimed: true }] }).exec();
+    await this.mails.deleteMany({ userId: new Types.ObjectId(user.id), read: true, ...DISPOSABLE }).exec();
   }
 
   /** 관리자: 한 사람 또는 모든 계정에 우편(다이아 포함 가능)을 보낸다. */

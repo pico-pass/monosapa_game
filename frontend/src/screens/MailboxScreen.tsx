@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useState } from 'react';
-import { fmtDateTime } from '../components/format';
+import { fmtDateTime, fmtReward } from '../components/format';
 import { api, errorText } from '../platform/api';
 import { doClaimMail, toast } from '../store/gameStore';
 import { refreshSummary } from '../store/socialStore';
 
-type Kind = 'gift' | 'admin' | 'warning' | 'report' | 'live';
+type Kind = 'gift' | 'admin' | 'warning' | 'report' | 'live' | 'launch';
 interface Mail {
   id: string;
   kind: Kind;
   title: string;
   body: string;
   diamonds: number;
+  /** 붙은 코인(정식 출시 보상 같은 우편). 예전 서버 응답에는 없다. */
+  coins?: number;
   claimed: boolean;
   read: boolean;
   fromName: string | null;
@@ -23,11 +25,13 @@ interface Mailbox {
   claimable: number;
 }
 
-const KIND_ICON: Record<Kind, string> = { gift: '🎁', admin: '📢', warning: '⚠️', report: '📝', live: '🎤' };
+const KIND_ICON: Record<Kind, string> = { gift: '🎁', admin: '📢', warning: '⚠️', report: '📝', live: '🎤', launch: '🎉' };
 const DAY_MS = 86_400_000;
+const hasReward = (m: Mail) => m.diamonds > 0 || (m.coins ?? 0) > 0;
+const rewardText = fmtReward;
 const daysLeft = (expiresAt: number, now: number) => Math.max(0, Math.ceil((expiresAt - now) / DAY_MS));
 
-/** 우편함: 친구의 선물과 운영 안내가 와요. 💎가 붙은 우편은 「받기」를 눌러야 반영되고, 30일이 지나면 사라져요. */
+/** 우편함: 친구의 선물과 운영 안내가 와요. 💎·🪙가 붙은 우편은 「받기」를 눌러야 반영되고, 기간이 지나면 사라져요. */
 export function MailboxScreen() {
   const [box, setBox] = useState<Mailbox | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -82,13 +86,14 @@ export function MailboxScreen() {
   };
 
   const now = Date.now();
-  const total = box?.mails.filter((m) => m.diamonds > 0 && !m.claimed).reduce((n, m) => n + m.diamonds, 0) ?? 0;
-  const done = box?.mails.some((m) => m.read && (m.diamonds === 0 || m.claimed)) ?? false;
+  const open = box?.mails.filter((m) => hasReward(m) && !m.claimed) ?? [];
+  const totalText = rewardText({ diamonds: open.reduce((n, m) => n + m.diamonds, 0), coins: open.reduce((n, m) => n + (m.coins ?? 0), 0) });
+  const done = box?.mails.some((m) => m.read && (!hasReward(m) || m.claimed)) ?? false;
 
   return (
     <section className="screen" aria-label="우편함">
       <h2 className="section-title">우편함</h2>
-      <p className="muted">친구가 보낸 선물과 운영 안내가 와요. 우편은 30일 동안 보관돼요. 받지 않은 💎는 우편과 함께 사라지니 잊지 말고 받아 주세요.</p>
+      <p className="muted">친구가 보낸 선물과 운영 안내가 와요. 우편은 30일 동안 보관돼요. 받지 않은 💎·🪙는 우편과 함께 사라지니 잊지 말고 받아 주세요. (정식 출시 우편은 90일 동안 보관돼요.)</p>
       {error && (
         <p className="chat-error" role="alert">
           {error}
@@ -98,8 +103,8 @@ export function MailboxScreen() {
       {box && (
         <>
           <div className="pm-bar">
-            <button type="button" className="btn btn-primary" disabled={busy || total === 0} onClick={() => void claim()}>
-              {total > 0 ? `💎 ${total} 모두 받기` : '받을 💎 없음'}
+            <button type="button" className="btn btn-primary" disabled={busy || open.length === 0} onClick={() => void claim()}>
+              {open.length > 0 ? `${totalText} 모두 받기` : '받을 보상 없음'}
             </button>
             <button type="button" className="btn btn-ghost" disabled={!done} onClick={() => void clean()}>
               읽은 우편 정리
@@ -121,15 +126,15 @@ export function MailboxScreen() {
                 </small>
                 {m.body && <p className="pm-body">{m.body}</p>}
                 <div className="pm-actions">
-                  {m.diamonds > 0 &&
+                  {hasReward(m) &&
                     (m.claimed ? (
-                      <span className="badge badge-ok">💎 {m.diamonds} 받음</span>
+                      <span className="badge badge-ok">{rewardText(m)} 받음</span>
                     ) : (
                       <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void claim(m.id)}>
-                        💎 {m.diamonds} 받기
+                        {rewardText(m)} 받기
                       </button>
                     ))}
-                  {(m.diamonds === 0 || m.claimed) && (
+                  {(!hasReward(m) || m.claimed) && (
                     <button type="button" className="btn btn-ghost" onClick={() => void remove(m.id)} aria-label="우편 삭제">
                       🗑️ 삭제
                     </button>

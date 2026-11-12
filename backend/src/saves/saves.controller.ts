@@ -13,7 +13,7 @@ export class SavesController {
   @Get('me')
   async getMine(@Req() req: AuthedRequest, @Res({ passthrough: true }) res: Response): Promise<GetSaveDto> {
     res.setHeader('Cache-Control', 'no-store');
-    return { save: await this.saves.get(req.user.id) };
+    return { save: await this.saves.get(req.user.id), epoch: await this.saves.epoch() };
   }
 
   @Put('me')

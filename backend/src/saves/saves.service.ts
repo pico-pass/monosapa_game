@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable } from '@nestjs/comm
 import { InjectModel } from '@nestjs/mongoose';
 import { Types, type Model } from 'mongoose';
 import type { PutSaveDto, PutSaveResultDto, SaveDto } from './dto/save.dto.js';
+import { LaunchService } from '../launch/launch.service.js';
 import { villageFameOf } from '../village/rules.js';
 import { Save, type SaveDocument } from './save.schema.js';
 import { singleCountsOf } from './singles.js';
@@ -97,7 +98,15 @@ const toDto = (d: SaveDocument): SaveDto => ({ state: d.state, version: d.versio
 
 @Injectable()
 export class SavesService {
-  constructor(@InjectModel(Save.name) private readonly saves: Model<Save>) {}
+  constructor(
+    @InjectModel(Save.name) private readonly saves: Model<Save>,
+    private readonly launch: LaunchService,
+  ) {}
+
+  /** 현재 저장 세대 */
+  epoch(): Promise<number> {
+    return this.launch.epoch();
+  }
 
   async get(userId: string): Promise<SaveDto | null> {
     const doc = await this.saves.findOne({ userId: new Types.ObjectId(userId) }).exec();
@@ -106,6 +115,11 @@ export class SavesService {
 
   /** 저장한다. 클라이언트가 아는 버전이 서버와 다르면(그 사이 다른 기기가 저장) 서버 저장을 담아 409 로 돌려준다. */
   async put(userId: string, body: PutSaveDto | undefined): Promise<PutSaveResultDto> {
+    // 정식 출시 초기화 이후에는 옛 세대의 저장(초기화 전 진행)이 서버로 올라와 되살아나지 못하게 막는다.
+    const epoch = await this.launch.epoch();
+    const clientEpoch = Number.isInteger(body?.epoch) ? (body?.epoch as number) : 0;
+    if (clientEpoch !== epoch) throw new ConflictException({ message: '정식 출시로 게임 데이터가 초기화되었어요.', reset: true, epoch });
+
     const { state, baseVersion, writerId } = body ?? ({} as Partial<PutSaveDto>);
     if (!isObj(state) || !Number.isInteger(state.schemaVersion) || typeof state.savedAt !== 'number' || !Number.isFinite(state.savedAt)) {
       throw new BadRequestException('state 가 올바르지 않아요.');

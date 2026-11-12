@@ -90,7 +90,7 @@ import type {
   ThemeId,
 } from '../game/types';
 import { api, errorText } from '../platform/api';
-import { CloudSync, reconcileOnBoot, scopedStorage, type RemoteSave } from '../platform/cloudSave';
+import { CloudSync, reconcileOnBoot, resetLocalProgress, scopedStorage, type RemoteSave } from '../platform/cloudSave';
 import { initSampler } from '../platform/sampler';
 import { acquireWriter, setGuardHandlers, takeOverWriter } from '../platform/tabGuard';
 
@@ -501,7 +501,7 @@ function initKnownUnlocks(): void {
 
 function beginSession(): void {
   const storage = getStorage();
-  cloud.start(storage, adoptRemote);
+  cloud.start(storage, adoptRemote, handleReset);
   const loaded = loadGame(storage);
   if (loaded.status === 'corrupt') {
     set({ phase: 'corrupt', loadError: { message: loaded.error, hasBackup: loaded.hasBackup } });
@@ -607,6 +607,16 @@ function adoptRemote(remote: RemoteSave): void {
   stopTicker();
   beginSession();
   toast('다른 기기에서 더 최근에 저장해서 그 진행을 불러왔어요.', 'warn');
+}
+
+/** 서버가 초기화됐다(정식 출시). 이 기기의 옛 진행을 버리고 새 게임으로 시작한다. */
+function handleReset(epoch: number): void {
+  if (ui.phase !== 'ready') return;
+  resetLocalProgress(getStorage(), epoch);
+  resetRuntime();
+  stopTicker();
+  beginSession();
+  toast('정식 출시를 맞아 게임 데이터가 초기화됐어요. 새로 시작해요!', 'good');
 }
 
 /** 로그아웃 전에: 지금 진행을 저장하고 서버에 올린다. */
@@ -1398,11 +1408,12 @@ export async function doClaimChallenge(): Promise<boolean> {
 /** 우편함의 다이아를 받는다. id 를 안 주면 받을 수 있는 것을 모두 받는다. 서버가 한 번만 내주고 반영은 여기서 한다. */
 export async function doClaimMail(id?: string): Promise<boolean> {
   try {
-    const res = await api<{ diamonds: number; count: number }>(id ? `mailbox/${id}/claim` : 'mailbox/claim-all', { method: 'POST' });
-    const r = exec((s) => applyMailClaim(s, res.diamonds));
+    const res = await api<{ diamonds: number; coins?: number; count: number }>(id ? `mailbox/${id}/claim` : 'mailbox/claim-all', { method: 'POST' });
+    const r = exec((s) => applyMailClaim(s, res.diamonds, res.coins ?? 0));
     if (r?.ok) {
       sfx.album();
-      toast(`📬 우편 ${res.count}통에서 💎 +${r.diamonds}`, 'good');
+      const parts = [r.diamonds > 0 ? `💎 +${r.diamonds}` : '', r.coins > 0 ? `🪙 +${fmt(r.coins)}` : ''].filter(Boolean).join(' · ');
+      toast(`📬 우편 ${res.count}통에서 ${parts}`, 'good');
       saveNow(true);
     }
     return true;

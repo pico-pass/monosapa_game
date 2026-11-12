@@ -17,6 +17,7 @@
     "sim:nurture": "npm run sim:nurture -w frontend",
     "sim:village": "npm run sim:village -w frontend",
     "sim:arcade": "npm run sim:arcade -w frontend",
-    "dev:realtime": "npm run dev -w realtime"
+    "dev:realtime": "npm run dev -w realtime",
+    "launch:reset": "node backend/scripts/launch-reset.mjs"
   }
 }

@@ -6,6 +6,8 @@ export class MailDto {
   title!: string;
   body!: string;
   diamonds!: number;
+  /** 붙어 있는 코인 */
+  coins!: number;
   claimed!: boolean;
   read!: boolean;
   fromName!: string | null;
@@ -20,13 +22,14 @@ export class MailboxDto {
   mails!: MailDto[];
   /** 아직 열어 보지 않은 우편 수 */
   unread!: number;
-  /** 받지 않은 다이아가 붙은 우편 수 */
+  /** 받지 않은 보상(다이아·코인)이 붙은 우편 수 */
   claimable!: number;
 }
 
 /** 받기 응답. 반영은 클라이언트가 한다. */
 export class MailClaimDto {
   diamonds!: number;
+  coins!: number;
   /** 받은 우편 수 */
   count!: number;
 }

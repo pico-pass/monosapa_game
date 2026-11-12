@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SAVE_KEY, createInitialState, type StorageLike } from '../../game/persistence';
-import { CloudSync, PUSH_MIN_INTERVAL_MS, reconcileOnBoot, scopedStorage } from '../cloudSave';
+import { CloudSync, PUSH_MIN_INTERVAL_MS, reconcileOnBoot, resetLocalProgress, scopedStorage } from '../cloudSave';
 
 function memory(): StorageLike & { data: Map<string, string> } {
   const data = new Map<string, string>();
@@ -77,6 +77,48 @@ describe('reconcileOnBoot', () => {
     expect(b.getItem(SAVE_KEY)).toBeNull();
   });
 
+  it('정식 출시 초기화: 서버 저장 세대가 올라갔으면 이 기기의 옛 진행(저장·백업·버전)과 기기 저장 이어받기를 버린다', async () => {
+    const device = memory();
+    device.setItem(SAVE_KEY, stateText(777)); // 계정 저장이 생기기 전의 기기 저장
+    const account = scopedStorage(device, 'A');
+    account.setItem(SAVE_KEY, stateText(500));
+    account.setItem('monosapa.save.backup', stateText(400));
+    account.setItem('monosapa.sync.version', '9');
+    mockFetch({ status: 200, body: { save: null, epoch: 1 } });
+    await reconcileOnBoot(account, device, 'A');
+    expect(account.getItem(SAVE_KEY)).toBeNull(); // 되살아나면 초기화가 무효가 된다
+    expect(account.getItem('monosapa.save.backup')).toBeNull();
+    expect(account.getItem('monosapa.sync.version')).toBe('0');
+    expect(account.getItem('monosapa.sync.epoch')).toBe('1');
+    expect(device.getItem('monosapa.save.adoptedBy')).toBe('reset'); // 기기 저장이 새 게임으로 넘어오지 못한다
+  });
+
+  it('세대가 같으면 로컬을 지키고, 서버가 세대를 알려 주지 않아도 그대로 동작한다', async () => {
+    const device = memory();
+    const account = scopedStorage(device, 'A');
+    account.setItem(SAVE_KEY, stateText(500));
+    account.setItem('monosapa.sync.version', '3');
+    account.setItem('monosapa.sync.epoch', '1');
+    mockFetch({ status: 200, body: { save: { state: { coins: 7 }, version: 3, savedAt: T0 }, epoch: 1 } });
+    await reconcileOnBoot(account, device, 'A');
+    expect(JSON.parse(account.getItem(SAVE_KEY)!).coins).toBe(500);
+
+    mockFetch({ status: 200, body: { save: { state: { coins: 7 }, version: 3, savedAt: T0 } } });
+    await reconcileOnBoot(account, device, 'A');
+    expect(JSON.parse(account.getItem(SAVE_KEY)!).coins).toBe(500);
+  });
+
+  it('세대가 올라간 뒤 다른 기기가 이미 새 저장을 올렸으면 그 저장을 따른다', async () => {
+    const device = memory();
+    const account = scopedStorage(device, 'A');
+    account.setItem(SAVE_KEY, stateText(500));
+    account.setItem('monosapa.sync.version', '3');
+    mockFetch({ status: 200, body: { save: { state: { coins: 7 }, version: 3, savedAt: T0 }, epoch: 1 } });
+    await reconcileOnBoot(account, device, 'A');
+    expect(JSON.parse(account.getItem(SAVE_KEY)!)).toEqual({ coins: 7 });
+    expect(account.getItem('monosapa.sync.epoch')).toBe('1');
+  });
+
   it('서버에 닿지 않으면(오류·네트워크 실패) 로컬을 그대로 둔다', async () => {
     const device = memory();
     const account = scopedStorage(device, 'A');
@@ -134,6 +176,45 @@ describe('CloudSync', () => {
     expect(onConflict).toHaveBeenCalledWith({ state: { coins: 9 }, version: 5, savedAt: T0 });
     await vi.advanceTimersByTimeAsync(PUSH_MIN_INTERVAL_MS * 3);
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('저장을 올릴 때 이 기기가 아는 저장 세대를 함께 보낸다', async () => {
+    const calls = mockFetch({ status: 200, body: { version: 1, savedAt: 0 } });
+    const storage = memory();
+    storage.setItem('monosapa.sync.epoch', '2');
+    const sync = new CloudSync();
+    sync.start(storage, () => {});
+    sync.submit({ n: 1 });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls[0].body).toMatchObject({ epoch: 2 });
+    const fresh = mockFetch({ status: 200, body: { version: 1, savedAt: 0 } });
+    const other = new CloudSync();
+    other.start(memory(), () => {});
+    other.submit({ n: 1 });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fresh[0].body).toMatchObject({ epoch: 0 }); // 기억이 없으면 0
+  });
+
+  it('서버가 초기화됐다고(409 reset) 하면 올리지 않고 알려 준다. 충돌 처리와는 다르다', async () => {
+    mockFetch({ status: 409, body: { reset: true, epoch: 3, message: '초기화' } });
+    const onConflict = vi.fn();
+    const onReset = vi.fn();
+    const sync = new CloudSync();
+    sync.start(memory(), onConflict, onReset);
+    sync.submit({ n: 1 });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onReset).toHaveBeenCalledWith(3);
+    expect(onConflict).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(PUSH_MIN_INTERVAL_MS * 3);
+    expect(fetch).toHaveBeenCalledTimes(1); // 옛 진행을 계속 올리려 하지 않는다
+  });
+
+  it('resetLocalProgress 는 저장·백업·손상본·버전을 지우고 세대를 기록한다', () => {
+    const storage = memory();
+    for (const k of [SAVE_KEY, 'monosapa.save.backup', 'monosapa.save.corrupt', 'monosapa.sync.version']) storage.setItem(k, 'x');
+    resetLocalProgress(storage, 4);
+    expect([...storage.data.keys()]).toEqual(['monosapa.sync.epoch']);
+    expect(storage.getItem('monosapa.sync.epoch')).toBe('4');
   });
 
   it('서버 오류면 같은 상태를 간격 뒤에 다시 보낸다', async () => {

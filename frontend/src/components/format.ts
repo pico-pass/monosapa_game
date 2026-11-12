@@ -15,6 +15,9 @@ export function fmt(n: number): string {
   return String(Math.floor(n));
 }
 
+/** 우편·보상에서 받을 것을 한 줄로: 💎 150 · 🪙 100M (없는 쪽은 뺀다) */
+export const fmtReward = (r: { diamonds: number; coins?: number }): string => [r.diamonds > 0 ? `💎 ${r.diamonds}` : '', (r.coins ?? 0) > 0 ? `🪙 ${fmt(r.coins ?? 0)}` : ''].filter(Boolean).join(' · ');
+
 /** 보유량은 내림해서 보여준다. (3.9개 보유인데 4개로 보이면 발매가 안 될 때 혼란스럽다) */
 export const fmtHave = (n: number) => fmt(Math.floor(n + 1e-9));
 

@@ -5304,3 +5304,124 @@ span.rar {
   user-select: none;
   -webkit-user-select: none;
 }
+
+/* ---------- 정식 출시 환영 팝업 ---------- */
+.launch-backdrop {
+  z-index: 70;
+}
+.launch-card {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  max-height: 92dvh;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  border-radius: 24px;
+  color: #fff;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+  outline: none;
+  animation: pop 0.24s ease-out;
+  /* 왼쪽은 밝은 일반속성, 오른쪽은 어두운 어둠속성. 가운데는 비스듬한 빛줄기로 나눈다. */
+  background: linear-gradient(105deg, #ffe3f1 0%, #ffc4de 48.6%, #fff 49.3%, #fff 50.7%, #4a1d63 51.4%, #170a22 100%);
+}
+.launch-stage {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: 210px;
+  overflow: hidden;
+  border-radius: 24px 24px 0 0;
+}
+.launch-side {
+  display: flex;
+  align-items: flex-end;
+  min-width: 0;
+}
+.launch-side img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: bottom;
+  pointer-events: none;
+  user-select: none;
+}
+.launch-side-normal img {
+  filter: drop-shadow(0 6px 10px rgba(255, 120, 180, 0.35));
+}
+.launch-side-dark img {
+  filter: drop-shadow(0 6px 12px rgba(255, 46, 95, 0.45));
+}
+.launch-vs {
+  position: absolute;
+  left: 50%;
+  top: 14px;
+  transform: translateX(-50%);
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: #170a22;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  box-shadow: 0 0 0 2px #fff;
+}
+.launch-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 12px 12px;
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(16, 8, 26, 0.82);
+  backdrop-filter: blur(6px);
+  text-align: center;
+}
+.launch-kicker {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: #ffb3d4;
+}
+.launch-title {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.3;
+}
+.launch-title em {
+  display: block;
+  font-style: normal;
+  font-size: 30px;
+  color: #ffd75e;
+  text-shadow: 0 0 18px rgba(255, 215, 94, 0.45);
+}
+.launch-lead {
+  margin: 0;
+  font-size: 14px;
+  color: #eadcf5;
+}
+.launch-pack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 215, 94, 0.6);
+  background: rgba(255, 215, 94, 0.1);
+}
+.launch-pack span {
+  font-size: 18px;
+  font-weight: 800;
+}
+.launch-pack small {
+  color: #d9c9e6;
+}
+.launch-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.launch-panel .btn-ghost {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.35);
+}

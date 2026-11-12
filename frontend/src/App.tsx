@@ -37,6 +37,7 @@ import { DmScreen } from './screens/DmScreen';
 import { EquipScreen } from './screens/EquipScreen';
 import { FriendsScreen } from './screens/FriendsScreen';
 import { InquiryScreen } from './screens/InquiryScreen';
+import { LaunchWelcome } from './screens/LaunchWelcome';
 import { LoginScreen } from './screens/LoginScreen';
 import { MailScreen } from './screens/MailScreen';
 import { MailboxScreen } from './screens/MailboxScreen';
@@ -384,6 +385,7 @@ function Overlays() {
       {ui.settingsOpen && <SettingsSheet />}
       {ui.basisOpen && <BasisModal />}
       <SocialOverlays />
+      <LaunchWelcome />
     </>
   );
 }
