@@ -103,6 +103,8 @@ describe('환영 팝업 화면', () => {
     const t = render();
     expect(t).toContain('정식 출시');
     expect(t).toContain('모노사파 키우기');
+    expect(t).toContain('일반과 어둠, 두 모노사파');
+    expect(t).not.toContain('빛과 어둠');
     expect(t).toContain('launch-side-normal');
     expect(t).toContain('launch-side-dark');
     expect(t).toContain(ASSETS.characters.normal!);

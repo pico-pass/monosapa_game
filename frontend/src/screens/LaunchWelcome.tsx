@@ -33,7 +33,7 @@ export function LaunchCard({ starter, onMailbox, onHideDay, onClose }: { starter
           <h2 className="launch-title">
             모노사파 키우기 <em>정식 출시</em>
           </h2>
-          <p className="launch-lead">빛과 어둠, 두 모노사파가 새 무대에서 기다려요. 함께해 주셔서 고마워요!</p>
+          <p className="launch-lead">일반과 어둠, 두 모노사파가 새 무대에서 기다려요. 함께해 주셔서 고마워요!</p>
           <div className="launch-pack">
             <b>🎁 스타트 패키지</b>
             <span>
