@@ -58,9 +58,10 @@ export const BALANCE = {
   /**
    * 작업하기 입력 상한(game/input.ts). 평균 초당 maxPerSec회까지 인정하되 **균등한 간격**으로 받는다.
    * 예전에는 「아무 1초 창에 3회」라서 빠르게 연타하면 3번을 몰아서 받고 약 0.9초를 쉬어 끊겨 보였다(사용자 신고).
+   * 상한 자체는 사용자 지정으로 초당 3회 → 7회 → 9회로 올렸다.
    * earlyMs: 정해진 간격(1000/maxPerSec)보다 이만큼 일찍 눌러도 받는다. 장기 평균 상한은 그대로지만 처음 한 번 더 받을 수 있다.
    */
-  click: { value: 1, maxPerSec: 3, holdPerSec: 2, earlyMs: 40 },
+  click: { value: 1, maxPerSec: 9, holdPerSec: 2, earlyMs: 40 },
   /**
    * 순수 음악력 업그레이드(사용자 요청으로 추가, 원안에 없음). 코인으로 올리고 최대 레벨은 없다.
    *   작업하기 한 번의 기본 라임 = click.value + clickPerLevel × 레벨 (여기에 생산배율이 곱해진다)

@@ -768,20 +768,24 @@ describe('공연', () => {
 });
 
 describe('입력 상한', () => {
-  it('몰아서 눌러도 평균 초당 3회만 인정하고 한꺼번에 받지 않는다', () => {
+  const MAX = BALANCE.click.maxPerSec;
+  const STEP = 1000 / MAX; // 인정하는 입력 사이의 기본 간격(ms)
+
+  it('몰아서 눌러도 평균 초당 상한(9회)만 인정하고 한꺼번에 받지 않는다', () => {
+    expect(MAX).toBe(9);
     const lim = new InputLimiter();
     // 쉬었다가 한꺼번에 눌러도 바로 여러 번 받지 않는다(예전에는 처음 3번을 몰아서 받았다)
     expect([0, 10, 20, 30, 40].map((t) => lim.accept(t))).toEqual([true, false, false, false, false]);
-    // 8회/초로 5초 동안 연타해도 인정은 14~16회(평균 3회/초를 넘지 않는다)
+    // 20회/초로 5초 동안 연타해도 인정은 40~46회(평균 9회/초를 넘지 않는다, 쉬었다 누른 첫 입력만 덤)
     const long = new InputLimiter();
     let n = 0;
-    for (let t = 0; t < 5000; t += 125) if (long.accept(t)) n++;
-    expect(n).toBeGreaterThanOrEqual(14);
-    expect(n).toBeLessThanOrEqual(16);
+    for (let t = 0; t < 5000; t += 50) if (long.accept(t)) n++;
+    expect(n).toBeGreaterThanOrEqual(40);
+    expect(n).toBeLessThanOrEqual(MAX * 5 + 1);
   });
 
-  it('빠르게 연타해도 인정되는 입력 사이가 고르다(0.55초 넘게 끊기지 않는다)', () => {
-    for (const hz of [6, 8, 12]) {
+  it('빠르게 연타해도 인정되는 입력 사이가 고르다(0.3초 넘게 끊기지 않는다)', () => {
+    for (const hz of [10, 12, 14, 20]) {
       const lim = new InputLimiter();
       const got: number[] = [];
       // 손가락 간격이 ±25% 흔들리는 연타
@@ -789,18 +793,19 @@ describe('입력 상한', () => {
       const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
       for (let t = 0; t < 20_000; t += (1000 / hz) * (1 + (rnd() - 0.5) * 0.5)) if (lim.accept(t)) got.push(t);
       const gaps = got.slice(1).map((x, i) => x - got[i]);
-      expect(Math.max(...gaps), `${hz}회/초`).toBeLessThan(550);
-      expect(got.length / 20).toBeGreaterThan(2.6);
-      expect(got.length / 20).toBeLessThanOrEqual(3.1);
+      expect(Math.max(...gaps), `${hz}회/초`).toBeLessThan(300);
+      expect(got.length / 20).toBeGreaterThan(7.5);
+      expect(got.length / 20).toBeLessThanOrEqual(MAX + 0.2);
     }
   });
 
   it('상한보다 느리게 누르면 전부 인정하고, reset 하면 처음처럼 받는다', () => {
     const lim = new InputLimiter();
-    expect([0, 400, 800, 1200, 1600].map((t) => lim.accept(t))).toEqual([true, true, true, true, true]);
-    expect(lim.accept(1610)).toBe(false);
+    const taps = [0, 1, 2, 3, 4].map((i) => Math.round(i * (STEP + 8)));
+    expect(taps.map((t) => lim.accept(t))).toEqual([true, true, true, true, true]);
+    expect(lim.accept(taps[4] + 10)).toBe(false);
     lim.reset();
-    expect(lim.accept(1611)).toBe(true);
+    expect(lim.accept(taps[4] + 11)).toBe(true);
   });
 
   it('작업하기는 지금 자아의 장비 생산배율만 곱한다', () => {
