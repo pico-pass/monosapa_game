@@ -39,8 +39,8 @@ export type QuizPhase = 'lobby' | 'question' | 'reveal' | 'result' | 'closed';
 export interface QuizOut {
   to(uid: string, msg: ServerMsg): void;
   all(msg: ServerMsg): void;
-  /** 결과가 나왔다. rewarded가 참이면 rows의 reward 만큼 우편으로 보낸다. */
-  finish(rows: EndRow[], rewarded: boolean): void;
+  /** 결과가 나왔다. rewarded가 참이면 rows의 reward 만큼 우편으로 보낸다. rounds 는 이어진 문제 수. */
+  finish(rows: EndRow[], rewarded: boolean, rounds: number): void;
 }
 
 interface Player extends PlayerRow {
@@ -242,9 +242,9 @@ export class LyricRoom {
     const rows: EndRow[] = this.ranked().map((p, i) => {
       const rank = i + 1;
       const reward = !rewarded || p.correct === 0 ? 0 : (QUIZ.rewards[i] ?? QUIZ.participation);
-      return { uid: p.uid, name: p.name, score: p.score, rank, reward };
+      return { uid: p.uid, name: p.name, score: p.score, rank, reward, correct: p.correct };
     });
     this.out.all({ t: 'l.end', rows, rewarded, rounds: this.round });
-    this.out.finish(rows, rewarded);
+    this.out.finish(rows, rewarded, this.round);
   }
 }

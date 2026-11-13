@@ -4,12 +4,13 @@ import { describe, expect, it } from 'vitest';
 import { LIVE_DAILY_CAP } from '../../../../backend/src/live/rules';
 import { FANDOM } from '../../../../realtime/src/fandom/world';
 import { QUIZ } from '../../../../realtime/src/lyric/quiz';
-import type { FandomSnapshot, ServerMsg } from '../../../../realtime/src/protocol';
+import type { FandomSnapshot, LyricRecord, ServerMsg } from '../../../../realtime/src/protocol';
 import { liveUrl } from '../../platform/live';
 import { FANDOM_FIRST_TIER, drawFandom } from '../live/FandomLive';
 import { LyricBoard } from '../live/LyricLive';
 import { fandomReduce, initialFandom } from '../live/fandomState';
 import { lerpView, toView, viewAt, type FandomViewData } from '../live/fandomView';
+import { RecordCard, RecordLine } from '../live/LyricRecord';
 import { initialLyric, lyricReduce, type LyricState } from '../live/lyricState';
 import { FANDOM_REWARD_TEXT, QUIZ_REWARD_TEXT } from '../live/text';
 import { LiveScreen } from '../LiveScreen';
@@ -25,6 +26,19 @@ describe('라이브 소켓 주소', () => {
     expect(liveUrl({ protocol: 'http:', host: 'localhost:5173' })).toBe('ws://localhost:5173/rt');
   });
 });
+
+const RECORD: LyricRecord = {
+  games: 12,
+  multiGames: 9,
+  wins: 3,
+  totalCorrect: 41,
+  bestScore: 1280,
+  bestCorrect: 8,
+  recent: [
+    { at: 1_700_000_000_000, rank: 2, players: 3, score: 700, correct: 4, rounds: 7, multi: true },
+    { at: 1_700_100_000_000, rank: 1, players: 1, score: 1280, correct: 8, rounds: 9, multi: false },
+  ],
+};
 
 describe('가사 빈칸 속도전 상태', () => {
   const players = [
@@ -45,13 +59,24 @@ describe('가사 빈칸 속도전 상태', () => {
     expect(s.view).toMatchObject({ hint: '둘', wrong: 1, me: { ok: true, gain: 115 }, solved: [{ uid: 'b', place: 1 }] });
     s = lyricReduce(s, { t: 'l.reveal', line: '하나 둘 셋', answer: '둘', board: [{ uid: 'a', name: '에이', score: 115, gain: 115 }], nextInMs: 5000, last: false }, 24_000);
     expect(s.view).toMatchObject({ k: 'reveal', round: 1, answer: '둘', nextAt: 29_000, last: false });
-    s = lyricReduce(s, { t: 'l.end', rows: [{ uid: 'a', name: '에이', score: 900, rank: 1, reward: 5 }], rewarded: true, rounds: 9 }, 99_000);
+    s = lyricReduce(s, { t: 'l.end', rows: [{ uid: 'a', name: '에이', score: 900, rank: 1, reward: 5, correct: 6 }], rewarded: true, rounds: 9 }, 99_000);
     expect(s.view).toMatchObject({ k: 'end', rewarded: true, rounds: 9 });
     s = lyricReduce(s, { t: 'reward', diamonds: 5, capped: false }, 99_500);
     expect(s.reward).toEqual({ diamonds: 5, capped: false });
     // 같은 방에서 다시 시작하면 보상 표시는 지워진다
     s = lyricReduce(s, { t: 'l.lobby', players, startsInMs: 12_000, solo: false }, 120_000);
     expect(s.reward).toBeNull();
+  });
+
+  it('판 기록이 오면 결과에 붙고, 새 판이 시작되면 결과용 기록은 지워지지만 최근 기록은 남는다', () => {
+    let s = lyricReduce(initialLyric, { t: 'l.end', rows: [{ uid: 'a', name: '에이', score: 900, rank: 1, reward: 5, correct: 6 }], rewarded: true, rounds: 9 }, 0);
+    expect(s.record).toBeNull();
+    s = lyricReduce(s, { t: 'l.record', record: RECORD, best: { score: true, correct: false } }, 1);
+    expect(s.record).toEqual({ record: RECORD, best: { score: true, correct: false } });
+    expect(s.mine).toBe(RECORD);
+    s = lyricReduce(s, { t: 'l.lobby', players, startsInMs: 12_000, solo: false }, 2);
+    expect(s.record).toBeNull();
+    expect(s.mine).toBe(RECORD);
   });
 
   it('상황에 맞지 않는 메시지는 무시하고, 거절 이유는 말로 바꾼다', () => {
@@ -106,15 +131,62 @@ describe('가사 빈칸 속도전 화면', () => {
     const lastRev = lyricReduce(s, { t: 'l.reveal', line: '하나 둘 셋', answer: '둘', board: [{ uid: 'a', name: '에이', score: 130, gain: 0 }], nextInMs: 5000, last: true }, 0);
     expect(render(lastRev, 1000)).toContain('4초 뒤 결과');
     expect(render(lastRev, 1000)).toContain('아무도 못 맞혀서 여기서 끝나요');
-    const end = lyricReduce(s, { t: 'l.end', rows: [{ uid: 'a', name: '에이', score: 900, rank: 1, reward: 5 }, { uid: 'b', name: '비', score: 100, rank: 2, reward: 0 }], rewarded: true, rounds: 7 }, 0);
+    const end = lyricReduce(s, { t: 'l.end', rows: [{ uid: 'a', name: '에이', score: 900, rank: 1, reward: 5, correct: 6 }, { uid: 'b', name: '비', score: 100, rank: 2, reward: 0, correct: 1 }], rewarded: true, rounds: 7 }, 0);
     expect(render(end)).toContain('7문제까지 이어졌어요');
     expect(render(end)).toContain('보상 💎5을 우편함으로 보내는 중');
     expect(render(lyricReduce(end, { t: 'reward', diamonds: 5, capped: false }, 0))).toContain('보상 💎5을 우편함으로 보냈어요');
     expect(render(lyricReduce(end, { t: 'reward', diamonds: 0, capped: true }, 0))).toContain('오늘 라이브 보상 한도');
     expect(render(lyricReduce(end, { t: 'reward', diamonds: 3, capped: true }, 0))).toContain('오늘 한도까지만');
-    const solo = lyricReduce(s, { t: 'l.end', rows: [{ uid: 'a', name: '에이', score: 900, rank: 1, reward: 0 }], rewarded: false, rounds: 2 }, 0);
+    const solo = lyricReduce(s, { t: 'l.end', rows: [{ uid: 'a', name: '에이', score: 900, rank: 1, reward: 0, correct: 2 }], rewarded: false, rounds: 2 }, 0);
     expect(render(solo)).toContain('혼자 시작한 판은 보상이 없어요');
     expect(render(end)).toContain('한 판 더');
+  });
+});
+
+describe('가사 빈칸 속도전 내 기록 화면', () => {
+  it('한 줄 요약은 한 판이라도 했을 때만 보인다', () => {
+    expect(html(createElement(RecordLine, { record: null }))).toBe('');
+    expect(html(createElement(RecordLine, { record: { ...RECORD, games: 0 } }))).toBe('');
+    const t = html(createElement(RecordLine, { record: RECORD }));
+    expect(t).toContain('내 기록');
+    expect(t).toContain('12판');
+    expect(t).toContain('1위 3번');
+    expect(t).toContain('최고 1.28K점');
+  });
+
+  it('기록 카드: 누적·최고와 최근 판(최신이 위), 새 기록 표시', () => {
+    const t = html(createElement(RecordCard, { record: RECORD, best: { score: true, correct: false } }));
+    expect(t).toContain('새 기록!');
+    expect(t).toContain('12판');
+    expect(t).toContain('3번');
+    expect(t).toContain('/ 9판');
+    expect(t).toContain('1.28K점 🎉');
+    expect(t).not.toContain('8문제 🎉');
+    expect(t).toContain('41문제');
+    expect(t).toContain('최근 2판');
+    expect(t).toContain('혼자 연습');
+    expect(t).toContain('3명 중 2위');
+    expect(t.indexOf('혼자 연습')).toBeLessThan(t.indexOf('3명 중 2위')); // 최근 판이 위
+    expect(t).toContain('도중에 나가면 그 판은 남지 않고');
+    expect(html(createElement(RecordCard, { record: RECORD, best: { score: false, correct: false } }))).not.toContain('새 기록!');
+    expect(html(createElement(RecordCard, { record: { ...RECORD, recent: [] }, best: { score: false, correct: true } }))).not.toContain('최근');
+  });
+
+  it('결과 화면에는 이 판이 쌓인 기록이 오면 붙고, 오기 전에는 붙지 않는다. 대기실에는 최근 기록이 한 줄로 보인다', () => {
+    const base = lyricAfter([{ t: 'hello', uid: 'a', name: '에이' }]);
+    const noop = () => undefined;
+    const render = (state: LyricState, record?: LyricRecord | null) => html(createElement(LyricBoard, { state, now: 0, onAnswer: noop, onAgain: noop, onExit: noop, record }));
+    const end = lyricReduce(base, { t: 'l.end', rows: [{ uid: 'a', name: '에이', score: 900, rank: 1, reward: 5, correct: 6 }], rewarded: true, rounds: 9 }, 0);
+    expect(render(end)).toContain('내가 맞힌 문제는 6개예요');
+    expect(render(end, RECORD)).not.toContain('내 기록'); // 목록에서 가져온 옛 기록은 결과에 붙이지 않는다(방금 판이 빠져 있다)
+    const withRecord = lyricReduce(end, { t: 'l.record', record: RECORD, best: { score: false, correct: true } }, 0);
+    expect(render(withRecord)).toContain('내 기록');
+    expect(render(withRecord)).toContain('8문제 🎉');
+    const lobby = lyricReduce(base, { t: 'l.lobby', players: [{ uid: 'a', name: '에이' }], startsInMs: 12_000, solo: false }, 0);
+    expect(render(lobby)).not.toContain('내 기록');
+    expect(render(lobby, RECORD)).toContain('12판');
+    // 이번 화면에서 더 최근 기록을 알게 됐으면 그것이 우선한다
+    expect(render({ ...lobby, mine: { ...RECORD, games: 13 } }, RECORD)).toContain('13판');
   });
 });
 

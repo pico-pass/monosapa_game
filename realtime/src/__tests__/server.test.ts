@@ -1,7 +1,7 @@
 import type { AddressInfo } from 'node:net';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { WebSocket } from 'ws';
-import type { RewardRequest } from '../hub.js';
+import type { RecordRequest, RewardRequest } from '../hub.js';
 import { QUIZ } from '../lyric/quiz.js';
 import type { ClientMsg, ServerMsg } from '../protocol.js';
 import { createRealtimeServer, sameOrigin, type RealtimeServer } from '../server.js';
@@ -14,17 +14,30 @@ let app: RealtimeServer;
 let port = 0;
 let clock = 1_000_000;
 const paid: RewardRequest[] = [];
+const saved: RecordRequest[] = [];
+/** 기록 저장소의 동작: ok 는 저장하고 갱신된 기록을 돌려주고, off 는 꺼진 것(null), fail 은 실패한다 */
+let recordMode: 'ok' | 'off' | 'fail' = 'ok';
 const sockets: WebSocket[] = [];
 
 beforeEach(async () => {
   clock = 1_000_000;
   paid.length = 0;
+  saved.length = 0;
+  recordMode = 'ok';
   app = createRealtimeServer({
     auth: async (cookie) => USERS[cookie?.replace('u=', '') ?? ''] ?? null,
     rewards: {
       async pay(req) {
         paid.push(req);
         return { granted: req.diamonds, capped: false };
+      },
+    },
+    records: {
+      async save(req) {
+        if (recordMode === 'fail') throw new Error('기록 서버 오류');
+        if (recordMode === 'off') return null;
+        saved.push(req);
+        return { record: { games: saved.length, multiGames: saved.length, wins: 0, totalCorrect: req.correct, bestScore: req.score, bestCorrect: req.correct, recent: [] }, best: { score: false, correct: true } };
       },
     },
     lines: LINES,
@@ -135,6 +148,40 @@ describe('접속 확인', () => {
   });
 });
 
+/** 대기실이 닫히고 solvedRounds 문제를 둘 다 맞힌 뒤, 아무도 못 맞힌 문제로 끝나 결과가 나올 때까지 진행한다. */
+async function playToEnd(a: Client, b: Client, solvedRounds: number): Promise<void> {
+  clock += QUIZ.lobbyMs;
+  app.hub.tick(clock);
+  await settle();
+  for (let r = 0; r < solvedRounds; r++) {
+    expect(a.last('l.q')?.round).toBe(r + 1);
+    a.send({ t: 'ans', text: '틀린 답' });
+    await settle();
+    expect(a.last('l.me')).toMatchObject({ ok: false });
+    clock += 300;
+    a.send({ t: 'ans', text: answerFor(a) });
+    clock += 300;
+    b.send({ t: 'ans', text: answerFor(b) });
+    await settle();
+    expect(a.last('l.ok')).toBeDefined();
+    app.hub.tick(clock);
+    await settle();
+    expect(a.last('l.reveal')).toBeDefined();
+    clock += QUIZ.revealMs;
+    app.hub.tick(clock);
+    await settle();
+  }
+  expect(a.last('l.end')).toBeUndefined();
+  expect(a.last('l.q')?.round).toBe(solvedRounds + 1);
+  clock += QUIZ.answerMs; // 이번 문제는 아무도 못 맞힌다
+  app.hub.tick(clock);
+  await settle();
+  expect(a.last('l.reveal')).toMatchObject({ last: true });
+  clock += QUIZ.revealMs;
+  app.hub.tick(clock);
+  await settle();
+}
+
 describe('가사 빈칸 속도전(소켓)', () => {
   it('두 사람이 들어와 끝까지 치르고 결과와 보상을 받는다', async () => {
     const a = await connect('a');
@@ -147,36 +194,7 @@ describe('가사 빈칸 속도전(소켓)', () => {
 
     // 문제 수에 끝이 없다: 맞히는 동안 이어지다가, 아무도 못 맞힌 문제가 나오면 끝난다
     const solvedRounds = 3;
-    clock += QUIZ.lobbyMs;
-    app.hub.tick(clock);
-    await settle();
-    for (let r = 0; r < solvedRounds; r++) {
-      expect(a.last('l.q')?.round).toBe(r + 1);
-      a.send({ t: 'ans', text: '틀린 답' });
-      await settle();
-      expect(a.last('l.me')).toMatchObject({ ok: false });
-      clock += 300;
-      a.send({ t: 'ans', text: answerFor(a) });
-      clock += 300;
-      b.send({ t: 'ans', text: answerFor(b) });
-      await settle();
-      expect(a.last('l.ok')).toBeDefined();
-      app.hub.tick(clock);
-      await settle();
-      expect(a.last('l.reveal')).toBeDefined();
-      clock += QUIZ.revealMs;
-      app.hub.tick(clock);
-      await settle();
-    }
-    expect(a.last('l.end')).toBeUndefined();
-    expect(a.last('l.q')?.round).toBe(solvedRounds + 1);
-    clock += QUIZ.answerMs; // 이번 문제는 아무도 못 맞힌다
-    app.hub.tick(clock);
-    await settle();
-    expect(a.last('l.reveal')).toMatchObject({ last: true });
-    clock += QUIZ.revealMs;
-    app.hub.tick(clock);
-    await settle();
+    await playToEnd(a, b, solvedRounds);
     const end = a.last('l.end')!;
     expect(end.rounds).toBe(solvedRounds + 1);
     expect(end.rewarded).toBe(true);
@@ -189,6 +207,15 @@ describe('가사 빈칸 속도전(소켓)', () => {
     expect(new Set(paid.map((p) => p.ref)).size).toBe(2);
     expect(paid[0].label).toContain('1위');
     expect(a.last('reward')).toEqual({ t: 'reward', diamonds: QUIZ.rewards[0], capped: false });
+    // 판 기록: 끝까지 남은 사람마다 한 번씩, 순위·정답 수·이어진 문제 수와 함께 쌓이고 갱신된 내 기록이 그 사람에게 간다
+    expect(saved.map((r) => [r.uid, r.game, r.rank, r.players, r.correct, r.rounds, r.multi])).toEqual([
+      ['ua', 'lyric', 1, 2, solvedRounds, solvedRounds + 1, true],
+      ['ub', 'lyric', 2, 2, solvedRounds, solvedRounds + 1, true],
+    ]);
+    expect(saved[0].score).toBe(end.rows[0].score);
+    expect(new Set(saved.map((r) => r.ref)).size).toBe(2);
+    expect(a.last('l.record')).toMatchObject({ t: 'l.record', record: { games: 1, bestScore: saved[0].score }, best: { score: false, correct: true } });
+    expect(b.last('l.record')).toBeDefined();
     // 결과 화면에서 다시 하기: 새 방에 들어간다
     a.send({ t: 'join', game: 'lyric' });
     await settle();
@@ -196,6 +223,49 @@ describe('가사 빈칸 속도전(소켓)', () => {
     clock += QUIZ.resultMs;
     app.hub.tick(clock);
     expect(app.hub.stats.rooms).toBe(1);
+  });
+
+  it('기록 저장이 실패하거나 꺼져 있어도 게임·보상은 그대로 끝나고 기록 메시지만 가지 않는다', async () => {
+    for (const mode of ['fail', 'off'] as const) {
+      recordMode = mode;
+      paid.length = 0;
+      clock = 1_000_000;
+      const a = await connect('a');
+      const b = await connect('b');
+      a.send({ t: 'join', game: 'lyric' });
+      b.send({ t: 'join', game: 'lyric' });
+      await settle();
+      await playToEnd(a, b, 1);
+      expect(a.last('l.end')).toBeDefined();
+      expect(paid).toHaveLength(2);
+      expect(a.last('reward')).toBeDefined();
+      await settle();
+      expect(a.last('l.record')).toBeUndefined();
+      expect(saved).toHaveLength(0);
+      a.ws.close();
+      b.ws.close();
+      await Promise.all([a.closed, b.closed]);
+      await settle();
+    }
+  });
+
+  it('혼자 한 판도 기록은 쌓이지만 함께한 판(multi)이 아니다', async () => {
+    const a = await connect('a');
+    a.send({ t: 'join', game: 'lyric' });
+    await settle();
+    clock += QUIZ.lobbyMs;
+    app.hub.tick(clock);
+    await settle();
+    clock += QUIZ.answerMs; // 한 문제도 못 맞히고 끝난다
+    app.hub.tick(clock);
+    await settle();
+    clock += QUIZ.revealMs;
+    app.hub.tick(clock);
+    await until(() => a.last('l.record'));
+    expect(saved).toHaveLength(1);
+    expect(saved[0]).toMatchObject({ uid: 'ua', rank: 1, players: 1, correct: 0, rounds: 1, multi: false });
+    expect(paid).toHaveLength(0);
+    expect(a.last('l.record')).toBeDefined();
   });
 
   it('도중에 나가거나 끊으면 방에서 빠진다', async () => {

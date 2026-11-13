@@ -50,3 +50,67 @@ export type LiveDailyDocument = HydratedDocument<LiveDaily>;
 export const LiveDailySchema = SchemaFactory.createForClass(LiveDaily);
 LiveDailySchema.index({ userId: 1, day: 1 }, { unique: true });
 LiveDailySchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+/** 가사 빈칸 속도전 최근 한 판(오래된 것부터 최대 10개). 고유 값(ref)은 같은 판을 두 번 쌓지 않으려고 둔다. */
+@Schema({ _id: false })
+export class LiveRecordGame {
+  @Prop({ type: String, required: true })
+  ref!: string;
+
+  @Prop({ type: Number, required: true })
+  at!: number;
+
+  @Prop({ type: Number, required: true })
+  rank!: number;
+
+  @Prop({ type: Number, required: true })
+  players!: number;
+
+  @Prop({ type: Number, required: true })
+  score!: number;
+
+  @Prop({ type: Number, required: true })
+  correct!: number;
+
+  @Prop({ type: Number, required: true })
+  rounds!: number;
+
+  @Prop({ type: Boolean, required: true })
+  multi!: boolean;
+}
+const LiveRecordGameSchema = SchemaFactory.createForClass(LiveRecordGame);
+
+/** 사람·게임별 라이브 미니게임 내 기록. 진행 데이터라 정식 출시 같은 초기화 때 함께 비운다(`CLEAR_COLLECTIONS`). */
+@Schema({ collection: 'live_records', minimize: false })
+export class LiveRecord {
+  @Prop({ type: Types.ObjectId, required: true })
+  userId!: Types.ObjectId;
+
+  @Prop({ type: String, required: true })
+  game!: string;
+
+  @Prop({ type: Number, default: 0 })
+  games!: number;
+
+  @Prop({ type: Number, default: 0 })
+  multiGames!: number;
+
+  @Prop({ type: Number, default: 0 })
+  wins!: number;
+
+  @Prop({ type: Number, default: 0 })
+  totalCorrect!: number;
+
+  @Prop({ type: Number, default: 0 })
+  bestScore!: number;
+
+  @Prop({ type: Number, default: 0 })
+  bestCorrect!: number;
+
+  @Prop({ type: [LiveRecordGameSchema], default: [] })
+  recent!: LiveRecordGame[];
+}
+
+export type LiveRecordDocument = HydratedDocument<LiveRecord>;
+export const LiveRecordSchema = SchemaFactory.createForClass(LiveRecord);
+LiveRecordSchema.index({ userId: 1, game: 1 }, { unique: true });

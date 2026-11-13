@@ -2,7 +2,7 @@
  * 가사 빈칸 속도전 화면 상태(순수). 서버 메시지를 하나씩 받아 화면에 보일 모습(view)으로 바꾼다.
  * 시각은 서버 시계가 아니라 메시지를 받은 이 기기의 시각(at, performance.now() ms)에 서버가 알려 준 남은 시간을 더해 센다.
  */
-import type { BoardRow, EndRow, PlayerRow, ServerMsg } from '../../../../realtime/src/protocol';
+import type { BoardRow, EndRow, LyricRecord, PlayerRow, ServerMsg } from '../../../../realtime/src/protocol';
 
 export interface Solved {
   uid: string;
@@ -25,11 +25,15 @@ export interface LyricState {
   myUid: string | null;
   /** 보상 우편이 나간 결과(아직 안 왔으면 null) */
   reward: { diamonds: number; capped: boolean } | null;
+  /** 방금 끝난 판이 쌓인 내 기록과 새 최고 기록 표시(아직 안 왔거나 새 판이 시작되면 null) */
+  record: { record: LyricRecord; best: { score: boolean; correct: boolean } } | null;
+  /** 이 화면에서 가장 최근에 알게 된 내 기록(판이 끝날 때마다 갱신, 새 판이 시작돼도 남는다) */
+  mine: LyricRecord | null;
   /** 서버가 거절한 이유(없으면 null) */
   error: string | null;
 }
 
-export const initialLyric: LyricState = { view: { k: 'wait' }, myUid: null, reward: null, error: null };
+export const initialLyric: LyricState = { view: { k: 'wait' }, myUid: null, reward: null, record: null, mine: null, error: null };
 
 const ERR_TEXT: Record<string, string> = { busy: '이미 게임 중이에요.', full: '지금은 들어갈 자리가 없어요. 잠시 뒤에 다시 해 주세요.', rate: '너무 빨라요. 잠깐만요!', bad: '' };
 
@@ -39,7 +43,7 @@ export function lyricReduce(s: LyricState, m: ServerMsg, at: number): LyricState
     case 'hello':
       return { ...s, myUid: m.uid };
     case 'l.lobby':
-      return { ...s, error: null, reward: null, view: { k: 'lobby', players: m.players, startsAt: at + m.startsInMs, solo: m.solo } };
+      return { ...s, error: null, reward: null, record: null, view: { k: 'lobby', players: m.players, startsAt: at + m.startsInMs, solo: m.solo } };
     case 'l.q':
       return { ...s, error: null, view: { k: 'question', round: m.round, before: m.before, after: m.after, len: m.len, endsAt: at + m.endsInMs, totalMs: m.endsInMs, hint: null, solved: [], me: null, wrong: 0 } };
     case 'l.hint':
@@ -55,6 +59,8 @@ export function lyricReduce(s: LyricState, m: ServerMsg, at: number): LyricState
     }
     case 'l.end':
       return { ...s, view: { k: 'end', rows: m.rows, rewarded: m.rewarded, rounds: m.rounds } };
+    case 'l.record':
+      return { ...s, record: { record: m.record, best: m.best }, mine: m.record };
     case 'reward':
       return { ...s, reward: { diamonds: m.diamonds, capped: m.capped } };
     case 'left':

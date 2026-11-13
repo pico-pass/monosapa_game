@@ -1,6 +1,6 @@
 import { config } from './config.js';
 import { LYRIC_LINES } from './lyric/lines.js';
-import { httpAuth, httpRewards } from './remote.js';
+import { httpAuth, httpRecords, httpRewards } from './remote.js';
 import { createRealtimeServer } from './server.js';
 
 const log = (msg: string): void => console.log(`[realtime] ${msg}`);
@@ -8,6 +8,7 @@ const log = (msg: string): void => console.log(`[realtime] ${msg}`);
 const app = createRealtimeServer({
   auth: httpAuth(config.authUrl),
   rewards: httpRewards(config.rewardUrl, config.secret),
+  records: httpRecords(config.recordUrl, config.secret),
   lines: LYRIC_LINES,
   path: config.path,
   maxConns: config.maxConns,

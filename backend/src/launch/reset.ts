@@ -24,6 +24,7 @@ export const CLEAR_COLLECTIONS = [
   'chart_claims',
   'live_rewards',
   'live_daily',
+  'live_records',
   'challenge_entries',
   'friend_gifts',
 ] as const;

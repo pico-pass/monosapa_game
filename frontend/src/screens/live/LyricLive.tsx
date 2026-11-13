@@ -1,5 +1,7 @@
 import { useReducer, useState } from 'react';
 import { fmt } from '../../components/format';
+import type { LyricRecord } from '../../platform/liveRecords';
+import { RecordCard, RecordLine } from './LyricRecord';
 import { QUIZ_REWARD_TEXT } from './text';
 import { initialLyric, lyricReduce, type LyricState } from './lyricState';
 import { STATUS_TEXT, useLive, useNow, type LiveStatus } from './useLive';
@@ -41,10 +43,12 @@ interface BoardProps {
   onAnswer: (text: string) => void;
   onAgain: () => void;
   onExit: () => void;
+  /** 대기실에 보여 줄 내 기록(없으면 안 보인다) */
+  record?: LyricRecord | null;
 }
 
 /** 가사 빈칸 속도전 화면(그리기만. 연결은 LyricLive가 한다). */
-export function LyricBoard({ state, now, onAnswer, onAgain, onExit }: BoardProps) {
+export function LyricBoard({ state, now, onAnswer, onAgain, onExit, record }: BoardProps) {
   const [text, setText] = useState('');
   const v = state.view;
   const submit = (e: React.FormEvent) => {
@@ -74,6 +78,7 @@ export function LyricBoard({ state, now, onAnswer, onAgain, onExit }: BoardProps
           ))}
         </ul>
         <p className="muted">{v.solo ? '혼자서도 연습할 수 있어요. 보상은 다른 팬과 함께한 판에만 나가요.' : '곧 시작해요! 정답을 먼저 칠수록 점수가 높아요.'}</p>
+        <RecordLine record={state.mine ?? record} />
         <button type="button" className="btn btn-ghost" onClick={onExit}>
           나가기
         </button>
@@ -173,7 +178,9 @@ export function LyricBoard({ state, now, onAnswer, onAgain, onExit }: BoardProps
         <h3>결과</h3>
         {mine && <strong>{mine.rank}위</strong>}
       </div>
-      <p className="muted">{v.rounds}문제까지 이어졌어요. 마지막 문제는 아무도 못 맞혔어요.</p>
+      <p className="muted">
+        {v.rounds}문제까지 이어졌어요. 마지막 문제는 아무도 못 맞혔어요.{mine ? ` 내가 맞힌 문제는 ${mine.correct}개예요.` : ''}
+      </p>
       <ol className="live-board">
         {v.rows.map((r) => (
           <li key={r.uid} className={r.uid === state.myUid ? 'live-me' : ''}>
@@ -185,6 +192,7 @@ export function LyricBoard({ state, now, onAnswer, onAgain, onExit }: BoardProps
         ))}
       </ol>
       <RewardNote state={state} rewarded={v.rewarded} mine={mine?.reward ?? 0} />
+      {mine && state.record && <RecordCard record={state.record.record} best={state.record.best} />}
       <div className="btn-col">
         <button type="button" className="btn btn-primary" onClick={onAgain}>
           한 판 더
@@ -198,7 +206,7 @@ export function LyricBoard({ state, now, onAnswer, onAgain, onExit }: BoardProps
 }
 
 /** 가사 빈칸 속도전: 소켓에 연결해 방에 들어가고, 서버가 내는 문제를 먼저 맞힌다. */
-export function LyricLive({ onExit }: { onExit: () => void }) {
+export function LyricLive({ onExit, record }: { onExit: () => void; record?: LyricRecord | null }) {
   const [state, dispatch] = useReducer((s: LyricState, a: { m: Parameters<typeof lyricReduce>[1]; at: number }) => lyricReduce(s, a.m, a.at), initialLyric);
   const { status, send, retry } = useLive('lyric', (m) => dispatch({ m, at: performance.now() }));
   const now = useNow(200, status === 'open');
@@ -213,6 +221,7 @@ export function LyricLive({ onExit }: { onExit: () => void }) {
           onAnswer={(text) => send({ t: 'ans', text })}
           onAgain={() => send({ t: 'join', game: 'lyric' })}
           onExit={onExit}
+          record={record}
         />
       )}
       {status !== 'open' && status !== 'connecting' && (

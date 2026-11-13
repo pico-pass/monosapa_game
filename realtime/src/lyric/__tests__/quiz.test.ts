@@ -8,7 +8,7 @@ const LINES = ['하나 둘 셋 넷', '다섯 여섯 일곱 여덟', '아홉 열 
 interface Log {
   to: { uid: string; msg: ServerMsg }[];
   all: ServerMsg[];
-  finished: { rows: EndRow[]; rewarded: boolean }[];
+  finished: { rows: EndRow[]; rewarded: boolean; rounds: number }[];
 }
 
 function setup(lines = LINES, seed = 1) {
@@ -16,7 +16,7 @@ function setup(lines = LINES, seed = 1) {
   const room = new LyricRoom('r1', lines, mulberry32(seed), {
     to: (uid, msg) => log.to.push({ uid, msg }),
     all: (msg) => log.all.push(msg),
-    finish: (rows, rewarded) => log.finished.push({ rows, rewarded }),
+    finish: (rows, rewarded, rounds) => log.finished.push({ rows, rewarded, rounds }),
   });
   return { room, log };
 }
@@ -215,6 +215,13 @@ describe('가사 빈칸 속도전 방', () => {
       ['c', 3, 0], // 한 문제도 못 맞히면 참가 보상도 없다
     ]);
     expect(log.all.at(-1)).toMatchObject({ t: 'l.end', rewarded: true, rounds: 4 });
+    // 기록용: 이어진 문제 수와 사람마다 맞힌 문제 수(a 3문제, b 2문제, c 0문제)가 결과와 함께 나간다
+    expect(end.rounds).toBe(4);
+    expect(end.rows.map((r) => [r.uid, r.correct])).toEqual([
+      ['a', 3],
+      ['b', 2],
+      ['c', 0],
+    ]);
     room.advance(t + QUIZ.resultMs);
     expect(room.phase).toBe('closed');
   });

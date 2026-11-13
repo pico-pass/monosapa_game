@@ -6,7 +6,7 @@
 import { FANDOM, FandomWorld, type RunResult } from './fandom/world.js';
 import { LyricRoom, QUIZ } from './lyric/quiz.js';
 import { cleanLines } from './lyric/lines.js';
-import type { ClientMsg, EndRow, LiveGame, ServerMsg } from './protocol.js';
+import type { ClientMsg, EndRow, LiveGame, LyricRecord, ServerMsg } from './protocol.js';
 import { mulberry32 } from './rng.js';
 
 export interface RewardRequest {
@@ -24,6 +24,30 @@ export interface RewardSink {
   pay(req: RewardRequest): Promise<{ granted: number; capped: boolean } | null>;
 }
 
+/** 가사 빈칸 속도전 한 판의 기록을 저장해 달라는 요청(끝까지 남은 사람마다 하나) */
+export interface RecordRequest {
+  uid: string;
+  game: 'lyric';
+  /** 같은 판의 기록을 두 번 쌓지 않게 하는 고유 값(방·사람) */
+  ref: string;
+  rank: number;
+  players: number;
+  score: number;
+  correct: number;
+  rounds: number;
+  multi: boolean;
+}
+
+export interface RecordResult {
+  record: LyricRecord;
+  best: { score: boolean; correct: boolean };
+}
+
+export interface RecordSink {
+  /** 기록을 쌓고 갱신된 내 기록을 돌려준다. 기록이 꺼져 있으면 null. */
+  save(req: RecordRequest): Promise<RecordResult | null>;
+}
+
 export interface Conn {
   uid: string;
   name: string;
@@ -32,6 +56,8 @@ export interface Conn {
 
 export interface HubDeps {
   rewards: RewardSink;
+  /** 판 기록 저장(없으면 기록은 남기지 않는다) */
+  records?: RecordSink;
   /** 방을 만들 때 쓰는 난수 씨앗을 만드는 함수(테스트에서 고정) */
   seed?: () => number;
   /** 가사 빈칸 속도전 출제 목록 */
@@ -140,7 +166,10 @@ export class Hub {
       room = new LyricRoom(id, this.lines, rng, {
         to: (uid, msg) => this.sendTo(uid, msg),
         all: (msg) => this.sendToRoom(id, msg),
-        finish: (rows, rewarded) => this.payQuiz(id, rows, rewarded),
+        finish: (rows, rewarded, rounds) => {
+          this.payQuiz(id, rows, rewarded);
+          this.recordQuiz(id, rows, rewarded, rounds);
+        },
       });
       this.rooms.set(id, room);
     }
@@ -204,6 +233,21 @@ export class Hub {
     for (const r of rows) {
       const label = r.rank <= QUIZ.rewards.length ? `가사 빈칸 속도전 ${r.rank}위` : '가사 빈칸 속도전 참가';
       void this.pay({ uid: r.uid, game: 'lyric', diamonds: r.reward, ref: `${roomId}:${r.uid}`, label });
+    }
+  }
+
+  /** 끝까지 남은 사람마다 판 기록을 쌓고, 갱신된 내 기록을 그 사람에게 보낸다(실패해도 게임에는 영향이 없다). */
+  private recordQuiz(roomId: string, rows: EndRow[], multi: boolean, rounds: number): void {
+    const sink = this.deps.records;
+    if (!sink) return;
+    for (const r of rows) {
+      const req: RecordRequest = { uid: r.uid, game: 'lyric', ref: `${roomId}:${r.uid}`, rank: r.rank, players: rows.length, score: r.score, correct: r.correct, rounds, multi };
+      void sink
+        .save(req)
+        .then((res) => {
+          if (res) this.sendTo(r.uid, { t: 'l.record', record: res.record, best: res.best });
+        })
+        .catch((e: unknown) => this.log(`기록 실패 ${req.ref}: ${e instanceof Error ? e.message : String(e)}`));
     }
   }
 

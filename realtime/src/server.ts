@@ -5,13 +5,15 @@
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { Duplex } from 'node:stream';
 import { WebSocket, WebSocketServer } from 'ws';
-import { Hub, type Conn, type RewardSink } from './hub.js';
+import { Hub, type Conn, type RecordSink, type RewardSink } from './hub.js';
 import { parseClientMsg, type ServerMsg } from './protocol.js';
 import type { AuthFn } from './remote.js';
 
 export interface ServerDeps {
   auth: AuthFn;
   rewards: RewardSink;
+  /** 가사 빈칸 속도전 판 기록 저장(없으면 기록은 남기지 않는다) */
+  records?: RecordSink;
   lines: readonly string[];
   path?: string;
   maxConns?: number;
@@ -55,7 +57,7 @@ export function createRealtimeServer(deps: ServerDeps): RealtimeServer {
   const now = deps.now ?? Date.now;
   const path = deps.path ?? '/rt';
   const maxConns = deps.maxConns ?? 400;
-  const hub = new Hub({ rewards: deps.rewards, lines: deps.lines, seed: deps.seed, log: deps.log });
+  const hub = new Hub({ rewards: deps.rewards, records: deps.records, lines: deps.lines, seed: deps.seed, log: deps.log });
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_PAYLOAD });
   const live = new Map<string, { ws: WebSocket; conn: Conn }>();
   const alive = new WeakMap<WebSocket, boolean>();

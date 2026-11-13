@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { fetchMyRecords, type MyLiveRecords } from '../platform/liveRecords';
 import { FandomLive } from './live/FandomLive';
 import { LyricLive } from './live/LyricLive';
+import { RecordLine } from './live/LyricRecord';
 
 type Game = 'lyric' | 'fandom' | null;
 
@@ -12,6 +14,18 @@ const GAMES = [
 /** 라이브 대전: 별도 소켓 서버에서 다른 팬들과 실시간으로 하는 미니게임 모음. */
 export function LiveScreen() {
   const [game, setGame] = useState<Game>(null);
+  const [records, setRecords] = useState<MyLiveRecords | null>(null);
+  // 목록으로 돌아올 때마다 내 기록을 다시 가져온다(방금 한 판이 쌓였을 수 있다)
+  useEffect(() => {
+    if (game !== null) return;
+    let alive = true;
+    void fetchMyRecords().then((r) => {
+      if (alive && r) setRecords(r);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [game]);
   const meta = GAMES.find((g) => g.id === game);
   return (
     <section className="screen" aria-label="라이브 대전">
@@ -28,6 +42,7 @@ export function LiveScreen() {
                 <small className="muted">{g.hint}</small>
               </div>
               <p className="muted">{g.desc}</p>
+              {g.id === 'lyric' && <RecordLine record={records?.lyric} />}
               <button type="button" className="btn btn-primary btn-wide" onClick={() => setGame(g.id)}>
                 입장하기
               </button>
@@ -45,7 +60,7 @@ export function LiveScreen() {
               ← 목록
             </button>
           </div>
-          {game === 'lyric' && <LyricLive onExit={() => setGame(null)} />}
+          {game === 'lyric' && <LyricLive onExit={() => setGame(null)} record={records?.lyric ?? null} />}
           {game === 'fandom' && <FandomLive onExit={() => setGame(null)} />}
         </>
       )}

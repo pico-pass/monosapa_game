@@ -1,10 +1,8 @@
-import { Body, Controller, ForbiddenException, Headers, NotFoundException, Post } from '@nestjs/common';
-import { createHash, timingSafeEqual } from 'node:crypto';
+import { Body, Controller, Headers, Post } from '@nestjs/common';
 import { AppConfig } from '../config/app.config.js';
 import type { LiveRewardBodyDto, LiveRewardResultDto } from './dto/live.dto.js';
+import { assertRealtime } from './internal.js';
 import { LiveService } from './live.service.js';
-
-const digest = (s: string): Buffer => createHash('sha256').update(s).digest();
 
 /**
  * 소켓 서버(realtime)가 라이브 미니게임 보상 우편을 요청하는 내부 주소. 로그인 쿠키가 아니라 공유 비밀 값(`x-realtime-secret`)으로 확인한다.
@@ -19,9 +17,7 @@ export class LiveController {
 
   @Post()
   grant(@Headers('x-realtime-secret') secret: string | undefined, @Body() body: LiveRewardBodyDto | undefined): Promise<LiveRewardResultDto> {
-    const expected = this.config.realtimeSecret;
-    if (!expected) throw new NotFoundException();
-    if (typeof secret !== 'string' || !timingSafeEqual(digest(secret), digest(expected))) throw new ForbiddenException();
+    assertRealtime(secret, this.config.realtimeSecret);
     return this.live.grant(body);
   }
 }

@@ -16,6 +16,8 @@ export const config = {
   authUrl: process.env.REALTIME_AUTH_URL ?? 'http://127.0.0.1:3000/api/auth/me',
   /** 보상 우편을 보내는 메인 서버의 내부 주소. 비밀 값이 없으면 보상은 꺼진다. */
   rewardUrl: process.env.REALTIME_REWARD_URL ?? 'http://127.0.0.1:3000/api/internal/live-reward',
+  /** 가사 빈칸 속도전 판 기록을 쌓는 메인 서버의 내부 주소(같은 비밀 값을 쓴다) */
+  recordUrl: process.env.REALTIME_RECORD_URL ?? 'http://127.0.0.1:3000/api/internal/live-record',
   secret: (process.env.REALTIME_SECRET ?? '').trim(),
   /** 동시 접속 상한 */
   maxConns: Number(process.env.REALTIME_MAX_CONNS ?? 400),

@@ -34,8 +34,44 @@ export interface BoardRow extends PlayerRow {
 export interface EndRow extends PlayerRow {
   score: number;
   rank: number;
+  /** 이 판에서 이 사람이 맞힌 문제 수 */
+  correct: number;
   /** 서버가 정한 순위 보상(다이아). 하루 한도는 우편을 보낼 때 적용되고 결과는 `reward` 메시지로 따로 온다. */
   reward: number;
+}
+
+/**
+ * 가사 빈칸 속도전 한 판의 기록(끝까지 남아 있던 사람마다 판이 끝날 때 서버가 남긴다).
+ * 메인 서버 `backend/src/live/records.ts`의 모양과 같아야 한다.
+ */
+export interface LyricGameRecord {
+  /** 판이 끝난 시각(ms) */
+  at: number;
+  rank: number;
+  /** 끝까지 남은 사람 수 */
+  players: number;
+  score: number;
+  correct: number;
+  /** 이어진 문제 수 */
+  rounds: number;
+  /** 2명 이상으로 시작한 판(보상이 나가는 판)이다 */
+  multi: boolean;
+}
+
+/** 가사 빈칸 속도전 내 기록: 계정마다 쌓인 누적과 최고, 최근 판 */
+export interface LyricRecord {
+  /** 끝까지 한 판 수 */
+  games: number;
+  /** 그중 2명 이상으로 시작한 판 */
+  multiGames: number;
+  /** 2명 이상으로 시작한 판에서 1위를 한 횟수 */
+  wins: number;
+  totalCorrect: number;
+  bestScore: number;
+  /** 한 판에서 맞힌 문제 수의 최고 */
+  bestCorrect: number;
+  /** 최근 판(오래된 것부터) */
+  recent: LyricGameRecord[];
 }
 
 export interface FandomRosterRow {
@@ -78,6 +114,8 @@ export type ServerMsg =
   | { t: 'l.reveal'; line: string; answer: string; board: BoardRow[]; nextInMs: number; last: boolean }
   /** rounds 는 이어진 문제 수 */
   | { t: 'l.end'; rows: EndRow[]; rewarded: boolean; rounds: number }
+  /** 방금 끝난 판이 내 기록에 쌓였다. best 는 이 판으로 최고 기록을 새로 세웠는가(첫 판은 제외) */
+  | { t: 'l.record'; record: LyricRecord; best: { score: boolean; correct: boolean } }
   | { t: 'f.go'; id: number; w: number; h: number; runMs: number }
   | { t: 'f.roster'; list: FandomRosterRow[] }
   | FandomSnapshot

@@ -1,6 +1,6 @@
 # AGENTS.md
 
-모노사파 키우기 — 두 자아의 믹스테이프. npm workspaces 모노레포. `frontend/`는 React + TypeScript + Vite 웹게임(게임 규칙 전부), `backend/`는 NestJS + TypeScript 서버(상태 확인 `GET /api/health`, 구글 로그인 `/api/auth/*`, 공개 챗방 `/api/chat`, 문의함 `/api/inquiries`, 해시태그 챌린지 `/api/challenge`, 음원 차트 `/api/chart`, 카드 교환소 `/api/trades`, 프로필 `/api/profiles`, 친구·선물 `/api/friends`, 우편함 `/api/mailbox`, 개인채팅 `/api/dm`, 신고·관리자 처리 `/api/reports`, 알림 개수 `/api/social/summary`, 팬 마을 친구 열람·깃발 `/api/village`, 월드 보스 `/api/boss`, 라이브 미니게임 보상 내부 주소 `/api/internal/live-reward`, 정식 출시 안내 `/api/launch`, MongoDB에 계정·세션 저장). 라이브 미니게임(가사 빈칸 속도전·팬덤 모으기)은 별도 소켓 서버 `realtime/`이다(아래). 게임 규칙은 서버에 없고(서버는 저장 JSON을 그대로 보관만 한다) 유저끼리 만나는 기능(챗·문의·챌린지·차트·교환소·친구·우편함·개인채팅·신고·마을 깃발·월드 보스)만 서버 로직이 있다. 진행 데이터는 계정별로 MongoDB에 자동 저장되고, 계정 레벨 랭킹(`GET /api/ranking`)이 있다.
+모노사파 키우기 — 두 자아의 믹스테이프. npm workspaces 모노레포. `frontend/`는 React + TypeScript + Vite 웹게임(게임 규칙 전부), `backend/`는 NestJS + TypeScript 서버(상태 확인 `GET /api/health`, 구글 로그인 `/api/auth/*`, 공개 챗방 `/api/chat`, 문의함 `/api/inquiries`, 해시태그 챌린지 `/api/challenge`, 음원 차트 `/api/chart`, 카드 교환소 `/api/trades`, 프로필 `/api/profiles`, 친구·선물 `/api/friends`, 우편함 `/api/mailbox`, 개인채팅 `/api/dm`, 신고·관리자 처리 `/api/reports`, 알림 개수 `/api/social/summary`, 팬 마을 친구 열람·깃발 `/api/village`, 월드 보스 `/api/boss`, 라이브 미니게임 보상·기록 내부 주소 `/api/internal/live-reward`·`/api/internal/live-record`와 내 기록 `/api/live/records/me`, 정식 출시 안내 `/api/launch`, MongoDB에 계정·세션 저장). 라이브 미니게임(가사 빈칸 속도전·팬덤 모으기)은 별도 소켓 서버 `realtime/`이다(아래). 게임 규칙은 서버에 없고(서버는 저장 JSON을 그대로 보관만 한다) 유저끼리 만나는 기능(챗·문의·챌린지·차트·교환소·친구·우편함·개인채팅·신고·마을 깃발·월드 보스)만 서버 로직이 있다. 진행 데이터는 계정별로 MongoDB에 자동 저장되고, 계정 레벨 랭킹(`GET /api/ranking`)이 있다.
 
 ## 명령 (루트에서)
 
@@ -9,7 +9,7 @@ npm install
 npm run dev           # frontend 개발 서버 (http://localhost:5173, /api 는 backend 3000 으로 프록시)
 npm run dev:backend   # backend 개발 서버 (http://localhost:3000/api)
 npm run dev:realtime  # 라이브 대전 소켓 서버 (127.0.0.1:3001/rt, 개발 서버가 /rt 웹소켓을 넘겨 준다)
-npm test              # frontend vitest (엔진·저장·미니게임 규칙·화면 렌더링) + backend vitest (프로필·도배 방지·신고 우편 같은 순수 규칙) + realtime vitest (빈칸·퀴즈 방·팬덤 세계·소켓 통신)
+npm test              # frontend vitest (엔진·저장·미니게임 규칙·화면 렌더링) + backend vitest (프로필·도배 방지·신고 우편·라이브 기록 같은 순수 규칙) + realtime vitest (빈칸·퀴즈 방·팬덤 세계·소켓 통신)
 npm run typecheck     # frontend + backend 타입체크
 npm run build         # frontend + backend 빌드
 npm run sim           # 성장 속도 시뮬레이션 (frontend/scripts/simulate.ts)
@@ -36,11 +36,12 @@ npm run launch:reset   # 정식 출시 초기화 점검(dry-run, 쓰지 않음).
 
 ## 구조 원칙 (realtime: 라이브 미니게임 소켓 서버)
 
-- `realtime/`은 Node + `ws`로 만든 별도 서버(NestJS 아님, ESM이라 상대 import에 `.js`)이고 pm2 `monosapa-realtime`으로 127.0.0.1:3001에서 돈다. nginx의 `/rt`(웹소켓 업그레이드) 프록시로만 바깥에 닿는다. 환경 변수는 `src/config.ts`에서만 읽는다(`realtime/.env`: `REALTIME_SECRET` 필수, `REALTIME_PORT`·`REALTIME_AUTH_URL`·`REALTIME_REWARD_URL`·`REALTIME_MAX_CONNS` 선택).
+- `realtime/`은 Node + `ws`로 만든 별도 서버(NestJS 아님, ESM이라 상대 import에 `.js`)이고 pm2 `monosapa-realtime`으로 127.0.0.1:3001에서 돈다. nginx의 `/rt`(웹소켓 업그레이드) 프록시로만 바깥에 닿는다. 환경 변수는 `src/config.ts`에서만 읽는다(`realtime/.env`: `REALTIME_SECRET` 필수, `REALTIME_PORT`·`REALTIME_AUTH_URL`·`REALTIME_REWARD_URL`·`REALTIME_RECORD_URL`·`REALTIME_MAX_CONNS` 선택).
 - 메시지는 JSON 한 덩어리(`t`가 종류, 가사 빈칸 속도전 `l.`·팬덤 모으기 `f.`)이고 모양은 `src/protocol.ts`가 정한다. 프런트(`platform/live.ts`·`screens/live/*`)는 이 파일의 **타입만** `import type`으로 가져다 쓴다(런타임 코드를 가져오지 않는다). 메시지를 바꾸면 양쪽을 같이 고친다.
 - 서버가 방·시간·점수·충돌을 모두 계산한다(권위 서버). 규칙은 순수 클래스(`lyric/blank.ts`·`lyric/quiz.ts`·`fandom/world.ts`)라서 시계·난수·보내기를 밖에서 받고, 테스트에서 시계를 마음대로 돌린다. 팬덤 세계는 고정 50ms 걸음과 씨앗 난수만 쓴다. `hub.ts`가 사람을 방에 이어 주고 `server.ts`가 업그레이드(로그인·Origin 확인)·속도 제한·한 계정 한 접속·끊김 정리를 맡는다. 메인 서버와는 `remote.ts`로만 이야기한다: 로그인 확인은 쿠키를 `GET /api/auth/me`에 넘기고, 보상은 `POST /api/internal/live-reward`(헤더 `x-realtime-secret`)로 요청한다.
 - 보상은 소켓 서버가 양을 정하고(`lyric/quiz.ts`의 `QUIZ.rewards`, `fandom/world.ts`의 `FANDOM.rewardTiers`), 메인 서버 `backend/src/live/`가 하루 한도(`rules.ts`의 `LIVE_DAILY_CAP`, 한국 시간 하루)와 같은 `ref`의 중복 지급 방지를 책임지고 `live` 종류 우편으로 보낸다(`live_rewards` 장부 7일·`live_daily` 3일 뒤 삭제). 보상 안내 문구(`screens/live/text.ts`)의 수치는 프런트 테스트(`live.test.tsx`)가 서버 값과 비교한다. 새 보상 게임을 더하면 `LIVE_GAMES`(백엔드 `rules.ts`)·`protocol.ts`의 `LiveGame`·허브·화면을 같이 맞춘다.
 - 가사 빈칸 속도전은 문제 수에 끝이 없다: 한 명이라도 맞히면 이어지고 아무도 못 맞힌 문제가 나오면 그 공개 뒤에 끝난다(`l.reveal.last`, `l.end.rounds`; `l.q`에는 전체 문제 수가 없다). 목록을 한 바퀴 돌면 다시 섞는다. 보상은 순위로만 정해진다.
+- **내 기록**(가사 빈칸 속도전): 판이 끝나면(`quiz.ts`의 `finish(rows, rewarded, rounds)`) `hub.ts`의 `recordQuiz`가 **끝까지 남은 사람마다** `RecordSink.save`(`remote.ts`의 `httpRecords` → `POST /api/internal/live-record`, 같은 비밀 값)로 한 판의 결과를 보내고, 갱신된 기록을 그 사람에게 `l.record`로 돌려준다. 기록이 실패하거나 꺼져 있어도(`records` 없음·비밀 값 없음) 게임과 보상은 영향이 없다(로그만 남긴다). 메인 서버 `backend/src/live/`: `records.ts`(순수 규칙: `parseGameEntry` 입력 검증·`incOf`·`applyGame`(첫 판은 새 기록 없음)·`pushRecent`(`RECENT_MAX` 10)·`toRecordDto`, `__tests__/records.test.ts`), `live-records.service.ts`(`live_records` 문서 하나가 (사람, 게임): `$inc`·`$max`·`$push`+`$slice`를 한 번에 하고 `recent.ref`가 이미 있으면 필터가 안 맞아 유니크 인덱스 충돌(11000)로 중복을 걸러 현재 기록을 돌려준다), `live-records.controller.ts`(`GET /api/live/records/me` 세션 가드·`POST /api/internal/live-record` 비밀 값, 비밀 값 확인은 `internal.ts`의 `assertRealtime`이고 보상 컨트롤러도 같이 쓴다). `LyricRecord`·`LyricGameRecord`(`protocol.ts`)와 백엔드 `LiveRecordDto`·`records.ts`의 모양은 같아야 하고, 프런트는 `platform/liveRecords.ts`·`screens/live/LyricRecord.tsx`(한 줄 `RecordLine`·결과 카드 `RecordCard`)가 쓴다. 진행 데이터라 `live_records`는 `launch/reset.ts`의 `CLEAR_COLLECTIONS`에 들어 있다. 새 게임의 기록을 더하면 `game` 키·`LIVE_GAMES`·`l.` 같은 메시지·화면을 같이 맞춘다(지금은 가사 빈칸만 `game: 'lyric'`을 받는다). `EndRow.correct`(그 판에서 맞힌 문제 수)가 기록의 정답 수다.
 - 출제 목록은 `src/lyric/lines.ts`의 배열 한 곳이다(줄을 더하면 되고 앞뒤·연속 공백과 중복은 읽을 때 걸러진다). 방은 메모리에만 있으므로 재시작하면 진행 중인 판이 사라진다.
 - 배포(`deploy.sh`)가 `realtime/dist`가 바뀌었거나 pm2 프로세스가 없으면 재시작하고 `/rt/health`를 확인한다(실패해도 되돌리지는 않는다). `deploy.sh --dry-run`이나 `npm run build`를 먼저 돌리면 dist가 이미 최신이라 재시작이 안 되니, 소켓 서버나 백엔드를 바꿨다면 해당 `dist` 폴더를 지우고 배포한다.
 
