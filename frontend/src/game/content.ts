@@ -595,6 +595,21 @@ export const PACK_TEXT = {
   blurb: '편의점 계산대 옆에 걸려 있는 포토카드 한 봉지. 뜯기 전에는 아무도 모른다.',
 };
 
+export const SCRATCH_TEXT = {
+  name: '스크래치 복권',
+  icon: '🍀',
+  blurb: '계산대 옆 동전으로 긁는 복권. 은박을 벗기기 전까지는 다들 한 번쯤 기대한다.',
+};
+
+/** 복권 결과 이름. mult는 낸 값에 곱해 돌려받는 배수(0이면 꽝). */
+export const scratchLabel = (mult: number): string => (mult <= 0 ? '꽝' : mult === 1 ? '본전' : mult < 1 ? `${mult}배 환급` : `${mult}배 당첨!`);
+
+export const SLEEVE_TEXT = {
+  name: '카드 슬리브',
+  icon: '🪪',
+  blurb: '포토카드를 넣는 투명한 비닐. 새것처럼 보이게 해 주지만, 같은 카드가 두 장이면 소용없다.',
+};
+
 export const MEAL_TEXT = {
   name: '야식 컵라면 세트',
   icon: '🍜',

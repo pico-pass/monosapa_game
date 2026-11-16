@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { BALANCE, GOODS_IDS, ITEM_IDS, SNACK_IDS, nurtureActionById } from '../balance';
+import { BALANCE, GOODS_IDS, ITEM_IDS, PHOTO_GRADES, PHOTO_SETS, SNACK_IDS, nurtureActionById, photoCardId } from '../balance';
+import { hasAllPhotos, photoPull, rollPhoto } from '../photocards';
 import { beginArcade, finishArcade } from '../arcade';
 import { buyEquipment, runAutoConcert } from '../commands';
 import { nurtureAct, nurtureWaitMs, previewNurture } from '../nurture';
@@ -8,7 +9,7 @@ import { bonuses } from '../packdata';
 import { chocoMult, cooldownMult, equipmentCost, goodsBonus, heatUpMult, itemBonus, maxRoyaltyPerSec, milkMult, odenMult, powerBonusNow, previewEquipment, proteinPower, receiptDiscount, rhymeRate, royaltyBreakdown, shopPrice, streamBoostMult, streamCoinsPerSec, streamTotal } from '../selectors';
 import { advance, makeReport, settleOffline } from '../simulation';
 import { dayKey } from '../missions';
-import { buyGoods, buyItem, buyMeal, buyPack, buyReceipt, buySnack, goodsPrice, itemPrice, mealPrice, packPrice, packsLeft, receiptPrice, redeemCoupon, stampMart } from '../shop';
+import { buyGoods, buyItem, buyMeal, buyPack, buyReceipt, buyScratch, buySleeve, buySnack, goodsPrice, itemPrice, mealPrice, packPrice, packsLeft, receiptPrice, redeemCoupon, scratchMult, scratchPrice, scratchesLeft, sleevePrice, stampMart } from '../shop';
 import { towerPower } from '../tower';
 import type { GameState, GoodsId, ItemId, Mart, Single } from '../types';
 
@@ -628,6 +629,232 @@ describe('저장: 생활용품·영수증·카드팩', () => {
     expect(w.state.buffs.goods).toBeNull();
     expect(validateState({ ...raw, buffs: { snack: null, campaign: null, item: null, goods: 'x' } }).ok).toBe(false);
     expect(validateState({ ...raw, buffs: { snack: null, campaign: null, item: null, goods: { id: 'icebar', until: 'x' } } }).ok).toBe(false);
+  });
+});
+
+/** 구매 횟수(counters.snacks)를 바꿔서 원하는 배수가 나오는 상태를 찾는다(결과가 씨앗과 그 횟수로만 정해지기 때문). */
+function withScratchMult(s: GameState, mult: number): GameState {
+  for (let n = 0; n < 5000; n++) {
+    if (scratchMult(s.feat.seed, n) === mult) return { ...s, counters: { ...s.counters, snacks: n } };
+  }
+  throw new Error(`배수 ${mult}가 나오는 구매 횟수를 못 찾았어요`);
+}
+
+describe('스크래치 복권: 코인을 내고 바로 긁기', () => {
+  it('당첨 표는 합이 1000이고 기댓값이 낸 값의 80~85%다', () => {
+    const prizes = BALANCE.shop.scratch.prizes;
+    expect(prizes.reduce((a, p) => a + p.weight, 0)).toBe(1000);
+    const ev = prizes.reduce((a, p) => a + p.mult * (p.weight / 1000), 0);
+    expect(ev).toBeGreaterThan(0.8);
+    expect(ev).toBeLessThan(0.85);
+    expect(prizes.some((p) => p.mult === 0)).toBe(true); // 꽝이 있다
+  });
+
+  it('결과 빈도가 표와 비슷하고, 같은 (씨앗, 횟수)면 늘 같은 결과다', () => {
+    const seed = base().feat.seed;
+    const N = 20000;
+    const count = new Map<number, number>();
+    for (let n = 0; n < N; n++) {
+      const m = scratchMult(seed, n);
+      count.set(m, (count.get(m) ?? 0) + 1);
+      expect(scratchMult(seed, n)).toBe(m);
+    }
+    for (const p of BALANCE.shop.scratch.prizes) {
+      const got = (count.get(p.mult) ?? 0) / N;
+      expect(Math.abs(got - p.weight / 1000)).toBeLessThan(0.015);
+    }
+  });
+
+  it('사면 값을 내고 낸 값 × 배수를 바로 돌려받으며 편의점 구매로 세어진다', () => {
+    const s0 = withScratchMult(base({ coins: 1e12 }), 2);
+    const r = ok(buyScratch(s0));
+    expect(r.cost).toBe(scratchPrice(s0));
+    expect(r.mult).toBe(2);
+    expect(r.prize).toBe(r.cost * 2);
+    expect(r.state.coins).toBe(s0.coins - r.cost + r.prize);
+    expect(r.left).toBe(BALANCE.shop.scratch.perDay - 1);
+    expect(r.state.counters.snacks).toBe(s0.counters.snacks + 1);
+    expect(r.state.mart.scratches).toBe(1);
+    expect(r.state.mart.scratchDay).toBe(dayKey(T0));
+    expect(r.state.mart.stamps).toBe(1);
+  });
+
+  it('꽝이면 낸 값만 잃고, 0.5배면 절반을 올림 없이 돌려받는다', () => {
+    const lose = ok(buyScratch(withScratchMult(base({ coins: 1e12 }), 0)));
+    expect(lose.prize).toBe(0);
+    expect(lose.state.coins).toBe(1e12 - lose.cost);
+    const half = ok(buyScratch(withScratchMult(base({ coins: 1e12 }), 0.5)));
+    expect(half.prize).toBe(Math.floor(half.cost * 0.5));
+    expect(half.state.coins).toBe(1e12 - half.cost + half.prize);
+  });
+
+  it('되돌려 다시 긁을 수 없다: 같은 상태는 같은 결과이고, 한 장 긁으면 다음 장은 다른 번호다', () => {
+    const s = base({ coins: 1e12 });
+    expect(ok(buyScratch(s)).mult).toBe(ok(buyScratch(s)).mult);
+    const first = ok(buyScratch(s));
+    expect(first.state.counters.snacks).toBe(s.counters.snacks + 1);
+    expect(ok(buyScratch(first.state)).mult).toBe(scratchMult(s.feat.seed, s.counters.snacks + 1));
+  });
+
+  it('하루 한도까지 사고, 날짜가 바뀌면 다시 살 수 있다', () => {
+    let s = base({ coins: 1e12 });
+    expect(scratchesLeft(s)).toBe(BALANCE.shop.scratch.perDay);
+    for (let i = 0; i < BALANCE.shop.scratch.perDay; i++) s = ok(buyScratch(s)).state;
+    expect(scratchesLeft(s)).toBe(0);
+    expect(failReason(buyScratch(s))).toBe('daily_limit');
+    const tomorrow = at(s, T0 + 25 * HOUR);
+    expect(scratchesLeft(tomorrow)).toBe(BALANCE.shop.scratch.perDay);
+    const again = ok(buyScratch(tomorrow));
+    expect(again.state.mart.scratchDay).toBe(dayKey(T0 + 25 * HOUR));
+    expect(again.state.mart.scratches).toBe(1);
+  });
+
+  it('코인이 모자라면 못 사고 아무것도 바뀌지 않는다', () => {
+    const s = base({ coins: 1 });
+    const r = buyScratch(s);
+    expect(failReason(r)).toBe('insufficient_coins');
+    expect((r as { state: GameState }).state).toBe(s);
+  });
+
+  it('가격은 기본가와 인세 5분 분량 중 큰 쪽이다', () => {
+    expect(scratchPrice(base({ fans: 100 }))).toBe(shopPrice(BALANCE.shop.scratch.base, 100));
+    const rich = base({ fans: 1e7 });
+    expect(scratchPrice(rich)).toBe(Math.ceil(maxRoyaltyPerSec(rich) * BALANCE.shop.scratch.incomeSecs));
+  });
+
+  it('코인이 상한에 닿아 있어도 상한을 넘지 않는다', () => {
+    const s = withScratchMult(base({ coins: BALANCE.maxResource }), 20);
+    expect(ok(buyScratch(s)).state.coins).toBeLessThanOrEqual(BALANCE.maxResource);
+  });
+});
+
+describe('카드 슬리브: 포토카드 중복을 새 카드로', () => {
+  /** 첫 뽑기에서 나올 카드를 미리 알아내서, 그 카드를 가진 채 뽑게 한다. */
+  const rigged = (owned: Record<string, number>, sleeves: number, tickets = 1): { s: GameState; set: number; grade: number } => {
+    const s0 = base({ coins: 1e12 });
+    const roll = rollPhoto(s0.photo.seed, s0.photo.pulls + 1, s0.photo.pity);
+    const s = { ...s0, mart: mart({ sleeves }), photo: { ...s0.photo, tickets, owned: { [photoCardId(roll.set, roll.grade)]: 1, ...owned } } };
+    return { s, set: roll.set, grade: roll.grade };
+  };
+
+  it('사면 한 장이 늘고 최대 장수까지만 가지며, 스탬프도 쌓인다', () => {
+    let s = base({ coins: 1e12 });
+    for (let i = 0; i < BALANCE.shop.sleeve.max; i++) {
+      const r = ok(buySleeve(s));
+      expect(r.cost).toBe(sleevePrice(s));
+      expect(r.state.coins).toBe(s.coins - r.cost);
+      s = r.state;
+    }
+    expect(s.mart.sleeves).toBe(BALANCE.shop.sleeve.max);
+    expect(s.mart.stamps).toBe(BALANCE.shop.sleeve.max);
+    expect(failReason(buySleeve(s))).toBe('already_done');
+  });
+
+  it('코인이 모자라면 못 산다. 36장을 모두 모았으면 살 필요가 없다', () => {
+    expect(failReason(buySleeve(base({ coins: 1 })))).toBe('insufficient_coins');
+    const owned: Record<string, number> = {};
+    for (let set = 1; set <= PHOTO_SETS; set++) for (let g = 1; g <= PHOTO_GRADES; g++) owned[photoCardId(set, g)] = 1;
+    const full = base({ coins: 1e12 });
+    const all = { ...full, photo: { ...full.photo, owned } };
+    expect(hasAllPhotos(all.photo.owned)).toBe(true);
+    expect(hasAllPhotos(full.photo.owned)).toBe(false);
+    expect(failReason(buySleeve(all))).toBe('already_done');
+  });
+
+  it('가격은 기본가와 인세 20분 분량 중 큰 쪽이고 카드팩보다 조금 싸다', () => {
+    expect(sleevePrice(base({ fans: 100 }))).toBe(shopPrice(BALANCE.shop.sleeve.base, 100));
+    const rich = base({ fans: 1e7 });
+    expect(sleevePrice(rich)).toBe(Math.ceil(maxRoyaltyPerSec(rich) * BALANCE.shop.sleeve.incomeSecs));
+    expect(sleevePrice(rich)).toBeLessThan(packPrice(rich));
+  });
+
+  it('이미 가진 카드가 나오면 슬리브 한 장이 쓰여 같은 등급의 다음 세트 새 카드가 된다', () => {
+    const { s, set, grade } = rigged({}, 2);
+    const r = ok(photoPull(s, 1));
+    const next = (set % PHOTO_SETS) + 1;
+    expect(r.results[0]).toMatchObject({ set: next, grade, isNew: true, sleeve: true, id: photoCardId(next, grade) });
+    expect(r.state.mart.sleeves).toBe(1);
+    expect(r.state.photo.owned[photoCardId(set, grade)]).toBe(1); // 원래 나온 카드는 늘지 않는다
+    expect(r.state.photo.owned[photoCardId(next, grade)]).toBe(1);
+    expect(r.state.photo.tickets).toBe(0);
+  });
+
+  it('다음 세트도 이미 가졌으면 그다음 세트로 건너뛴다', () => {
+    const { s, set, grade } = rigged({}, 1);
+    const second = (set % PHOTO_SETS) + 1;
+    const third = (second % PHOTO_SETS) + 1;
+    const withSecond = { ...s, photo: { ...s.photo, owned: { ...s.photo.owned, [photoCardId(second, grade)]: 1 } } };
+    const r = ok(photoPull(withSecond, 1));
+    expect(r.results[0]).toMatchObject({ set: third, grade, isNew: true, sleeve: true });
+  });
+
+  it('새 카드가 나오면 슬리브는 쓰이지 않는다', () => {
+    const s0 = base();
+    const s = { ...s0, mart: mart({ sleeves: 3 }), photo: { ...s0.photo, tickets: 1 } };
+    const r = ok(photoPull(s, 1));
+    expect(r.results[0]).toMatchObject({ isNew: true, sleeve: false });
+    expect(r.state.mart.sleeves).toBe(3);
+  });
+
+  it('바꿀 새 카드가 없으면(그 등급을 모든 세트에서 가졌으면) 슬리브는 그대로 남고 중복이 된다', () => {
+    const s0 = base();
+    const roll = rollPhoto(s0.photo.seed, s0.photo.pulls + 1, s0.photo.pity);
+    const owned: Record<string, number> = {};
+    for (let set = 1; set <= PHOTO_SETS; set++) owned[photoCardId(set, roll.grade)] = 1;
+    const s = { ...s0, mart: mart({ sleeves: 2 }), photo: { ...s0.photo, tickets: 1, owned } };
+    const r = ok(photoPull(s, 1));
+    expect(r.results[0]).toMatchObject({ set: roll.set, grade: roll.grade, isNew: false, sleeve: false });
+    expect(r.state.mart.sleeves).toBe(2);
+    expect(r.state.photo.owned[photoCardId(roll.set, roll.grade)]).toBe(2);
+  });
+
+  it('슬리브가 없으면 예전과 똑같이 중복이 된다', () => {
+    const { s, set, grade } = rigged({}, 0);
+    const r = ok(photoPull(s, 1));
+    expect(r.results[0]).toMatchObject({ set, grade, isNew: false, sleeve: false });
+    expect(r.state.photo.owned[photoCardId(set, grade)]).toBe(2);
+  });
+
+  it('슬리브는 등급·천장 계산을 바꾸지 않는다', () => {
+    const { s, grade } = rigged({}, 1);
+    const withSleeve = ok(photoPull(s, 1));
+    const without = ok(photoPull({ ...s, mart: mart() }, 1));
+    expect(withSleeve.results[0].grade).toBe(grade);
+    expect(without.results[0].grade).toBe(grade);
+    expect(withSleeve.state.photo.pity).toBe(without.state.photo.pity);
+    expect(withSleeve.state.photo.pulls).toBe(without.state.photo.pulls);
+  });
+
+  it('여러 번 뽑을 때 쓰인 만큼만 줄어들고, 뽑은 횟수와 티켓도 그대로 센다', () => {
+    const s0 = base();
+    const s = { ...s0, mart: mart({ sleeves: 5 }), photo: { ...s0.photo, tickets: 10 } };
+    const r = ok(photoPull(s, 10));
+    const used = r.results.filter((x) => x.sleeve).length;
+    expect(r.state.mart.sleeves).toBe(5 - used);
+    expect(r.state.photo.tickets).toBe(0);
+    expect(r.state.photo.pulls).toBe(s0.photo.pulls + 10);
+    // 슬리브가 쓰인 카드는 모두 새 카드다
+    for (const x of r.results.filter((y) => y.sleeve)) expect(x.isNew).toBe(true);
+  });
+});
+
+describe('저장: 스크래치 복권·카드 슬리브', () => {
+  it('새 필드가 저장·불러오기를 거쳐도 그대로다', () => {
+    const s = base({ mart: mart({ scratchDay: '2026-11-04', scratches: 2, sleeves: 3 }) });
+    const v = ok(validateState(JSON.parse(JSON.stringify(s))));
+    expect(v.state.mart).toEqual(mart({ scratchDay: '2026-11-04', scratches: 2, sleeves: 3 }));
+  });
+
+  it('예전 저장은 빈 값으로 읽고, 이상한 값은 버리거나 한도로 줄인다', () => {
+    const raw = JSON.parse(JSON.stringify(base())) as Record<string, unknown>;
+    raw.mart = { nightMeals: 1, stamps: 2, coupon: null, receipts: 1, packDay: '2026-11-04', packs: 1 }; // 복권·슬리브 필드가 없던 때
+    const v = ok(validateState(raw));
+    expect(v.state.mart).toEqual(mart({ nightMeals: 1, stamps: 2, receipts: 1, packDay: '2026-11-04', packs: 1 }));
+    raw.mart = { nightMeals: 0, stamps: 0, coupon: null, scratchDay: '어제', scratches: 99, sleeves: 99 };
+    const w = ok(validateState(raw));
+    expect(w.state.mart).toEqual(mart({ scratchDay: '', scratches: BALANCE.shop.scratch.perDay, sleeves: BALANCE.shop.sleeve.max }));
+    raw.mart = { nightMeals: 0, stamps: 0, coupon: null, scratches: -1 };
+    expect(validateState(raw).ok).toBe(false);
   });
 });
 

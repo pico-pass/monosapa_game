@@ -261,7 +261,7 @@ function parseBuffs(raw: unknown): Buffs {
   return buffs;
 }
 
-export const emptyMart = (): Mart => ({ nightMeals: 0, stamps: 0, coupon: null, receipts: 0, packDay: '', packs: 0 });
+export const emptyMart = (): Mart => ({ nightMeals: 0, stamps: 0, coupon: null, receipts: 0, packDay: '', packs: 0, scratchDay: '', scratches: 0, sleeves: 0 });
 
 /** 편의점 상태. 없는 예전 저장은 빈 상태로 읽고, 알 수 없는 쿠폰은 버린다. */
 function parseMart(raw: unknown): Mart {
@@ -277,6 +277,9 @@ function parseMart(raw: unknown): Mart {
     // 날짜 모양이 아니면 버린다(오늘 산 카드팩 수는 날짜가 바뀌면 어차피 0부터다)
     packDay: typeof raw.packDay === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.packDay) ? raw.packDay : '',
     packs: raw.packs === undefined ? 0 : Math.min(BALANCE.shop.pack.perDay, int(raw, 'packs', 0, 1_000_000, 'mart.packs')),
+    scratchDay: typeof raw.scratchDay === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.scratchDay) ? raw.scratchDay : '',
+    scratches: raw.scratches === undefined ? 0 : Math.min(BALANCE.shop.scratch.perDay, int(raw, 'scratches', 0, 1_000_000, 'mart.scratches')),
+    sleeves: raw.sleeves === undefined ? 0 : Math.min(BALANCE.shop.sleeve.max, int(raw, 'sleeves', 0, 1_000_000, 'mart.sleeves')),
   };
 }
 

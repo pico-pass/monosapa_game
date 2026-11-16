@@ -155,6 +155,7 @@ export function PhotoTab() {
             천장까지 {pullsToPity(g)}회 · 조각 {fmt(p.shards)}
           </small>
         </div>
+        {g.mart.sleeves > 0 && <p className="muted">🪪 카드 슬리브 {g.mart.sleeves}장 — 이미 가진 카드가 나오면 같은 등급의 새 카드로 바꿔 줘요.</p>}
         <div className="btn-row">
           <button type="button" className="btn btn-primary" disabled={p.tickets < 1} onClick={() => doPhotoPull(1)}>
             1회 뽑기

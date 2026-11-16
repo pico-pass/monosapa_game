@@ -41,11 +41,11 @@ import { buyTickets, craftPhoto, dismantlePhoto, giveCard, photoPull, takeCard, 
 import { applyBossClaim, applyChallengeClaim, applyChallengePosted, applyChartClaim, applyMailClaim, applyVillageHearts } from '../game/serverRewards';
 import { remasterCard, toggleDeck } from '../game/songcards';
 import { abandonTower, beginTower, finishTower, rollTower, type TowerOutcome, type TowerRun } from '../game/tower';
-import { ACHIEVEMENT_TEXT, CAMPAIGN_TEXT, COSTUME_TEXT, GOODS_TEXT, ITEM_TEXT, MEAL_TEXT, PACK_TEXT, RECEIPT_TEXT, SNACK_TEXT, STAGE_TEXT, THEME_TEXT, pickLine, residentName, type Situation } from '../game/content';
+import { ACHIEVEMENT_TEXT, CAMPAIGN_TEXT, COSTUME_TEXT, GOODS_TEXT, ITEM_TEXT, MEAL_TEXT, PACK_TEXT, RECEIPT_TEXT, SCRATCH_TEXT, SLEEVE_TEXT, SNACK_TEXT, STAGE_TEXT, THEME_TEXT, pickLine, residentName, scratchLabel, type Situation } from '../game/content';
 import { replyMail, rollMail } from '../game/fanmail';
 import { claimAttendance, claimMission, rollMissions } from '../game/missions';
 import { buySlot, collectPost, startPost } from '../game/monogram';
-import { buyCampaign, buyCostume, buyGoods, buyItem, buyMeal, buyPack, buyReceipt, buySnack, buyTheme, redeemCoupon, setCostume, setTheme } from '../game/shop';
+import { buyCampaign, buyCostume, buyGoods, buyItem, buyMeal, buyPack, buyReceipt, buyScratch, buySleeve, buySnack, buyTheme, redeemCoupon, setCostume, setTheme } from '../game/shop';
 import { InputLimiter } from '../game/input';
 import type { BlocksSummary } from '../game/blocks';
 import type { BounceSummary } from '../game/bounce';
@@ -196,6 +196,13 @@ export type GachaResult =
   | { kind: 'photo'; results: PhotoPullResult[]; sets: number[]; diamonds: number }
   | { kind: 'feat'; results: FeatPullResult[]; refund: number };
 
+/** 방금 긁은 스크래치 복권의 결과(상점 카드에 보여 준다). mult는 낸 값에 곱해 돌려받은 배수. */
+export interface ScratchResultView {
+  mult: number;
+  cost: number;
+  prize: number;
+}
+
 export interface ArcadeResultView {
   outcome: ArcadeOutcome;
   run: ArcadeRun;
@@ -227,6 +234,7 @@ export interface UiState {
   /** 가사 덱을 끝낸 뒤 고를 수 있는 카드 후보 */
   lyricDraft: string[] | null;
   gachaResult: GachaResult | null;
+  scratchResult: ScratchResultView | null;
   /** 진행 중인 계단 보스전. 전체화면이라 이 동안은 다른 탭으로 나갈 수 없다. */
   towerRun: TowerRun | null;
   towerResult: TowerOutcome | null;
@@ -352,6 +360,7 @@ let ui: UiState = {
   arcadeResult: null,
   lyricDraft: null,
   gachaResult: null,
+  scratchResult: null,
   towerRun: null,
   towerResult: null,
 };
@@ -1024,6 +1033,33 @@ export function doBuyPack(): void {
   saveNow();
 }
 
+/** 스크래치 복권을 사서 바로 긁는다. 결과는 상점 카드(`scratchResult`)와 알림으로 알린다. */
+export function doBuyScratch(): void {
+  const r = exec((s) => buyScratch(s));
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  if (r.mult >= 5) sfx.album();
+  else sfx.buy();
+  set({ scratchResult: { mult: r.mult, cost: r.cost, prize: r.prize } });
+  const label = scratchLabel(r.mult);
+  toast(
+    r.prize > 0
+      ? `${SCRATCH_TEXT.icon} ${label} +🪙 ${fmt(r.prize)} (오늘 ${r.left}장 더) 🪙 ${fmt(r.cost)}`
+      : `${SCRATCH_TEXT.icon} ${label}… (오늘 ${r.left}장 더) 🪙 ${fmt(r.cost)}`,
+    r.mult >= 1 ? 'good' : 'info',
+  );
+  saveNow();
+}
+
+export function doBuySleeve(): void {
+  const r = exec((s) => buySleeve(s));
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  sfx.buy();
+  toast(`${SLEEVE_TEXT.icon} ${SLEEVE_TEXT.name}를 챙겼어요! 같은 카드가 나오면 새 카드로 바꿔 줘요. 🪙 ${fmt(r.cost)}`, 'good');
+  saveNow();
+}
+
 export function doBuyMeal(): void {
   const r = exec((s) => buyMeal(s));
   if (!r) return;
@@ -1614,6 +1650,7 @@ function resetRuntime(): void {
     arcadeResult: null,
     lyricDraft: null,
     gachaResult: null,
+    scratchResult: null,
     towerRun: null,
     towerResult: null,
     tab: 'studio',

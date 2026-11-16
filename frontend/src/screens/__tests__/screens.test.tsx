@@ -144,24 +144,52 @@ describe('새 화면 렌더링', () => {
     expect(html).toContain('카드팩');
     expect(html).toContain('오늘 2 / 2장 남음');
     expect(html).toContain('포토카드 티켓 1장');
+    // 카드 슬리브·스크래치 복권
+    expect(html).toContain('카드 슬리브');
+    expect(html).toContain('이미 가진 카드가 나오면, 같은 등급의 아직 없는 카드로 바꿔 줘요');
+    expect(html).toContain('가진 수 0 / 5');
+    expect(html).toContain('스크래치 복권');
+    expect(html).toContain('오늘 3 / 3장 남음');
+    expect(html).toContain('꽝 — 35%');
+    expect(html).toContain('20배 당첨! — 0.5%');
+    expect(html).not.toContain('방금 결과'); // 아직 긁지 않았다
     expect(html).toContain('야식 컵라면 세트');
     expect(html).toContain('편의점 멤버십');
     expect(html).toContain('0 / 10');
     expect(html).not.toContain('쿠폰 쓰기'); // 쿠폰이 없으면 버튼이 없다
     const s = richState();
-    const withCoupon = await render('shop', { ...s, mart: { nightMeals: 3, stamps: 4, coupon: 'lunchbox', receipts: 2, packDay: '', packs: 0 } });
+    const withCoupon = await render('shop', { ...s, mart: { ...s.mart, nightMeals: 3, stamps: 4, coupon: 'lunchbox', receipts: 2, packDay: '', packs: 0, sleeves: 2 } });
     expect(withCoupon).toContain('쿠폰 쓰기');
     expect(withCoupon).toContain('편의점 도시락');
     expect(withCoupon).toContain('가진 수 3 / 3');
     expect(withCoupon).toContain('더 챙길 수 없어요');
     expect(withCoupon).toContain('4 / 10');
     expect(withCoupon).toContain('가진 수 2 / 3'); // 영수증
-    // 카드팩은 하루 한도를 다 사면 막힌다
+    expect(withCoupon).toContain('가진 수 2 / 5'); // 카드 슬리브
+    // 카드팩·스크래치 복권은 하루 한도를 다 사면 막힌다
     const day = new Date(T0);
     const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
-    const sold = await render('shop', { ...s, coins: 1e12, mart: { ...s.mart, packDay: key, packs: BALANCE.shop.pack.perDay } });
+    const sold = await render('shop', { ...s, coins: 1e12, mart: { ...s.mart, packDay: key, packs: BALANCE.shop.pack.perDay, scratchDay: key, scratches: BALANCE.shop.scratch.perDay } });
     expect(sold).toContain('오늘은 모두 샀어요');
     expect(sold).toContain('오늘 0 / 2장 남음');
+    expect(sold).toContain('오늘은 모두 긁었어요');
+    expect(sold).toContain('오늘 0 / 3장 남음');
+  });
+
+  it('상점: 방금 긁은 복권 결과와 카드를 다 모았을 때의 슬리브 버튼', async () => {
+    const loader = () => import('../ShopScreen');
+    const g = richState();
+    const win = await renderNamed(loader, 'ShopScreen', 'shop', g, { scratchResult: { mult: 5, cost: 1000, prize: 5000 } });
+    expect(win).toContain('방금 결과');
+    expect(win).toContain('5배 당첨!');
+    expect(win).toContain('🪙 +');
+    const lose = await renderNamed(loader, 'ShopScreen', 'shop', g, { scratchResult: { mult: 0, cost: 1000, prize: 0 } });
+    expect(lose).toContain('방금 결과');
+    expect(lose).toContain('잃었어요');
+    const owned: Record<string, number> = {};
+    for (let set = 1; set <= 6; set++) for (let grade = 1; grade <= 6; grade++) owned[`p${set}-${grade}`] = 1;
+    const full = await renderNamed(loader, 'ShopScreen', 'shop', { ...g, photo: { ...g.photo, owned } });
+    expect(full).toContain('카드를 모두 모았어요');
   });
 
   it('작업실: 켜져 있는 편의점 상품·생활용품이 칩으로 보인다', async () => {
@@ -771,6 +799,9 @@ describe('콘텐츠 팩 2 화면', () => {
     expect(photo).toContain('천장까지 80회');
     expect(photo).toContain('방구석 일기');
     expect(photo).toContain('교환소');
+    expect(photo).not.toContain('카드 슬리브'); // 슬리브가 없으면 안내가 없다
+    const sleeved = await renderNamed(loader, 'PhotoTab', 'collect', { ...g, mart: { ...g.mart, sleeves: 3 } });
+    expect(sleeved).toContain('카드 슬리브 3장');
     expect(photo).toContain('중복 카드가 없어요'.slice(0, 2)); // 중복 선택지(보유 카드 중 p1-1이 2장)
 
     const feat = await renderNamed(loader, 'FeatTab', 'collect', g);
@@ -928,10 +959,20 @@ describe('콘텐츠 팩 2 화면', () => {
   it('가챠·계단 결과 창', async () => {
     const g = packState();
     const loader = () => import('../ResultModals');
-    const photo = { kind: 'photo', results: [{ id: 'p1-6', set: 1, grade: 6, isNew: true, pity: true }, { id: 'p2-1', set: 2, grade: 1, isNew: false, pity: false }], sets: [1], diamonds: 10 };
+    const photo = {
+      kind: 'photo',
+      results: [
+        { id: 'p1-6', set: 1, grade: 6, isNew: true, pity: true, sleeve: false },
+        { id: 'p2-1', set: 2, grade: 1, isNew: false, pity: false, sleeve: false },
+        { id: 'p3-2', set: 3, grade: 2, isNew: true, pity: false, sleeve: true },
+      ],
+      sets: [1],
+      diamonds: 10,
+    };
     const html = await renderNamed(loader, 'GachaModal', 'collect', g, { gachaResult: photo });
     expect(html).toContain('신화');
     expect(html).toContain('천장');
+    expect(html).toContain('🪪 슬리브'); // 슬리브로 새 카드가 된 줄
     expect(html).toContain('세트 완성');
     const feat = { kind: 'feat', results: [{ id: 'f-scails', rarity: 'SSR', isNew: true, starUp: false, refund: 0, pickup: true }], refund: 0 };
     const featHtml = await renderNamed(loader, 'GachaModal', 'collect', g, { gachaResult: feat });

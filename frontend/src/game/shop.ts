@@ -1,15 +1,15 @@
 import { BALANCE, SNACK_IDS, costumePersona } from './balance';
 import { dayKey } from './missions';
-import { addTickets } from './photocards';
-import { maxRoyaltyPerSec, shopPrice, streamCoinsPerSec } from './selectors';
+import { addTickets, hasAllPhotos } from './photocards';
+import { clampResource, maxRoyaltyPerSec, shopPrice, streamCoinsPerSec } from './selectors';
 import { mix } from './streaming';
 import { track } from './tracking';
 import type { CampaignId, CommandResult, Cosmetics, CostumeId, Fail, FailReason, GameState, GoodsId, ItemId, Persona, SnackId, ThemeId } from './types';
 
 /*
  * 상점 명령. 다른 명령과 같이 이미 now까지 정산된 상태(state.lastSettledAt이 now)를 받는다.
- * 간식·편의점 상품·생활용품·야식·할인 영수증·카드팩·홍보 캠페인은 코인, 테마·코스튬은 다이아로 산다.
- * 편의점(간식·상품·생활용품·야식·영수증·카드팩)에서 살 때마다 멤버십 스탬프가 하나 쌓이고, 목표를 채우면 무료 간식 쿠폰이 뽑힌다.
+ * 간식·편의점 상품·생활용품·야식·할인 영수증·카드팩·스크래치 복권·카드 슬리브·홍보 캠페인은 코인, 테마·코스튬은 다이아로 산다.
+ * 편의점(간식·상품·생활용품·야식·영수증·카드팩·복권·슬리브)에서 살 때마다 멤버십 스탬프가 하나 쌓이고, 목표를 채우면 무료 간식 쿠폰이 뽑힌다.
  */
 
 const fail = (state: GameState, reason: FailReason): Fail => ({ ok: false, reason, state });
@@ -38,6 +38,13 @@ export function packsLeft(s: Pick<GameState, 'mart' | 'lastSettledAt'>): number 
   const used = s.mart.packDay === dayKey(s.lastSettledAt) ? s.mart.packs : 0;
   return Math.max(0, BALANCE.shop.pack.perDay - used);
 }
+export const scratchPrice = (s: GameState): number => incomePrice(s, BALANCE.shop.scratch.base, BALANCE.shop.scratch.incomeSecs);
+/** 오늘(기기 시간대) 더 살 수 있는 스크래치 복권 수 */
+export function scratchesLeft(s: Pick<GameState, 'mart' | 'lastSettledAt'>): number {
+  const used = s.mart.scratchDay === dayKey(s.lastSettledAt) ? s.mart.scratches : 0;
+  return Math.max(0, BALANCE.shop.scratch.perDay - used);
+}
+export const sleevePrice = (s: GameState): number => incomePrice(s, BALANCE.shop.sleeve.base, BALANCE.shop.sleeve.incomeSecs);
 export const campaignPrice = (s: Pick<GameState, 'fans'>, id: CampaignId): number => shopPrice(BALANCE.shop.campaigns[id].base, s.fans);
 
 /** 버프를 사면 끝나는 시각. 같은 버프가 켜져 있으면 시간이 더해지고(최대 maxStack배), 다르면 새로 시작한다. */
@@ -121,6 +128,41 @@ export function buyPack(state: GameState): CommandResult<{ cost: number; left: n
   const paid = addTickets({ ...state, coins: state.coins - cost, mart: { ...state.mart, packDay: day, packs } }, 1);
   const bought = track(paid, 'snacks');
   return { ok: true, state: stampMart(bought), cost, left: BALANCE.shop.pack.perDay - packs };
+}
+
+/** 복권 한 장의 결과 배수. 천분율 구간(씨앗 + 편의점 구매 횟수로만 정해진다)을 prizes 표에서 찾는다. */
+export function scratchMult(seed: number, seq: number): number {
+  let r = mix(seed ^ 0x73637261, seq) % 1000;
+  for (const p of BALANCE.shop.scratch.prizes) {
+    if (r < p.weight) return p.mult;
+    r -= p.weight;
+  }
+  return 0;
+}
+
+/**
+ * 스크래치 복권을 사서 바로 긁는다. 하루 scratch.perDay장까지. 낸 값 × 배수를 코인으로 돌려받는다(꽝은 0).
+ * 결과는 씨앗과 지금까지의 편의점 구매 횟수로만 정해지고, 사는 순간 구매 횟수가 하나 올라 다음 장은 다른 결과다.
+ */
+export function buyScratch(state: GameState): CommandResult<{ cost: number; mult: number; prize: number; left: number }> {
+  if (scratchesLeft(state) <= 0) return fail(state, 'daily_limit');
+  const cost = scratchPrice(state);
+  if (state.coins < cost) return fail(state, 'insufficient_coins');
+  const mult = scratchMult(state.feat.seed, state.counters.snacks);
+  const prize = Math.floor(cost * mult);
+  const day = dayKey(state.lastSettledAt);
+  const scratches = (state.mart.scratchDay === day ? state.mart.scratches : 0) + 1;
+  const paid: GameState = { ...state, coins: clampResource(state.coins - cost + prize), mart: { ...state.mart, scratchDay: day, scratches } };
+  return { ok: true, state: stampMart(track(paid, 'snacks')), cost, mult, prize, left: BALANCE.shop.scratch.perDay - scratches };
+}
+
+/** 카드 슬리브를 산다. 최대 sleeve.max장까지 가진다. 카드를 모두 모았으면 살 필요가 없다. */
+export function buySleeve(state: GameState): CommandResult<{ cost: number }> {
+  if (state.mart.sleeves >= BALANCE.shop.sleeve.max || hasAllPhotos(state.photo.owned)) return fail(state, 'already_done');
+  const cost = sleevePrice(state);
+  if (state.coins < cost) return fail(state, 'insufficient_coins');
+  const bought = track({ ...state, coins: state.coins - cost, mart: { ...state.mart, sleeves: state.mart.sleeves + 1 } }, 'snacks');
+  return { ok: true, state: stampMart(bought), cost };
 }
 
 /** 야식 컵라면 세트를 산다. 최대 meal.max개까지 가진다. */

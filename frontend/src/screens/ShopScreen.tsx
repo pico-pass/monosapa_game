@@ -2,16 +2,17 @@ import { fmt, fmtDuration } from '../components/format';
 import { Progress } from '../components/parts';
 import { ASSETS } from '../assets';
 import { BALANCE, CAMPAIGN_IDS, COSTUME_IDS_OF, GOODS_IDS, ITEM_IDS, SNACK_IDS, THEME_IDS } from '../game/balance';
-import { CAMPAIGN_TEXT, COSTUME_TEXT, GOODS_TEXT, ITEM_TEXT, MEAL_TEXT, PACK_TEXT, PERSONA_TEXT, RECEIPT_TEXT, SNACK_TEXT, THEME_TEXT } from '../game/content';
+import { CAMPAIGN_TEXT, COSTUME_TEXT, GOODS_TEXT, ITEM_TEXT, MEAL_TEXT, PACK_TEXT, PERSONA_TEXT, RECEIPT_TEXT, SCRATCH_TEXT, SLEEVE_TEXT, SNACK_TEXT, THEME_TEXT, scratchLabel } from '../game/content';
+import { hasAllPhotos } from '../game/photocards';
 import { campaignMult, maxRoyaltyPerSec, offlineCapMs, snackMult, wornCostume } from '../game/selectors';
-import { campaignPrice, goodsPrice, itemPrice, mealPrice, packPrice, packsLeft, receiptPrice, snackPrice } from '../game/shop';
+import { campaignPrice, goodsPrice, itemPrice, mealPrice, packPrice, packsLeft, receiptPrice, scratchPrice, scratchesLeft, sleevePrice, snackPrice } from '../game/shop';
 import type { GameState, Persona } from '../game/types';
-import { doBuyCampaign, doBuyCostume, doBuyGoods, doBuyItem, doBuyMeal, doBuyPack, doBuyReceipt, doBuySnack, doBuyTheme, doRedeemCoupon, doSetCostume, doSetTheme, useUi } from '../store/gameStore';
+import { doBuyCampaign, doBuyCostume, doBuyGoods, doBuyItem, doBuyMeal, doBuyPack, doBuyReceipt, doBuyScratch, doBuySleeve, doBuySnack, doBuyTheme, doRedeemCoupon, doSetCostume, doSetTheme, useUi } from '../store/gameStore';
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 
 export function ShopScreen() {
-  const { game: g } = useUi();
+  const { game: g, scratchResult } = useUi();
   const now = g.lastSettledAt;
   const snack = g.buffs.snack && g.buffs.snack.until > now ? g.buffs.snack : null;
   const campaign = g.buffs.campaign && g.buffs.campaign.until > now ? g.buffs.campaign : null;
@@ -156,6 +157,59 @@ export function ShopScreen() {
         </button>
       </div>
 
+      <h3 className="sub-title">{SLEEVE_TEXT.icon} 카드 슬리브 — 포토카드 중복 방지</h3>
+      <div className="card shop-card">
+        <div className="card-row">
+          <h3>
+            <span aria-hidden>{SLEEVE_TEXT.icon}</span> {SLEEVE_TEXT.name}
+          </h3>
+          <small className="muted">
+            가진 수 {g.mart.sleeves} / {BALANCE.shop.sleeve.max}
+          </small>
+        </div>
+        <p className="muted">{SLEEVE_TEXT.blurb}</p>
+        <p>
+          <b>포토카드를 뽑다가 이미 가진 카드가 나오면, 같은 등급의 아직 없는 카드로 바꿔 줘요</b>
+        </p>
+        <small className="muted">바꿀 카드가 있을 때만 한 장이 쓰여요. 카드를 많이 모은 뒤에 쓸모가 커요. 36장을 다 모으면 살 필요가 없어요.</small>
+        <button type="button" className="btn btn-primary btn-wide" disabled={g.coins < sleevePrice(g) || g.mart.sleeves >= BALANCE.shop.sleeve.max || hasAllPhotos(g.photo.owned)} onClick={() => doBuySleeve()}>
+          {hasAllPhotos(g.photo.owned) ? '카드를 모두 모았어요' : g.mart.sleeves >= BALANCE.shop.sleeve.max ? '더 챙길 수 없어요' : `사기 🪙 ${fmt(sleevePrice(g))}`}
+        </button>
+      </div>
+
+      <h3 className="sub-title">{SCRATCH_TEXT.icon} 스크래치 복권 — 코인 한 방</h3>
+      <div className="card shop-card">
+        <div className="card-row">
+          <h3>
+            <span aria-hidden>{SCRATCH_TEXT.icon}</span> {SCRATCH_TEXT.name}
+          </h3>
+          <small className="muted">
+            오늘 {scratchesLeft(g)} / {BALANCE.shop.scratch.perDay}장 남음
+          </small>
+        </div>
+        <p className="muted">{SCRATCH_TEXT.blurb}</p>
+        <p>
+          <b>낸 값의 0 ~ {BALANCE.shop.scratch.prizes[BALANCE.shop.scratch.prizes.length - 1].mult}배를 바로 돌려받아요</b>
+        </p>
+        <ul className="muted" aria-label="복권 당첨 표">
+          {BALANCE.shop.scratch.prizes.map((p) => (
+            <li key={p.mult}>
+              {scratchLabel(p.mult)} — {p.weight / 10}%
+            </li>
+          ))}
+        </ul>
+        <small className="muted">평균으로는 낸 값보다 조금 덜 돌아와요. 하루에 {BALANCE.shop.scratch.perDay}장까지 살 수 있어요.</small>
+        {scratchResult && (
+          <p role="status" className={scratchResult.mult >= 1 ? 'buff-note' : 'muted'}>
+            방금 결과: <b>{scratchLabel(scratchResult.mult)}</b>
+            {scratchResult.prize > 0 ? ` · 🪙 +${fmt(scratchResult.prize)} (낸 값 🪙 ${fmt(scratchResult.cost)})` : ` · 🪙 ${fmt(scratchResult.cost)}을 잃었어요`}
+          </p>
+        )}
+        <button type="button" className="btn btn-primary btn-wide" disabled={g.coins < scratchPrice(g) || scratchesLeft(g) <= 0} onClick={() => doBuyScratch()}>
+          {scratchesLeft(g) <= 0 ? '오늘은 모두 긁었어요' : `긁기 🪙 ${fmt(scratchPrice(g))}`}
+        </button>
+      </div>
+
       <h3 className="sub-title">{MEAL_TEXT.icon} 야식 컵라면 세트 — 오래 자리를 비울 때</h3>
       <div className="card shop-card">
         <div className="card-row">
@@ -185,7 +239,7 @@ export function ShopScreen() {
           </small>
         </div>
         <Progress value={g.mart.stamps} max={BALANCE.shop.stamps.goal} label="멤버십 스탬프" />
-        <p className="muted">간식·상품·생활용품·야식·영수증·카드팩을 살 때마다 스탬프가 하나씩 쌓여요. {BALANCE.shop.stamps.goal}개를 모으면 무료 간식 쿠폰이 나와요.</p>
+        <p className="muted">간식·상품·생활용품·야식·영수증·카드팩·슬리브·복권을 살 때마다 스탬프가 하나씩 쌓여요. {BALANCE.shop.stamps.goal}개를 모으면 무료 간식 쿠폰이 나와요.</p>
         {g.mart.coupon ? (
           <>
             <p role="status">

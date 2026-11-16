@@ -151,7 +151,7 @@ export interface Buffs {
   goods: { id: GoodsId; until: number } | null;
 }
 
-/** 편의점의 쌓아 두는 것들: 야식 컵라면 세트 · 멤버십 스탬프와 무료 쿠폰 · 할인 영수증 · 오늘 산 카드팩 */
+/** 편의점의 쌓아 두는 것들: 야식 컵라면 세트 · 멤버십 스탬프와 무료 쿠폰 · 할인 영수증 · 오늘 산 카드팩·스크래치 복권 · 카드 슬리브 */
 export interface Mart {
   /** 가지고 있는 야식 컵라면 세트 수. 오프라인 정산 상한을 넘겨 자리를 비웠을 때 한 번에 하나씩 쓰인다. */
   nightMeals: number;
@@ -165,6 +165,12 @@ export interface Mart {
   packDay: string;
   /** packDay에 산 카드팩 수. 날짜가 바뀌면 0부터 다시 센다. */
   packs: number;
+  /** 스크래치 복권을 산 날짜(기기 시간대의 yyyy-mm-dd). 안 산 적이 없으면 빈 문자열. */
+  scratchDay: string;
+  /** scratchDay에 산 스크래치 복권 수. 날짜가 바뀌면 0부터 다시 센다. */
+  scratches: number;
+  /** 가지고 있는 카드 슬리브 수. 포토카드 뽑기에서 이미 가진 카드가 나올 때 한 장이 쓰여 새 카드로 바꿔 준다. */
+  sleeves: number;
 }
 
 /** 다이아로 사는 꾸미기. 효과는 모양뿐이다. */

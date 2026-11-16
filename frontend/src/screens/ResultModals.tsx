@@ -15,7 +15,11 @@ export function GachaModal() {
             <li key={i} className={`gacha-item pk-g${x.grade}`}>
               <span className={`pk-grade pk-g${x.grade}`}>{PHOTO_GRADE_NAMES[x.grade - 1]}</span>
               <span>{photoCardName(x.set, x.grade)}</span>
-              <small>{x.isNew ? 'NEW' : '중복'}{x.pity ? ' · 천장' : ''}</small>
+              <small>
+                {x.isNew ? 'NEW' : '중복'}
+                {x.pity ? ' · 천장' : ''}
+                {x.sleeve ? ' · 🪪 슬리브' : ''}
+              </small>
             </li>
           ))}
         </ul>

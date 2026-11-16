@@ -32,6 +32,20 @@ export interface PhotoPullResult {
   isNew: boolean;
   /** 천장으로 나온 카드인가 */
   pity: boolean;
+  /** 이미 가진 카드가 나와서 카드 슬리브 한 장이 같은 등급의 새 세트 카드로 바꿔 준 결과인가 */
+  sleeve: boolean;
+}
+
+/** 36장을 모두 가졌는가(이 뒤로는 카드 슬리브가 쓸모없다) */
+export const hasAllPhotos = (owned: Record<string, number>): boolean => completedSets(owned).length >= PHOTO_SETS;
+
+/** 같은 등급에서 아직 없는 카드가 있는 세트를 찾는다. 뽑힌 세트 다음 번호부터 돌아가며 보고, 없으면 null. */
+function freshSetOf(owned: Record<string, number>, set: number, grade: number): number | null {
+  for (let k = 1; k < PHOTO_SETS; k++) {
+    const next = ((set - 1 + k) % PHOTO_SETS) + 1;
+    if (!(owned[photoCardId(next, grade)] > 0)) return next;
+  }
+  return null;
 }
 
 /** n번째(1부터) 뽑기의 등급·세트. pity는 그 뽑기 직전까지 쌓인 천장 카운터. */
@@ -89,16 +103,29 @@ export function photoPull(state: GameState, count = 1): CommandResult<{ results:
   const owned = { ...state.photo.owned };
   let pity = state.photo.pity;
   let pulls = state.photo.pulls;
+  let sleeves = state.mart.sleeves;
   const results: PhotoPullResult[] = [];
   for (let i = 0; i < count; i++) {
     pulls += 1;
     const roll = rollPhoto(state.photo.seed, pulls, pity);
-    const id = photoCardId(roll.set, roll.grade);
-    results.push({ id, set: roll.set, grade: roll.grade, isNew: !(owned[id] > 0), pity: roll.byPity });
+    let set = roll.set;
+    let sleeve = false;
+    // 이미 가진 카드가 나왔고 슬리브가 있으면 같은 등급의 새 카드로 바꾼다(바꿀 카드가 없으면 슬리브는 그대로 남는다)
+    if (sleeves > 0 && owned[photoCardId(set, roll.grade)] > 0) {
+      const fresh = freshSetOf(owned, set, roll.grade);
+      if (fresh !== null) {
+        set = fresh;
+        sleeve = true;
+        sleeves -= 1;
+      }
+    }
+    const id = photoCardId(set, roll.grade);
+    results.push({ id, set, grade: roll.grade, isNew: !(owned[id] > 0), pity: roll.byPity, sleeve });
     owned[id] = (owned[id] ?? 0) + 1;
     pity = roll.grade >= P.pityGrade ? 0 : pity + 1;
   }
-  const pulled = track(withPhoto(state, { owned, pity, pulls, tickets: state.photo.tickets - count }), 'pulls', count);
+  const withSleeves = sleeves === state.mart.sleeves ? state : { ...state, mart: { ...state.mart, sleeves } };
+  const pulled = track(withPhoto(withSleeves, { owned, pity, pulls, tickets: state.photo.tickets - count }), 'pulls', count);
   const claim = settleSets(pulled);
   return { ok: true, state: claim.state, results, sets: claim.sets, diamonds: claim.diamonds };
 }
