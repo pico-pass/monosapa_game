@@ -1,21 +1,12 @@
 import { useState } from 'react';
 import { Progress } from '../components/parts';
 import { fmt } from '../components/format';
-import { titlePerkOf } from '../game/balance';
-import { ACHIEVEMENT_TEXT, ENDLESS_TEXT, VIBE_TEXT } from '../game/content';
+import { ACHIEVEMENT_TEXT, ENDLESS_TEXT } from '../game/content';
 import { endlessStatuses } from '../game/endless';
-import { achievementStatuses, titleText } from '../game/achievements';
+import { achievementStatuses, titlePerkText as perkText, titleText } from '../game/achievements';
 import { doSetTitle, useUi } from '../store/gameStore';
 
 type Filter = 'all' | 'done' | 'todo';
-
-/** 칭호가 주는 효과 문구: 「팬덤 +1.5%」 */
-function perkText(achievementId: string | null): string | null {
-  const perk = titlePerkOf(achievementId);
-  if (!perk) return null;
-  const v = VIBE_TEXT[perk.vibe];
-  return `${v.icon} ${v.name} +${Math.round(perk.value * 1000) / 10}%`;
-}
 
 export function AchievementScreen() {
   const { game: g } = useUi();

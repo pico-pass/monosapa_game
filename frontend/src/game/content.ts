@@ -1,4 +1,4 @@
-import type { AlbumType, BuildingId, CampaignId, CardRarity, CostumeId, DialogueTone, Persona, PostKind, SnackId, StageId, StreamPlatform, SkillId, ThemeId, Vibe, VirtualComment } from './types';
+import type { AlbumType, BuildingId, CampaignId, CardRarity, CostumeId, DialogueTone, ItemId, Persona, PostKind, SnackId, StageId, StreamPlatform, SkillId, ThemeId, Vibe, VirtualComment } from './types';
 
 /* 대사·제목·댓글·공연장 이름. 모두 게임용 창작 문구이며 실제 인물의 곡·발언이 아니다.
    가상의 상대·자기디스·황당한 상황만 다루고, 현실 이용자나 실제 인물을 겨냥하지 않는다. */
@@ -567,6 +567,20 @@ export const SNACK_TEXT: Record<SnackId, { name: string; icon: string; blurb: st
   coffee: { name: '캔커피', icon: '🥫', blurb: '달고 진하다. 새벽 작업의 기본.' },
   energy: { name: '에너지드링크', icon: '🥤', blurb: '심장이 박자보다 빨리 뛴다.' },
   lunchbox: { name: '편의점 도시락', icon: '🍱', blurb: '오늘만큼은 제대로 먹고 쓴다.' },
+};
+
+/** 편의점 상품. effect 는 화면에 보이는 효과 문구(수치는 balance.ts 의 shop.items) */
+export const ITEM_TEXT: Record<ItemId, { name: string; icon: string; blurb: string; effect: (bonus: number) => string }> = {
+  oden: { name: '어묵 꼬치', icon: '🍢', blurb: '국물까지 마시면 자리를 비워도 힘이 난다.', effect: (b) => `자동 라임 생산 +${Math.round(b * 100)}%` },
+  iced: { name: '얼음컵 아메리카노', icon: '🧊', blurb: '머리가 띵할 만큼 차갑다. 다음 판까지 기다릴 틈이 없다.', effect: (b) => `아케이드·육성 대기시간 −${Math.round(b * 100)}%` },
+  choco: { name: '초코바', icon: '🍫', blurb: '무대 뒤에서 한 입. 당이 들어가면 손이 빨라진다.', effect: (b) => `공연·아케이드 코인 보상 +${Math.round(b * 100)}%` },
+  milk: { name: '딸기우유', icon: '🥛', blurb: '분홍색이 반쯤 풀린 맛. 잘 먹은 날은 잘 큰다.', effect: (b) => `육성 성장도 +${Math.round(b * 100)}%` },
+};
+
+export const MEAL_TEXT = {
+  name: '야식 컵라면 세트',
+  icon: '🍜',
+  blurb: '불려 두고 나가면 돌아올 때까지 모노사파가 더 오래 일해 준다.',
 };
 
 export const CAMPAIGN_TEXT: Record<CampaignId, { name: string; icon: string; blurb: string }> = {

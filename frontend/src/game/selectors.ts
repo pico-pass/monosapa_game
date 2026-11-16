@@ -1,7 +1,7 @@
 import { BALANCE, SECRET_STAGE_IDS, STAGES, STREAM_PLATFORMS, TEMP_OPEN_STAGES, TOUR_STAGE, WORLD_STAGE, type AchievementMetric, type MissionMetric } from './balance';
 import { albumSeries, singleTitle, type AlbumDef } from './content';
 import { bonuses, completedSets, mascotStage, photoDistinct, songCardOf, type BonusState } from './packdata';
-import type { Album, AlbumType, CostumeId, CounterKey, DiamondUpgradeKind, Equipment, EquipmentKind, GameState, Persona, StageId, Streaming } from './types';
+import type { Album, AlbumType, CostumeId, CounterKey, DiamondUpgradeKind, Equipment, EquipmentKind, GameState, ItemId, Persona, StageId, Streaming } from './types';
 
 const P = BALANCE.persona;
 
@@ -57,6 +57,21 @@ export function campaignMult(s: Pick<GameState, 'buffs' | 'lastSettledAt'>): num
   return b && b.until > s.lastSettledAt ? BALANCE.shop.campaigns[b.id].mult : 1;
 }
 
+/** 그 편의점 상품이 at 시점에 켜져 있으면 그 효과 값(bonus), 아니면 0. */
+export function itemBonus(s: Pick<GameState, 'buffs' | 'lastSettledAt'>, id: ItemId, at: number = s.lastSettledAt): number {
+  const b = s.buffs.item;
+  return b && b.id === id && b.until > at ? BALANCE.shop.items[id].bonus : 0;
+}
+
+/** 어묵 꼬치: 자동 라임 생산 배율(두 자아 모두). 없거나 끝났으면 1. */
+export const odenMult = (s: Pick<GameState, 'buffs' | 'lastSettledAt'>, at: number = s.lastSettledAt): number => 1 + itemBonus(s, 'oden', at);
+/** 얼음컵 아메리카노: 아케이드·육성 돌보기 대기시간 배율(1보다 작다). 없거나 끝났으면 1. */
+export const cooldownMult = (s: Pick<GameState, 'buffs' | 'lastSettledAt'>): number => 1 - itemBonus(s, 'iced');
+/** 초코바: 공연·아케이드 코인 보상 배율. 없거나 끝났으면 1. */
+export const chocoMult = (s: Pick<GameState, 'buffs' | 'lastSettledAt'>): number => 1 + itemBonus(s, 'choco');
+/** 딸기우유: 육성 성장도 배율. 없거나 끝났으면 1. */
+export const milkMult = (s: Pick<GameState, 'buffs' | 'lastSettledAt'>): number => 1 + itemBonus(s, 'milk');
+
 /** 상점 코인 가격: 기본가 × 25 × (1 + 0.25 × (플레이어 레벨 − 1)) */
 export function shopPrice(base: number, fans: number): number {
   return Math.ceil(base * BALANCE.shop.priceMult * (1 + BALANCE.shop.priceLevelStep * (playerLevel(fans) - 1)));
@@ -108,7 +123,7 @@ export function isPenaltyActive(s: GameState, at: number = s.lastSettledAt): boo
 
 /** 현재(혹은 at 시점) 상태에서의 라임 초당 생산량. 효율(오프라인)은 곱하지 않는다. */
 export function rhymeRate(s: GameState, persona: Persona = s.activePersona, at: number = s.lastSettledAt): number {
-  const mult = productionMultiplier(s, persona) * diamondProductionMult(s) * collectionProductionMult(s, persona);
+  const mult = productionMultiplier(s, persona) * diamondProductionMult(s) * collectionProductionMult(s, persona) * odenMult(s, at);
   if (persona === 'normal') {
     return P.normalRate * mult * (isPenaltyActive(s, at) ? P.recoveryPenalty : 1);
   }

@@ -1,5 +1,5 @@
-import { ACHIEVEMENTS, type AchievementDef } from './balance';
-import { ACHIEVEMENT_TEXT } from './content';
+import { ACHIEVEMENTS, titlePerkOf, type AchievementDef } from './balance';
+import { ACHIEVEMENT_TEXT, VIBE_TEXT } from './content';
 import { achievementValue, clampResource } from './selectors';
 import type { CommandResult, Fail, GameState } from './types';
 
@@ -57,3 +57,21 @@ export function setTitle(state: GameState, id: string | null): CommandResult {
 /** 달고 있는 칭호의 표시 문구. 없으면 null */
 export const titleText = (s: Pick<GameState, 'cosmetics'>): string | null =>
   s.cosmetics.title ? (ACHIEVEMENT_TEXT[s.cosmetics.title]?.title ?? null) : null;
+
+/** 지금 달 수 있는 칭호(달성한 업적 중 칭호가 있는 것). 업적 목록 순서대로 */
+export function ownedTitles(s: Pick<GameState, 'achievements'>): { id: string; title: string }[] {
+  const out: { id: string; title: string }[] = [];
+  for (const def of ACHIEVEMENTS) {
+    const title = ACHIEVEMENT_TEXT[def.id]?.title;
+    if (title && s.achievements[def.id] !== undefined) out.push({ id: def.id, title });
+  }
+  return out;
+}
+
+/** 칭호가 주는 효과 문구: 「🎤 팬덤 +1.5%」. 효과가 없으면 null */
+export function titlePerkText(achievementId: string | null): string | null {
+  const perk = titlePerkOf(achievementId);
+  if (!perk) return null;
+  const v = VIBE_TEXT[perk.vibe];
+  return `${v.icon} ${v.name} +${Math.round(perk.value * 1000) / 10}%`;
+}

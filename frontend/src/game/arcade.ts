@@ -1,6 +1,6 @@
 import { BALANCE } from './balance';
 import { bonuses } from './packdata';
-import { clampResource, levelUpDiamonds, royaltyBreakdown } from './selectors';
+import { chocoMult, clampResource, cooldownMult, levelUpDiamonds, royaltyBreakdown } from './selectors';
 import { trackOfSingle, trackSingles } from './songcharts';
 import { mix } from './streaming';
 import { track } from './tracking';
@@ -9,6 +9,7 @@ import type { ArcadeKind, CommandResult, Fail, FailReason, GameState, Persona } 
 /*
  * 아케이드(리듬·생존·가사 덱·피켓팅·악플 베기·블랙홀 먹기·게이트 행진·음표 플링코) 공통 규칙. 콘서트와 같은 방식이다:
  *   시작할 때 쿨다운을 확정한다(포기해도 유지) → 끝나면 점수(0~1000)로 등급을 정하고 보상한다 → 같은 실행은 한 번만 정산한다.
+ * 얼음컵 아메리카노(편의점 상품)가 켜져 있으면 시작할 때 확정하는 쿨다운이 줄고, 초코바가 켜져 있으면 코인 보상이 늘어난다.
  * 점수를 만드는 게임 규칙은 각 게임 파일(rhythm·survival·lyricdeck·ticketing·slash·hole·gate·plinko)에 있다.
  */
 
@@ -88,7 +89,7 @@ export function beginArcade(
   const next = track(
     {
       ...state,
-      arcade: { ...state.arcade, [kind]: { ...record, cooldownUntil: state.lastSettledAt + A.kinds[kind].cooldownMs, plays: record.plays + 1 } },
+      arcade: { ...state.arcade, [kind]: { ...record, cooldownUntil: state.lastSettledAt + Math.round(A.kinds[kind].cooldownMs * cooldownMult(state)), plays: record.plays + 1 } },
     },
     'arcades',
   );
@@ -117,7 +118,8 @@ export function finishArcade(state: GameState, run: ArcadeRun, rawScore: number)
   const k = A.kinds[run.kind];
   const levelMult = run.kind === 'rhythm' ? BALANCE.rhythm.levels[run.level].mult : 1;
   const perSec = royaltyBreakdown(state, run.persona).perSec;
-  const coins = k.coinSecs[grade] > 0 ? Math.max(k.minCoins, Math.ceil(perSec * k.coinSecs[grade] * levelMult)) : 0;
+  // 초코바가 켜져 있으면 코인 보상이 늘어난다(팬·다이아는 그대로)
+  const coins = k.coinSecs[grade] > 0 ? Math.ceil(Math.max(k.minCoins, Math.ceil(perSec * k.coinSecs[grade] * levelMult)) * chocoMult(state)) : 0;
   const fans = Math.ceil(state.fans * k.fansPct[grade] * levelMult);
   const newFans = clampResource(state.fans + fans);
   const record = state.arcade[run.kind];

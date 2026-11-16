@@ -77,7 +77,7 @@ function richState(): GameState {
     fans: 5000,
     singles: singles(3),
     concerts,
-    buffs: { snack: { id: 'coffee', until: T0 + 600_000 }, campaign: { id: 'insta', until: T0 + 3600_000 } },
+    buffs: { snack: { id: 'coffee', until: T0 + 600_000 }, campaign: { id: 'insta', until: T0 + 3600_000 }, item: { id: 'oden', until: T0 + 900_000 } },
     cosmetics: { themes: ['default', 'neon'], theme: 'neon', costumes: ['bunny', 'king'], costume: 'bunny', darkCostume: 'king', title: 'grind' },
     achievements: { grind: T0, 'first-verse': T0 },
     counters: { ...s.counters, works: 20000, posts: 3, snacks: 12 },
@@ -121,6 +121,33 @@ describe('새 화면 렌더링', () => {
     expect(html).toContain('모노그램 광고 진행 중');
     expect(html).toContain('적용 중'); // 네온 테마
     expect(html).toContain('💎 30'); // 파스텔은 아직 없다
+  });
+
+  it('상점: 편의점 상품 4종·야식·멤버십과 켜져 있는 상품 표시', async () => {
+    const html = await render('shop', richState()); // 어묵 꼬치가 켜져 있고 스탬프·쿠폰은 비어 있다
+    expect(html).toContain('어묵 꼬치 효과 중');
+    expect(html).toContain('자동 라임 생산 +40%');
+    for (const name of ['얼음컵 아메리카노', '초코바', '딸기우유']) expect(html, name).toContain(name);
+    expect(html).toContain('아케이드·육성 대기시간 −30%');
+    expect(html).toContain('공연·아케이드 코인 보상 +50%');
+    expect(html).toContain('육성 성장도 +50%');
+    expect(html).toContain('야식 컵라면 세트');
+    expect(html).toContain('가진 수 0 / 3');
+    expect(html).toContain('편의점 멤버십');
+    expect(html).toContain('0 / 10');
+    expect(html).not.toContain('쿠폰 쓰기'); // 쿠폰이 없으면 버튼이 없다
+    const s = richState();
+    const withCoupon = await render('shop', { ...s, mart: { nightMeals: 3, stamps: 4, coupon: 'lunchbox' } });
+    expect(withCoupon).toContain('쿠폰 쓰기');
+    expect(withCoupon).toContain('편의점 도시락');
+    expect(withCoupon).toContain('가진 수 3 / 3');
+    expect(withCoupon).toContain('더 챙길 수 없어요');
+    expect(withCoupon).toContain('4 / 10');
+  });
+
+  it('작업실: 켜져 있는 편의점 상품이 칩으로 보인다', async () => {
+    const html = await render('studio', richState());
+    expect(html).toContain('자동 라임 생산 +40%');
   });
 
   it('상점: 코스튬 21종(일반 11·어둠 10)과 입는 중 표시', async () => {
@@ -996,6 +1023,28 @@ describe('친구·우편함·프로필·관리자', () => {
     expect(html.indexOf('메이드사파')).toBeLessThan(html.indexOf('어둠의신부사파')); // 일반이 먼저
     expect(html.match(/aria-pressed="true"/g)).toHaveLength(1);
     expect(html).toMatch(/aria-pressed="true"[^>]*aria-label="메이드사파"|aria-label="메이드사파"[^>]*aria-pressed="true"/);
+  });
+
+  it('칭호 고르기: 없음과 달성한 칭호가 보이고 고른 것만 눌려 있다', async () => {
+    const loader = () => import('../ProfileSheet');
+    const render = (props: Record<string, unknown>) => renderNamed(loader, 'TitlePicker', 'ranking', richState(), {}, props);
+    const none = await render({ owned: [], value: null, onPick: () => {} });
+    expect(none).toContain('아직 달 수 있는 칭호가 없어요');
+    expect(none).not.toContain('pf-title"');
+    const owned = [
+      { id: 'grind', title: '라임 기계' },
+      { id: 'a2', title: '둘째' },
+    ];
+    const html = await render({ owned, value: 'grind', onPick: () => {} });
+    expect(html).toContain('없음');
+    expect(html).toContain('「라임 기계」');
+    expect(html).toContain('「둘째」');
+    expect(html).toContain('칭호 효과:'); // grind 는 효과가 있는 칭호
+    expect(html.match(/aria-pressed="true"/g)).toHaveLength(1);
+    expect(html).toMatch(/aria-pressed="true"[^>]*>「라임 기계」/);
+    const off = await render({ owned, value: null, onPick: () => {} });
+    expect(off).toMatch(/aria-pressed="true"[^>]*>없음/);
+    expect(off).not.toContain('칭호 효과:');
   });
 
   it('신고창: 대상 이름과 사유 목록, 개인채팅 안내', async () => {

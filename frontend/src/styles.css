@@ -4759,6 +4759,25 @@ span.rar {
   border-color: var(--accent);
   outline: 2px solid var(--accent);
 }
+.pf-titles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pf-title {
+  min-height: 44px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.pf-title[aria-pressed='true'] {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+}
 .rank-clickable {
   cursor: pointer;
 }

@@ -411,8 +411,9 @@ function OfflineModal() {
     <Modal title="돌아왔어요" onClose={dismissOfflineReport}>
       <p>
         자리를 비운 <b>{fmtDuration(r.elapsedMs)}</b> 동안 모노사파가 작업을 이어갔어요. (효율 {BALANCE.offline.efficiency * 100}%
-        {r.capped ? ` · 최대 ${offlineCapMs(game) / 3600000}시간분만 반영` : ''})
+        {r.capped ? ` · 최대 ${(offlineCapMs(game) + (r.meal ? BALANCE.shop.meal.extraMs : 0)) / 3600000}시간분만 반영` : ''})
       </p>
+      {r.meal && <p className="muted">🍜 야식 컵라면 세트를 먹어서 정산 상한이 {BALANCE.shop.meal.extraMs / 3600000}시간 늘었어요.</p>}
       <ul className="reward-list">
         <li>
           🪙 코인 <b>+{fmt(Math.floor(r.coins))}</b>

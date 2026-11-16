@@ -123,6 +123,11 @@ export interface ConcertRecord {
 /** 편의점 간식(작업하기 라임 버프)과 홍보 캠페인(팬 획득 버프) */
 export type SnackId = 'kimbap' | 'coffee' | 'energy' | 'lunchbox';
 export type CampaignId = 'flyer' | 'insta' | 'billboard';
+/**
+ * 편의점 상품(간식과 따로 하나만 켜는 특수 버프): 어묵 꼬치(자동 라임 생산 +) · 얼음컵 아메리카노(아케이드·육성 대기시간 −) ·
+ * 초코바(공연·아케이드 코인 보상 +) · 딸기우유(육성 성장도 +)
+ */
+export type ItemId = 'oden' | 'iced' | 'choco' | 'milk';
 export type ThemeId = 'default' | 'pastel' | 'mono' | 'neon';
 /** 일반속성 모노사파의 코스튬(다이아로 산다. 모양만 바뀐다). 지뢰·텐션업·화난·메이드·토끼·타락천사·곰도리·수녀·뱀파이어·냥집사·유령신부 */
 export type NormalCostumeId = 'jirai' | 'hype' | 'angry' | 'maid' | 'bunny' | 'fallen' | 'bear' | 'nun' | 'vampire' | 'butler' | 'bride';
@@ -135,6 +140,18 @@ export interface Buffs {
   snack: { id: SnackId; until: number } | null;
   /** 싱글·앨범·모노그램으로 얻는 팬 ×N. until(ms)까지. 하나만 켤 수 있다. */
   campaign: { id: CampaignId; until: number } | null;
+  /** 편의점 상품 버프(어묵·얼음컵·초코바·딸기우유). 하나만 켤 수 있고 간식·홍보 캠페인과는 따로 켜진다. */
+  item: { id: ItemId; until: number } | null;
+}
+
+/** 편의점의 쌓아 두는 것들: 야식 컵라면 세트 · 멤버십 스탬프와 무료 쿠폰 */
+export interface Mart {
+  /** 가지고 있는 야식 컵라면 세트 수. 오프라인 정산 상한을 넘겨 자리를 비웠을 때 한 번에 하나씩 쓰인다. */
+  nightMeals: number;
+  /** 모은 멤버십 스탬프(0 ~ 목표) */
+  stamps: number;
+  /** 받을 수 있는 무료 간식 쿠폰(스탬프를 다 모으면 뽑힌다). 없으면 null. */
+  coupon: SnackId | null;
 }
 
 /** 다이아로 사는 꾸미기. 효과는 모양뿐이다. */
@@ -403,8 +420,10 @@ export interface GameState {
   village: Village;
   /** 끝없는 업적: 지표 ID → 지금까지 받은 단계 수 */
   endless: Record<string, number>;
-  /** 간식·홍보 캠페인 버프 */
+  /** 간식·홍보 캠페인·편의점 상품 버프 */
   buffs: Buffs;
+  /** 편의점: 야식 컵라면 세트와 멤버십 스탬프 */
+  mart: Mart;
   cosmetics: Cosmetics;
   counters: Counters;
   /** 달성한 업적: ID → 달성 시각 */

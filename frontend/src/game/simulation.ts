@@ -26,6 +26,9 @@ export function advance(state: GameState, durationMs: number, ctx: AdvanceContex
   const darkMult = productionMultiplier(state, 'dark') * dMult * (1 + bonus.rhyme.dark);
   const royaltyPerSec = (persona: GameState['activePersona']) => royaltyBreakdown(state, persona).perSec;
   const eff = Math.max(0, ctx.efficiency);
+  // 어묵 꼬치: 켜져 있는 동안만 자동 라임 생산이 늘어난다. 끝나는 시각에서 구간을 쪼개서 큰 전진과 작은 전진이 같은 결과를 낸다.
+  const odenUntil = state.buffs.item?.id === 'oden' ? state.buffs.item.until : 0;
+  const odenBoost = 1 + BALANCE.shop.items.oden.bonus;
 
   let t = state.lastSettledAt;
   const end = t + durationMs;
@@ -40,14 +43,16 @@ export function advance(state: GameState, durationMs: number, ctx: AdvanceContex
   let normalMs = 0;
   let darkMs = 0;
 
-  // 구간 수는 유한하다: 어둠→(80)→(100)→일반 이후에는 일반에서 경계가 하나뿐이다.
-  for (let guard = 0; guard < 16 && t < end - EPS; guard++) {
+  // 구간 수는 유한하다: 어둠→(80)→(100)→일반 이후에는 일반에서 경계가 하나뿐이고, 어묵이 끝나는 시각이 경계를 하나 더한다.
+  for (let guard = 0; guard < 24 && t < end - EPS; guard++) {
     const remaining = end - t;
     if (persona === 'normal') {
       const penalized = t < penaltyUntil - EPS;
-      const seg = penalized ? Math.min(remaining, penaltyUntil - t) : remaining;
+      const boosted = t < odenUntil - EPS;
+      let seg = penalized ? Math.min(remaining, penaltyUntil - t) : remaining;
+      if (boosted) seg = Math.min(seg, odenUntil - t);
       const sec = seg / 1000;
-      const rate = P.normalRate * normalMult * (penalized ? P.recoveryPenalty : 1);
+      const rate = P.normalRate * normalMult * (penalized ? P.recoveryPenalty : 1) * (boosted ? odenBoost : 1);
       normal += rate * sec * eff;
       normalMs += seg;
       coins += royaltyPerSec('normal') * sec * eff;
@@ -69,9 +74,10 @@ export function advance(state: GameState, durationMs: number, ctx: AdvanceContex
     const hot = heat >= P.hotThreshold - EPS;
     const boundary = hot ? P.maxHeat : P.hotThreshold;
     const toBoundaryMs = ((boundary - heat) / P.heatUpPerSec) * 1000;
-    const seg = Math.min(remaining, toBoundaryMs);
+    const boosted = t < odenUntil - EPS;
+    const seg = Math.min(remaining, toBoundaryMs, boosted ? odenUntil - t : Infinity);
     const sec = seg / 1000;
-    const rate = (hot ? P.darkHotRate : P.darkRate) * darkMult;
+    const rate = (hot ? P.darkHotRate : P.darkRate) * darkMult * (boosted ? odenBoost : 1);
     dark += rate * sec * eff;
     darkMs += seg;
     coins += royaltyPerSec('dark') * sec * eff;
@@ -147,6 +153,8 @@ export interface SettleResult {
   events: EngineEvent[];
   /** 반영된(보상 지급 대상) 시간. 상한을 넘은 시간은 포함하지 않는다. */
   paidMs: number;
+  /** 야식 컵라면 세트가 하나 쓰여 정산 상한이 늘었다 */
+  meal: boolean;
   /** 실제 경과 시간 */
   elapsedMs: number;
   capped: boolean;
@@ -158,10 +166,10 @@ export function settleOnline(state: GameState, now: number): SettleResult {
   if (!(gap > 0)) {
     // 정지·역행한 시계: 시각만 맞추고 보상은 주지 않는다.
     const synced = gap < 0 ? clampTimers({ ...state, lastSettledAt: now }, now) : state;
-    return { state: synced, events: [], paidMs: 0, elapsedMs: 0, capped: false };
+    return { state: synced, events: [], paidMs: 0, meal: false, elapsedMs: 0, capped: false };
   }
   const r = advance(state, gap, ONLINE);
-  return { state: r.state, events: r.events, paidMs: gap, elapsedMs: gap, capped: false };
+  return { state: r.state, events: r.events, paidMs: gap, meal: false, elapsedMs: gap, capped: false };
 }
 
 /**
@@ -171,14 +179,20 @@ export function settleOnline(state: GameState, now: number): SettleResult {
 export function settleOffline(state: GameState, now: number): SettleResult {
   const gap = Math.max(now - state.lastSettledAt, 0);
   if (gap === 0) return settleOnline(state, now);
-  const paid = Math.min(gap, offlineCapMs(state));
+  // 야식 컵라면 세트: 기본 상한을 넘겨 자리를 비웠을 때만 하나를 써서 상한을 늘린다(상한 안에서 돌아오면 아끼고 있는다).
+  const baseCap = offlineCapMs(state);
+  const meal = gap > baseCap && state.mart.nightMeals > 0;
+  const cap = baseCap + (meal ? BALANCE.shop.meal.extraMs : 0);
+  const paid = Math.min(gap, cap);
   const first = advance(state, paid, OFFLINE);
   const rest = gap - paid;
   const second = rest > 0 ? advance(first.state, rest, { efficiency: 0 }) : { state: first.state, events: [] };
+  const end = meal ? { ...second.state, mart: { ...second.state.mart, nightMeals: second.state.mart.nightMeals - 1 } } : second.state;
   return {
-    state: second.state,
+    state: end,
     events: [...first.events, ...second.events],
     paidMs: paid,
+    meal,
     elapsedMs: gap,
     capped: rest > 0,
   };
@@ -188,6 +202,8 @@ export interface OfflineReport {
   elapsedMs: number;
   paidMs: number;
   capped: boolean;
+  /** 야식 컵라면 세트가 쓰여 이번 정산 상한이 늘었다 */
+  meal: boolean;
   coins: number;
   normalRhymes: number;
   darkRhymes: number;
@@ -202,6 +218,7 @@ export function makeReport(before: GameState, r: SettleResult): OfflineReport {
     elapsedMs: r.elapsedMs,
     paidMs: r.paidMs,
     capped: r.capped,
+    meal: r.meal,
     coins: r.state.coins - before.coins,
     normalRhymes: r.state.normalRhymes - before.normalRhymes,
     darkRhymes: r.state.darkRhymes - before.darkRhymes,

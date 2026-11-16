@@ -4,11 +4,12 @@ import { fmt } from '../components/format';
 import { Modal } from '../components/Modal';
 import { Presence } from '../components/parts';
 import { COSTUME_IDS_OF } from '../game/balance';
+import { ownedTitles, titlePerkText } from '../game/achievements';
 import { COSTUME_TEXT } from '../game/content';
 import type { CostumeId } from '../game/types';
 import { api, errorText } from '../platform/api';
 import { patchAuthUser } from '../store/authStore';
-import { toast, useUi } from '../store/gameStore';
+import { doSetTitle, toast, useUi } from '../store/gameStore';
 import { closeProfile, openDm, openReport, refreshSummary } from '../store/socialStore';
 
 type Relation = 'self' | 'none' | 'friend' | 'outgoing' | 'incoming';
@@ -53,7 +54,7 @@ const AVATAR_CHOICES: [AvatarKind, string][] = [
 
 const fmtDate = (ms: number) => new Date(ms).toLocaleDateString('ko-KR');
 
-/** 사람의 프로필 창. 랭킹·챗방·친구 목록에서 열고, 내 프로필이면 설정(닉네임·한 줄 소개·프로필 사진)을 바꿀 수 있어요. */
+/** 사람의 프로필 창. 랭킹·챗방·친구 목록에서 열고, 내 프로필이면 설정(닉네임·한 줄 소개·프로필 사진·칭호)을 바꿀 수 있어요. */
 export function ProfileSheet({ uid, edit }: { uid: string; edit: boolean }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -264,12 +265,41 @@ export function CostumePicker({ owned, value, onPick }: { owned: readonly Costum
   );
 }
 
+/** 달성한 업적의 칭호를 고른다(없음 포함). 고른 것이 눌려 있고, 효과가 있는 칭호는 효과를 함께 보여 준다. */
+export function TitlePicker({ owned, value, onPick }: { owned: readonly { id: string; title: string }[]; value: string | null; onPick: (id: string | null) => void }) {
+  const perk = titlePerkText(value);
+  return (
+    <div className="field">
+      <span>칭호 — 달성한 업적에서 · 달면 효과가 붙고 챗방에도 보여요</span>
+      {owned.length > 0 ? (
+        <>
+          <div className="pf-titles" role="group" aria-label="칭호">
+            <button type="button" className="pf-title" aria-pressed={value === null} onClick={() => onPick(null)}>
+              없음
+            </button>
+            {owned.map((t) => (
+              <button key={t.id} type="button" className="pf-title" aria-pressed={value === t.id} onClick={() => onPick(t.id)}>
+                「{t.title}」
+              </button>
+            ))}
+          </div>
+          {perk && <small className="muted">칭호 효과: {perk}</small>}
+        </>
+      ) : (
+        <small className="muted">아직 달 수 있는 칭호가 없어요. 칭호가 있는 업적을 달성하면 여기서 고를 수 있어요.</small>
+      )}
+    </div>
+  );
+}
+
 function ProfileEditor({ onDone }: { onDone: (saved: boolean) => void }) {
   const { game } = useUi();
   const [mine, setMine] = useState<MyProfile | null>(null);
   const [nickname, setNickname] = useState('');
   const [bio, setBio] = useState('');
   const [avatar, setAvatar] = useState<AvatarKind>('google');
+  // 칭호는 게임 저장에 있고, 저장 버튼을 눌러야 달린다(취소하면 그대로).
+  const [title, setTitle] = useState<string | null>(game.cosmetics.title);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -298,6 +328,7 @@ function ProfileEditor({ onDone }: { onDone: (saved: boolean) => void }) {
     try {
       const saved = await api<MyProfile>('profiles/me', { method: 'PUT', body: { nickname, bio, avatar } });
       patchAuthUser({ nickname: saved.nickname, bio: saved.bio, avatar: saved.avatar, displayName: saved.name });
+      if (title !== game.cosmetics.title) doSetTitle(title);
       toast('프로필을 저장했어요.', 'good');
       onDone(true);
     } catch (e) {
@@ -348,6 +379,7 @@ function ProfileEditor({ onDone }: { onDone: (saved: boolean) => void }) {
         </div>
       </div>
       <CostumePicker owned={game.cosmetics.costumes} value={avatar} onPick={setAvatar} />
+      <TitlePicker owned={ownedTitles(game)} value={title} onPick={setTitle} />
       {error && (
         <p className="chat-error" role="alert">
           {error}

@@ -41,11 +41,11 @@ import { buyTickets, craftPhoto, dismantlePhoto, giveCard, photoPull, takeCard, 
 import { applyBossClaim, applyChallengeClaim, applyChallengePosted, applyChartClaim, applyMailClaim, applyVillageHearts } from '../game/serverRewards';
 import { remasterCard, toggleDeck } from '../game/songcards';
 import { abandonTower, beginTower, finishTower, rollTower, type TowerOutcome, type TowerRun } from '../game/tower';
-import { ACHIEVEMENT_TEXT, CAMPAIGN_TEXT, COSTUME_TEXT, SNACK_TEXT, STAGE_TEXT, THEME_TEXT, pickLine, residentName, type Situation } from '../game/content';
+import { ACHIEVEMENT_TEXT, CAMPAIGN_TEXT, COSTUME_TEXT, ITEM_TEXT, MEAL_TEXT, SNACK_TEXT, STAGE_TEXT, THEME_TEXT, pickLine, residentName, type Situation } from '../game/content';
 import { replyMail, rollMail } from '../game/fanmail';
 import { claimAttendance, claimMission, rollMissions } from '../game/missions';
 import { buySlot, collectPost, startPost } from '../game/monogram';
-import { buyCampaign, buyCostume, buySnack, buyTheme, setCostume, setTheme } from '../game/shop';
+import { buyCampaign, buyCostume, buyItem, buyMeal, buySnack, buyTheme, redeemCoupon, setCostume, setTheme } from '../game/shop';
 import { InputLimiter } from '../game/input';
 import type { BlocksSummary } from '../game/blocks';
 import type { BounceSummary } from '../game/bounce';
@@ -72,6 +72,7 @@ import { makeReport, settleOffline, settleOnline, type OfflineReport } from '../
 import type {
   AlbumType,
   CampaignId,
+  ItemId,
   CommandResult,
   BuildingId,
   CostumeId,
@@ -426,6 +427,7 @@ function mergeReport(prev: OfflineReport | null, next: OfflineReport): OfflineRe
     elapsedMs: prev.elapsedMs + next.elapsedMs,
     paidMs: prev.paidMs + next.paidMs,
     capped: prev.capped || next.capped,
+    meal: prev.meal || next.meal,
     coins: prev.coins + next.coins,
     normalRhymes: prev.normalRhymes + next.normalRhymes,
     darkRhymes: prev.darkRhymes + next.darkRhymes,
@@ -980,6 +982,34 @@ export function doBuySnack(id: SnackId): void {
   if (!r.ok) return failToast(r.reason);
   sfx.buy();
   toast(`${SNACK_TEXT[id].icon} ${SNACK_TEXT[id].name} ${r.extended ? '시간이 늘었어요' : '효과 시작'}! 🪙 ${fmt(r.cost)}`, 'good');
+  saveNow();
+}
+
+export function doBuyItem(id: ItemId): void {
+  const r = exec((s) => buyItem(s, id));
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  sfx.buy();
+  toast(`${ITEM_TEXT[id].icon} ${ITEM_TEXT[id].name} ${r.extended ? '시간이 늘었어요' : '효과 시작'}! 🪙 ${fmt(r.cost)}`, 'good');
+  saveNow();
+}
+
+export function doBuyMeal(): void {
+  const r = exec((s) => buyMeal(s));
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  sfx.buy();
+  toast(`${MEAL_TEXT.icon} ${MEAL_TEXT.name}를 챙겼어요! 🪙 ${fmt(r.cost)}`, 'good');
+  saveNow();
+}
+
+/** 멤버십 무료 간식 쿠폰을 쓴다. */
+export function doRedeemCoupon(): void {
+  const r = exec((s) => redeemCoupon(s));
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  sfx.buy();
+  toast(`🎁 무료 쿠폰으로 ${SNACK_TEXT[r.snack].icon} ${SNACK_TEXT[r.snack].name} ${r.extended ? '시간이 늘었어요' : '효과 시작'}!`, 'good');
   saveNow();
 }
 

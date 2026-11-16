@@ -5,6 +5,7 @@ import { addTickets } from './photocards';
 import { applyTicketBoost } from './ticketing';
 import {
   fanGainMult,
+  chocoMult,
   clampResource,
   clickGain,
   clickPowerOf,
@@ -301,6 +302,9 @@ export function manualConcertReward(
 
 const stageDef = (id: StageId) => STAGES.find((s) => s.id === id)!;
 
+/** 초코바(편의점 상품)가 켜져 있으면 공연 코인 보상이 늘어난다(첫 클리어 보너스는 따로라서 곱하지 않는다). */
+const chocoBoost = <T extends { coins: number }>(state: GameState, boosted: T): T => ({ ...boosted, coins: Math.floor(boosted.coins * chocoMult(state)) });
+
 /** 공연장을 처음 클리어하면 포토카드 티켓을 준다. */
 const firstClearTickets = (s: GameState, firstClear: boolean): GameState => (firstClear ? addTickets(s, BALANCE.photo.tickets.firstClear) : s);
 
@@ -329,7 +333,7 @@ export function runAutoConcert(state: GameState, id: StageId): CommandResult<{ o
   const bonus = firstClear ? def.firstClearCoins : 0;
   const diamonds = firstClear ? def.firstClearDiamonds : 0;
   const started = startCooldown(state, id);
-  const boosted = applyTicketBoost(started, def.baseCoins);
+  const boosted = chocoBoost(state, applyTicketBoost(started, def.baseCoins));
   const next: GameState = track(
     {
       ...boosted.state,
@@ -390,7 +394,7 @@ export function finishManualConcert(
   const firstClear = cleared && !rec.cleared;
   const bonus = firstClear ? def.firstClearCoins : 0;
   const diamonds = firstClear ? def.firstClearDiamonds : 0;
-  const boosted = applyTicketBoost(state, manualConcertReward(def.baseCoins, score, run.persona, run.game, cleared));
+  const boosted = chocoBoost(state, applyTicketBoost(state, manualConcertReward(def.baseCoins, score, run.persona, run.game, cleared)));
   const reward = boosted.coins;
   const next: GameState = track(
     {

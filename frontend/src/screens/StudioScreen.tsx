@@ -4,7 +4,7 @@ import { HeatGauge, PersonaBadge, WorkPad } from '../components/parts';
 import { fmtDuration, fmtHave, fmtRate } from '../components/format';
 import { BALANCE } from '../game/balance';
 import { titleText } from '../game/achievements';
-import { CAMPAIGN_TEXT, CLICK_POWER_TEXT, PERSONA_TEXT, SNACK_TEXT } from '../game/content';
+import { CAMPAIGN_TEXT, CLICK_POWER_TEXT, ITEM_TEXT, PERSONA_TEXT, SNACK_TEXT } from '../game/content';
 import { mascotView } from '../game/mascot';
 import {
   clickGain,
@@ -40,6 +40,7 @@ export function StudioScreen() {
   const mood: Mood = penalized && persona === 'normal' ? 'seized' : hot ? 'hot' : working ? 'work' : 'idle';
   const snack = g.buffs.snack && g.buffs.snack.until > now ? g.buffs.snack : null;
   const campaign = g.buffs.campaign && g.buffs.campaign.until > now ? g.buffs.campaign : null;
+  const item = g.buffs.item && g.buffs.item.until > now ? g.buffs.item : null;
   const hint = currentHint(g);
   const preview = previewSingle(g);
 
@@ -85,7 +86,7 @@ export function StudioScreen() {
 
       <HeatGauge heat={g.heat} persona={persona} />
 
-      {(snack || campaign) && (
+      {(snack || campaign || item) && (
         <div className="buff-row" role="status">
           {snack && (
             <button type="button" className="buff-chip" onClick={() => setTab('shop')}>
@@ -95,6 +96,11 @@ export function StudioScreen() {
           {campaign && (
             <button type="button" className="buff-chip" onClick={() => setTab('shop')}>
               {CAMPAIGN_TEXT[campaign.id].icon} 팬 ×{BALANCE.shop.campaigns[campaign.id].mult} · {fmtDuration(campaign.until - now)}
+            </button>
+          )}
+          {item && (
+            <button type="button" className="buff-chip" onClick={() => setTab('shop')}>
+              {ITEM_TEXT[item.id].icon} {ITEM_TEXT[item.id].effect(BALANCE.shop.items[item.id].bonus)} · {fmtDuration(item.until - now)}
             </button>
           )}
         </div>

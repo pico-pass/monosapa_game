@@ -1,4 +1,4 @@
-import type { BuildingId, CampaignId, CardRarity, CostumeId, CounterKey, DarkCostumeId, DiamondUpgradeKind, EquipmentKind, Persona, PostKind, SnackId, SkillId, StageId, StreamPlatform, ThemeId, Vibe } from './types';
+import type { BuildingId, CampaignId, CardRarity, CostumeId, CounterKey, DarkCostumeId, DiamondUpgradeKind, EquipmentKind, ItemId, Persona, PostKind, SnackId, SkillId, StageId, StreamPlatform, ThemeId, Vibe } from './types';
 
 /**
  * 모든 경제 수치는 이 파일 한 곳에서만 수정한다. (기획서 3~7, 11장)
@@ -147,6 +147,25 @@ export const BALANCE = {
       energy: { base: 400, bonus: 1.2, durationMs: 10 * 60_000 },
       lunchbox: { base: 1200, bonus: 2, durationMs: 20 * 60_000 },
     } as Record<SnackId, { base: number; bonus: number; durationMs: number }>,
+    /**
+     * 편의점 상품(사용자 요청으로 추가, 제안값). 간식과 따로 하나만 켜진다(다른 상품을 사면 바뀌고, 같은 상품을 또 사면 시간이 더해진다).
+     * bonus 의 뜻은 상품마다 다르다:
+     *   oden 자동 라임 생산(두 자아 모두, 인세 코인은 아님) +bonus · iced 아케이드·육성 대기시간 −bonus ·
+     *   choco 공연·아케이드 코인 보상 +bonus(첫 클리어 보너스는 제외) · milk 육성 성장도 +bonus.
+     * 어묵은 코인이 아니라 라임만 올려서 사서 되파는 순환이 생기지 않는다.
+     * incomeSecs 가 있는 값(초코바·야식)은 인세에 곱해져 늘어나는 코인이라, 가격이 기본가 × 25 × 레벨 배율과 인세 incomeSecs초 분량 중 큰 쪽이다
+     * (그렇지 않으면 팬이 늘어난 뒤에는 보상이 가격보다 수십~수백 배 커진다. 육성 돌보기 비용이 인세 N초 분량인 것과 같은 방식).
+     */
+    items: {
+      oden: { base: 900, bonus: 0.4, durationMs: 15 * 60_000 },
+      iced: { base: 500, bonus: 0.3, durationMs: 20 * 60_000 },
+      choco: { base: 600, bonus: 0.5, durationMs: 15 * 60_000, incomeSecs: 600 },
+      milk: { base: 700, bonus: 0.5, durationMs: 30 * 60_000 },
+    } as Record<ItemId, { base: number; bonus: number; durationMs: number; incomeSecs?: number }>,
+    /** 야식 컵라면 세트: 오프라인 정산 상한이 모자라게 자리를 비웠을 때 상한을 extraMs 늘려 주고 하나가 사라진다. 최대 max개까지 가진다. */
+    meal: { base: 1500, extraMs: 60 * 60_000, max: 3, incomeSecs: 1800 },
+    /** 멤버십: 편의점에서 간식·상품을 goal번 사면 무료 간식 쿠폰(어떤 간식인지는 씨앗으로 뽑는다) 하나 */
+    stamps: { goal: 10 },
     campaigns: {
       flyer: { base: 500, mult: 1.5, durationMs: 30 * 60_000 },
       insta: { base: 4000, mult: 2, durationMs: 2 * 3600_000 },
@@ -1581,6 +1600,7 @@ export const SKILL_IDS: readonly SkillId[] = ['rhyme', 'coin', 'fan', 'power', '
 export const BUILDING_IDS = Object.keys(BALANCE.village.buildings) as BuildingId[];
 
 export const SNACK_IDS = Object.keys(BALANCE.shop.snacks) as SnackId[];
+export const ITEM_IDS = Object.keys(BALANCE.shop.items) as ItemId[];
 export const CAMPAIGN_IDS = Object.keys(BALANCE.shop.campaigns) as CampaignId[];
 export const THEME_IDS = Object.keys(BALANCE.shop.themes) as ThemeId[];
 export const COSTUME_IDS = Object.keys(BALANCE.shop.costumes) as CostumeId[];

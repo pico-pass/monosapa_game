@@ -14,7 +14,7 @@ import {
   type LevelProgress,
   type NurtureBonus,
 } from './nurturedata';
-import { clampResource, royaltyBreakdown } from './selectors';
+import { clampResource, cooldownMult, milkMult, royaltyBreakdown } from './selectors';
 import type { CommandResult, Fail, FailReason, GameState, NurtureSide, Persona } from './types';
 
 /*
@@ -91,7 +91,7 @@ export function previewNurture(s: GameState, persona: Persona, def: NurtureActio
   const v = nurtureView(s, persona);
   const level = v.progress.level;
   const tolerance = toleranceFactor(def, level);
-  const xp = Math.max(1, Math.round(def.xp * v.efficiency * tolerance));
+  const xp = Math.max(1, Math.round(def.xp * v.efficiency * tolerance * milkMult(s)));
   let blocked: FailReason | null = null;
   if (!v.unlocked) blocked = 'nurture_locked';
   else if (level < def.unlockLevel) blocked = 'level_low';
@@ -135,7 +135,7 @@ export function nurtureAct(state: GameState, persona: Persona, actionId: string)
   const readyAt = Object.fromEntries(Object.entries(side.readyAt).filter(([, t]) => t > now));
   const next: NurtureSide = {
     ...side,
-    readyAt: { ...readyAt, [def.id]: now + N.cooldownMs },
+    readyAt: { ...readyAt, [def.id]: now + Math.round(N.cooldownMs * cooldownMult(state)) },
     xp: side.xp + p.xp,
     full: clampGauge(g.full + def.full),
     mood: clampGauge(g.mood + moodDelta),

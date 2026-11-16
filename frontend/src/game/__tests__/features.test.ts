@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { closeTempOpenStages, reopenTempOpenStages } from './tempOpen';
-import { evaluateAchievements, setTitle, titleText } from '../achievements';
+import { evaluateAchievements, ownedTitles, setTitle, titlePerkText, titleText } from '../achievements';
 import { moreAlerts } from '../alerts';
 import { ACHIEVEMENTS, BALANCE, COSTUME_IDS, COSTUME_IDS_OF, MISSIONS, STAGES, manualGameOf } from '../balance';
 import {
@@ -343,6 +343,16 @@ describe('업적', () => {
     if (!ok.ok) return;
     const cleared = setTitle(ok.state, null);
     expect(cleared.ok && cleared.state.cosmetics.title).toBeNull();
+  });
+
+  it('달 수 있는 칭호 목록: 달성한 칭호 업적만 업적 순서대로, 효과 문구는 효과가 있을 때만', () => {
+    expect(ownedTitles(base())).toEqual([]);
+    const s = base({ achievements: { grind: T0, 'first-verse': T0 } }); // first-verse 는 칭호가 없는 업적
+    expect(ownedTitles(s)).toEqual([{ id: 'grind', title: '라임 기계' }]);
+    // 목록에 나온 칭호는 모두 setTitle 로 달 수 있다(프로필 설정이 같은 규칙을 쓴다)
+    for (const t of ownedTitles(s)) expect(setTitle(s, t.id).ok).toBe(true);
+    expect(titlePerkText(null)).toBeNull();
+    expect(titlePerkText('grind')).toMatch(/\+\d+(\.\d)?%$/);
   });
 
   it('모든 업적에 문구가 있고 ID가 겹치지 않는다', () => {
@@ -785,7 +795,7 @@ describe('저장 검증(나중에 추가된 필드)', () => {
     if (!v.ok) return;
     expect(v.state.diamondUpgrades).toEqual({ production: 2, royalty: 1, offline: 0 });
     expect(v.state.distributor).toBe(0); // 유통사 호감도가 없던 저장은 0레벨
-    expect(v.state.buffs).toEqual({ snack: null, campaign: null });
+    expect(v.state.buffs).toEqual({ snack: null, campaign: null, item: null });
     expect(v.state.cosmetics).toEqual({ themes: ['default'], theme: 'default', costumes: [], costume: null, darkCostume: null, title: null });
     expect(v.state.counters).toEqual(zeroCounters());
     expect(v.state.achievements).toEqual({});
@@ -813,7 +823,7 @@ describe('저장 검증(나중에 추가된 필드)', () => {
     });
     expect(lenient.ok).toBe(true);
     if (!lenient.ok) return;
-    expect(lenient.state.buffs).toEqual({ snack: null, campaign: { id: 'flyer', until: 7 } });
+    expect(lenient.state.buffs).toEqual({ snack: null, campaign: { id: 'flyer', until: 7 }, item: null });
     expect(lenient.state.cosmetics).toEqual({ themes: ['default', 'pastel'], theme: 'default', costumes: ['bunny', 'king'], costume: null, darkCostume: null, title: 'grind' }); // 어둠 칸에 일반 옷은 못 입는다
     const worn = validateState({ ...s, cosmetics: { ...s.cosmetics, costumes: ['bunny', 'king'], costume: 'bunny', darkCostume: 'king' } });
     expect(worn.ok && worn.state.cosmetics).toMatchObject({ costumes: ['bunny', 'king'], costume: 'bunny', darkCostume: 'king' });
