@@ -1,12 +1,12 @@
 import { fmt, fmtDuration } from '../components/format';
 import { Progress } from '../components/parts';
 import { ASSETS } from '../assets';
-import { BALANCE, CAMPAIGN_IDS, COSTUME_IDS_OF, ITEM_IDS, SNACK_IDS, THEME_IDS } from '../game/balance';
-import { CAMPAIGN_TEXT, COSTUME_TEXT, ITEM_TEXT, MEAL_TEXT, PERSONA_TEXT, SNACK_TEXT, THEME_TEXT } from '../game/content';
-import { campaignMult, offlineCapMs, snackMult, wornCostume } from '../game/selectors';
-import { campaignPrice, itemPrice, mealPrice, snackPrice } from '../game/shop';
+import { BALANCE, CAMPAIGN_IDS, COSTUME_IDS_OF, GOODS_IDS, ITEM_IDS, SNACK_IDS, THEME_IDS } from '../game/balance';
+import { CAMPAIGN_TEXT, COSTUME_TEXT, GOODS_TEXT, ITEM_TEXT, MEAL_TEXT, PACK_TEXT, PERSONA_TEXT, RECEIPT_TEXT, SNACK_TEXT, THEME_TEXT } from '../game/content';
+import { campaignMult, maxRoyaltyPerSec, offlineCapMs, snackMult, wornCostume } from '../game/selectors';
+import { campaignPrice, goodsPrice, itemPrice, mealPrice, packPrice, packsLeft, receiptPrice, snackPrice } from '../game/shop';
 import type { GameState, Persona } from '../game/types';
-import { doBuyCampaign, doBuyCostume, doBuyItem, doBuyMeal, doBuySnack, doBuyTheme, doRedeemCoupon, doSetCostume, doSetTheme, useUi } from '../store/gameStore';
+import { doBuyCampaign, doBuyCostume, doBuyGoods, doBuyItem, doBuyMeal, doBuyPack, doBuyReceipt, doBuySnack, doBuyTheme, doRedeemCoupon, doSetCostume, doSetTheme, useUi } from '../store/gameStore';
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 
@@ -16,6 +16,7 @@ export function ShopScreen() {
   const snack = g.buffs.snack && g.buffs.snack.until > now ? g.buffs.snack : null;
   const campaign = g.buffs.campaign && g.buffs.campaign.until > now ? g.buffs.campaign : null;
   const item = g.buffs.item && g.buffs.item.until > now ? g.buffs.item : null;
+  const goods = g.buffs.goods && g.buffs.goods.until > now ? g.buffs.goods : null;
   const maxStack = BALANCE.shop.maxStack;
 
   return (
@@ -84,6 +85,77 @@ export function ShopScreen() {
       })}
       <p className="fineprint">초코바와 야식은 인세에 따라 가격이 올라가요. 상품은 간식·홍보 캠페인과 따로 켜져요. 같은 상품을 또 사면 시간이 더해지고(최대 {maxStack}배), 다른 상품을 사면 효과가 바뀌어요.</p>
 
+      <h3 className="sub-title">🧰 편의점 생활용품 — 두 번째 부스트</h3>
+      {goods && (
+        <p className="buff-note" role="status">
+          {GOODS_TEXT[goods.id].icon} {GOODS_TEXT[goods.id].name} 효과 중 · {GOODS_TEXT[goods.id].effect(BALANCE.shop.goods[goods.id].bonus)} · {fmtDuration(goods.until - now)} 남음
+        </p>
+      )}
+      {GOODS_IDS.map((id) => {
+        const def = BALANCE.shop.goods[id];
+        const t = GOODS_TEXT[id];
+        const price = goodsPrice(g, id);
+        const stacked = goods?.id === id && goods.until >= now + def.durationMs * maxStack;
+        return (
+          <div key={id} className="card shop-card">
+            <div className="card-row">
+              <h3>
+                <span aria-hidden>{t.icon}</span> {t.name}
+              </h3>
+              <small className="muted">{def.durationMs / 60_000}분</small>
+            </div>
+            <p className="muted">{t.blurb}</p>
+            <p>
+              <b>{t.effect(def.bonus)}</b>
+            </p>
+            <button type="button" className="btn btn-primary btn-wide" disabled={g.coins < price || stacked} onClick={() => doBuyGoods(id)}>
+              {stacked ? '더 쌓을 수 없어요' : goods?.id === id ? `시간 더하기 🪙 ${fmt(price)}` : `사기 🪙 ${fmt(price)}`}
+            </button>
+          </div>
+        );
+      })}
+      <p className="fineprint">생활용품은 간식·상품·홍보 캠페인과 따로 켜져요. 가격은 인세·스트리밍 수입에 따라 올라가요. 같은 용품을 또 사면 시간이 더해지고(최대 {maxStack}배), 다른 용품을 사면 효과가 바뀌어요.</p>
+
+      <h3 className="sub-title">{RECEIPT_TEXT.icon} 할인 영수증 — 장비를 살 때</h3>
+      <div className="card shop-card">
+        <div className="card-row">
+          <h3>
+            <span aria-hidden>{RECEIPT_TEXT.icon}</span> {RECEIPT_TEXT.name}
+          </h3>
+          <small className="muted">
+            가진 수 {g.mart.receipts} / {BALANCE.shop.receipt.max}
+          </small>
+        </div>
+        <p className="muted">{RECEIPT_TEXT.blurb}</p>
+        <p>
+          <b>다음 장비 구매 한 번에 −{pct(BALANCE.shop.receipt.rate)} (최대 🪙 {fmt(Math.floor(maxRoyaltyPerSec(g) * BALANCE.shop.receipt.capSecs))} 할인)</b>
+        </p>
+        <small className="muted">마이크·스튜디오·홍보 장비를 살 때 자동으로 한 장이 쓰여요. 싼 장비에는 이득이 작으니 비싼 장비 앞에서 아껴 둬요.</small>
+        <button type="button" className="btn btn-primary btn-wide" disabled={g.coins < receiptPrice(g) || g.mart.receipts >= BALANCE.shop.receipt.max} onClick={() => doBuyReceipt()}>
+          {g.mart.receipts >= BALANCE.shop.receipt.max ? '더 챙길 수 없어요' : `사기 🪙 ${fmt(receiptPrice(g))}`}
+        </button>
+      </div>
+
+      <h3 className="sub-title">{PACK_TEXT.icon} 카드팩 — 포토카드 티켓</h3>
+      <div className="card shop-card">
+        <div className="card-row">
+          <h3>
+            <span aria-hidden>{PACK_TEXT.icon}</span> {PACK_TEXT.name}
+          </h3>
+          <small className="muted">
+            오늘 {packsLeft(g)} / {BALANCE.shop.pack.perDay}장 남음
+          </small>
+        </div>
+        <p className="muted">{PACK_TEXT.blurb}</p>
+        <p>
+          <b>포토카드 티켓 1장 (수집 탭에서 뽑아요)</b>
+        </p>
+        <small className="muted">하루에 {BALANCE.shop.pack.perDay}장까지 살 수 있어요. 다이아로 사는 티켓과 같은 티켓이에요. 가진 티켓 {g.photo.tickets}장.</small>
+        <button type="button" className="btn btn-primary btn-wide" disabled={g.coins < packPrice(g) || packsLeft(g) <= 0} onClick={() => doBuyPack()}>
+          {packsLeft(g) <= 0 ? '오늘은 모두 샀어요' : `사기 🪙 ${fmt(packPrice(g))}`}
+        </button>
+      </div>
+
       <h3 className="sub-title">{MEAL_TEXT.icon} 야식 컵라면 세트 — 오래 자리를 비울 때</h3>
       <div className="card shop-card">
         <div className="card-row">
@@ -113,7 +185,7 @@ export function ShopScreen() {
           </small>
         </div>
         <Progress value={g.mart.stamps} max={BALANCE.shop.stamps.goal} label="멤버십 스탬프" />
-        <p className="muted">간식·상품·야식을 살 때마다 스탬프가 하나씩 쌓여요. {BALANCE.shop.stamps.goal}개를 모으면 무료 간식 쿠폰이 나와요.</p>
+        <p className="muted">간식·상품·생활용품·야식·영수증·카드팩을 살 때마다 스탬프가 하나씩 쌓여요. {BALANCE.shop.stamps.goal}개를 모으면 무료 간식 쿠폰이 나와요.</p>
         {g.mart.coupon ? (
           <>
             <p role="status">

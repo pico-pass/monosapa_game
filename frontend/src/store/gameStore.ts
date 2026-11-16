@@ -41,11 +41,11 @@ import { buyTickets, craftPhoto, dismantlePhoto, giveCard, photoPull, takeCard, 
 import { applyBossClaim, applyChallengeClaim, applyChallengePosted, applyChartClaim, applyMailClaim, applyVillageHearts } from '../game/serverRewards';
 import { remasterCard, toggleDeck } from '../game/songcards';
 import { abandonTower, beginTower, finishTower, rollTower, type TowerOutcome, type TowerRun } from '../game/tower';
-import { ACHIEVEMENT_TEXT, CAMPAIGN_TEXT, COSTUME_TEXT, ITEM_TEXT, MEAL_TEXT, SNACK_TEXT, STAGE_TEXT, THEME_TEXT, pickLine, residentName, type Situation } from '../game/content';
+import { ACHIEVEMENT_TEXT, CAMPAIGN_TEXT, COSTUME_TEXT, GOODS_TEXT, ITEM_TEXT, MEAL_TEXT, PACK_TEXT, RECEIPT_TEXT, SNACK_TEXT, STAGE_TEXT, THEME_TEXT, pickLine, residentName, type Situation } from '../game/content';
 import { replyMail, rollMail } from '../game/fanmail';
 import { claimAttendance, claimMission, rollMissions } from '../game/missions';
 import { buySlot, collectPost, startPost } from '../game/monogram';
-import { buyCampaign, buyCostume, buyItem, buyMeal, buySnack, buyTheme, redeemCoupon, setCostume, setTheme } from '../game/shop';
+import { buyCampaign, buyCostume, buyGoods, buyItem, buyMeal, buyPack, buyReceipt, buySnack, buyTheme, redeemCoupon, setCostume, setTheme } from '../game/shop';
 import { InputLimiter } from '../game/input';
 import type { BlocksSummary } from '../game/blocks';
 import type { BounceSummary } from '../game/bounce';
@@ -72,6 +72,7 @@ import { makeReport, settleOffline, settleOnline, type OfflineReport } from '../
 import type {
   AlbumType,
   CampaignId,
+  GoodsId,
   ItemId,
   CommandResult,
   BuildingId,
@@ -277,6 +278,7 @@ const FAIL_TEXT: Record<FailReason, string> = {
   insufficient_hearts: '❤️가 부족해요.',
   need_plaza: '광장을 지어야 축제를 열 수 있어요.',
   festival_used: '축제는 한 주에 한 번만 열 수 있어요.',
+  daily_limit: '오늘은 더 살 수 없어요. 내일 다시 와 주세요.',
 };
 
 /* ---------- 런타임(저장하지 않는) 변수 ---------- */
@@ -720,6 +722,7 @@ export function doBuy(kind: EquipmentKind, persona: Persona = 'normal'): void {
   if (!r.ok) return failToast(r.reason);
   say('buy', true);
   sfx.buy();
+  if (r.discount > 0) toast(`${RECEIPT_TEXT.icon} 할인 영수증을 썼어요! 🪙 ${fmt(r.discount)} 할인`, 'good');
   saveNow();
 }
 
@@ -991,6 +994,33 @@ export function doBuyItem(id: ItemId): void {
   if (!r.ok) return failToast(r.reason);
   sfx.buy();
   toast(`${ITEM_TEXT[id].icon} ${ITEM_TEXT[id].name} ${r.extended ? '시간이 늘었어요' : '효과 시작'}! 🪙 ${fmt(r.cost)}`, 'good');
+  saveNow();
+}
+
+export function doBuyGoods(id: GoodsId): void {
+  const r = exec((s) => buyGoods(s, id));
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  sfx.buy();
+  toast(`${GOODS_TEXT[id].icon} ${GOODS_TEXT[id].name} ${r.extended ? '시간이 늘었어요' : '효과 시작'}! 🪙 ${fmt(r.cost)}`, 'good');
+  saveNow();
+}
+
+export function doBuyReceipt(): void {
+  const r = exec((s) => buyReceipt(s));
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  sfx.buy();
+  toast(`${RECEIPT_TEXT.icon} ${RECEIPT_TEXT.name}을 챙겼어요! 다음 장비 구매에 자동으로 써요. 🪙 ${fmt(r.cost)}`, 'good');
+  saveNow();
+}
+
+export function doBuyPack(): void {
+  const r = exec((s) => buyPack(s));
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  sfx.buy();
+  toast(`${PACK_TEXT.icon} ${PACK_TEXT.name}에서 포토카드 티켓 1장이 나왔어요! (오늘 ${r.left}장 더) 🪙 ${fmt(r.cost)}`, 'good');
   saveNow();
 }
 

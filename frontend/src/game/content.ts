@@ -1,4 +1,4 @@
-import type { AlbumType, BuildingId, CampaignId, CardRarity, CostumeId, DialogueTone, ItemId, Persona, PostKind, SnackId, StageId, StreamPlatform, SkillId, ThemeId, Vibe, VirtualComment } from './types';
+import type { AlbumType, BuildingId, CampaignId, CardRarity, CostumeId, DialogueTone, GoodsId, ItemId, Persona, PostKind, SnackId, StageId, StreamPlatform, SkillId, ThemeId, Vibe, VirtualComment } from './types';
 
 /* 대사·제목·댓글·공연장 이름. 모두 게임용 창작 문구이며 실제 인물의 곡·발언이 아니다.
    가상의 상대·자기디스·황당한 상황만 다루고, 현실 이용자나 실제 인물을 겨냥하지 않는다. */
@@ -575,6 +575,24 @@ export const ITEM_TEXT: Record<ItemId, { name: string; icon: string; blurb: stri
   iced: { name: '얼음컵 아메리카노', icon: '🧊', blurb: '머리가 띵할 만큼 차갑다. 다음 판까지 기다릴 틈이 없다.', effect: (b) => `아케이드·육성 대기시간 −${Math.round(b * 100)}%` },
   choco: { name: '초코바', icon: '🍫', blurb: '무대 뒤에서 한 입. 당이 들어가면 손이 빨라진다.', effect: (b) => `공연·아케이드 코인 보상 +${Math.round(b * 100)}%` },
   milk: { name: '딸기우유', icon: '🥛', blurb: '분홍색이 반쯤 풀린 맛. 잘 먹은 날은 잘 큰다.', effect: (b) => `육성 성장도 +${Math.round(b * 100)}%` },
+};
+
+export const GOODS_TEXT: Record<GoodsId, { name: string; icon: string; blurb: string; effect: (bonus: number) => string }> = {
+  icebar: { name: '아이스바', icon: '🍦', blurb: '한 입 베어 물면 머리가 식는다. 어둠에 더 오래 있어도 마이크를 안 뺏긴다.', effect: (b) => `어둠 과열이 오르는 속도 −${Math.round(b * 100)}%` },
+  earbuds: { name: '무선 이어폰', icon: '🎧', blurb: '한쪽만 끼고 있어도 음원이 쌓인다. 재생 수가 알아서 오른다.', effect: (b) => `스트리밍이 쌓이는 속도 +${Math.round(b * 100)}%` },
+  protein: { name: '프로틴 바', icon: '💪', blurb: '무대 위에서 한 번 더 버티는 맛. 씹을수록 단단해진다.', effect: (b) => `전투력 +${Math.round(b * 100)}%` },
+};
+
+export const RECEIPT_TEXT = {
+  name: '할인 영수증',
+  icon: '🧾',
+  blurb: '장비 가게에서 내밀면 한 번 깎아 준다. 구겨 넣고 다니다가 비싼 걸 살 때 꺼낸다.',
+};
+
+export const PACK_TEXT = {
+  name: '카드팩',
+  icon: '🎴',
+  blurb: '편의점 계산대 옆에 걸려 있는 포토카드 한 봉지. 뜯기 전에는 아무도 모른다.',
 };
 
 export const MEAL_TEXT = {

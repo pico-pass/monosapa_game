@@ -10,6 +10,7 @@ import { TRACKS, trackOfSingle, trackSingles } from '../game/songcharts';
 import type { ArcadeKind, GameState, Persona } from '../game/types';
 import { towerStatus } from '../game/tower';
 import { bonuses } from '../game/packdata';
+import { proteinPower } from '../game/selectors';
 import { doTrimLyricCard, setTab, startArcade, startTower, useUi } from '../store/gameStore';
 
 const LEVELS: RhythmLevel[] = ['easy', 'normal', 'hard'];
@@ -28,11 +29,13 @@ function StartButton({ g, kind, onStart, label }: { g: GameState; kind: ArcadeKi
 export function ArcadeScreen() {
   const { game: g } = useUi();
   const b = bonuses(g);
+  const protein = proteinPower(g);
   return (
     <section className="screen" aria-label="아케이드">
       <h2 className="section-title">아케이드</h2>
       <p className="muted">
         직접 플레이하면 코인·팬·다이아를 줘요. 시작하면 쿨다운이 정해지고, 곡 카드·피처링·포토 세트의 전투력 보너스(지금 +{Math.round(b.power * 100)}%)가 판정과 전투력에 더해져요.
+        {protein > 0 && ` 💪 프로틴 바 효과로 전투력이 +${Math.round(protein * 100)}% 더 붙어요.`}
       </p>
       <RhythmCard g={g} />
       <SurvivalCard g={g} />

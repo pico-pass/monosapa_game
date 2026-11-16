@@ -123,6 +123,11 @@ function EquipCard({ g, kind, persona }: { g: GameState; kind: EquipmentKind; pe
               </dd>
             </div>
           </dl>
+          {pv.discount > 0 && (
+            <small className="muted" role="status">
+              🧾 할인 영수증 사용 — 🪙 {fmt(pv.discount)} 할인 (남은 영수증 {g.mart.receipts}장 중 한 장이 쓰여요)
+            </small>
+          )}
           <button type="button" className="btn btn-primary btn-wide" disabled={!can} onClick={() => doBuy(kind, persona)}>
             {can ? `강화 🪙 ${fmt(pv.cost)}` : `🪙 ${fmt(pv.cost)} 필요 (보유 ${fmt(Math.floor(g.coins))})`}
           </button>

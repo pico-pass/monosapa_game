@@ -1,29 +1,43 @@
 import { BALANCE, SNACK_IDS, costumePersona } from './balance';
-import { royaltyBreakdown, shopPrice } from './selectors';
+import { dayKey } from './missions';
+import { addTickets } from './photocards';
+import { maxRoyaltyPerSec, shopPrice, streamCoinsPerSec } from './selectors';
 import { mix } from './streaming';
 import { track } from './tracking';
-import type { CampaignId, CommandResult, Cosmetics, CostumeId, Fail, FailReason, GameState, ItemId, Persona, SnackId, ThemeId } from './types';
+import type { CampaignId, CommandResult, Cosmetics, CostumeId, Fail, FailReason, GameState, GoodsId, ItemId, Persona, SnackId, ThemeId } from './types';
 
 /*
  * 상점 명령. 다른 명령과 같이 이미 now까지 정산된 상태(state.lastSettledAt이 now)를 받는다.
- * 간식·편의점 상품·야식·홍보 캠페인은 코인, 테마·코스튬은 다이아로 산다.
- * 편의점(간식·상품·야식)에서 살 때마다 멤버십 스탬프가 하나 쌓이고, 목표를 채우면 무료 간식 쿠폰이 뽑힌다.
+ * 간식·편의점 상품·생활용품·야식·할인 영수증·카드팩·홍보 캠페인은 코인, 테마·코스튬은 다이아로 산다.
+ * 편의점(간식·상품·생활용품·야식·영수증·카드팩)에서 살 때마다 멤버십 스탬프가 하나 쌓이고, 목표를 채우면 무료 간식 쿠폰이 뽑힌다.
  */
 
 const fail = (state: GameState, reason: FailReason): Fail => ({ ok: false, reason, state });
 
 export const snackPrice = (s: Pick<GameState, 'fans'>, id: SnackId): number => shopPrice(BALANCE.shop.snacks[id].base, s.fans);
-/** 인세에 묶인 가격: 기본 가격(shopPrice)과 인세 secs초 분량 중 큰 쪽. 두 자아 중 인세가 높은 쪽으로 센다(자아를 바꿔 싸게 사지 못하게). */
-function incomePrice(s: GameState, base: number, secs: number): number {
-  const perSec = Math.max(royaltyBreakdown(s, 'normal').perSec, royaltyBreakdown(s, 'dark').perSec);
-  return Math.max(shopPrice(base, s.fans), Math.ceil(perSec * secs));
-}
+/** 인세에 묶인 가격: 기본 가격(shopPrice)과 수입 perSec × secs 분량 중 큰 쪽. */
+const incomePriceOf = (s: GameState, base: number, perSec: number, secs: number): number => Math.max(shopPrice(base, s.fans), Math.ceil(perSec * secs));
+/** 인세에 묶인 가격. 두 자아 중 인세가 높은 쪽으로 센다(자아를 바꿔 싸게 사지 못하게). */
+const incomePrice = (s: GameState, base: number, secs: number): number => incomePriceOf(s, base, maxRoyaltyPerSec(s), secs);
 
 export function itemPrice(s: GameState, id: ItemId): number {
   const def = BALANCE.shop.items[id];
   return def.incomeSecs ? incomePrice(s, def.base, def.incomeSecs) : shopPrice(def.base, s.fans);
 }
 export const mealPrice = (s: GameState): number => incomePrice(s, BALANCE.shop.meal.base, BALANCE.shop.meal.incomeSecs);
+/** 생활용품 가격. 이어폰은 스트리밍 정산 코인, 아이스바는 인세에 묶고 프로틴 바는 기본 가격이다. */
+export function goodsPrice(s: GameState, id: GoodsId): number {
+  const def = BALANCE.shop.goods[id];
+  if (!def.incomeSecs) return shopPrice(def.base, s.fans);
+  return incomePriceOf(s, def.base, id === 'earbuds' ? streamCoinsPerSec(s) : maxRoyaltyPerSec(s), def.incomeSecs);
+}
+export const receiptPrice = (s: GameState): number => incomePrice(s, BALANCE.shop.receipt.base, BALANCE.shop.receipt.incomeSecs);
+export const packPrice = (s: GameState): number => incomePrice(s, BALANCE.shop.pack.base, BALANCE.shop.pack.incomeSecs);
+/** 오늘(기기 시간대) 더 살 수 있는 카드팩 수 */
+export function packsLeft(s: Pick<GameState, 'mart' | 'lastSettledAt'>): number {
+  const used = s.mart.packDay === dayKey(s.lastSettledAt) ? s.mart.packs : 0;
+  return Math.max(0, BALANCE.shop.pack.perDay - used);
+}
 export const campaignPrice = (s: Pick<GameState, 'fans'>, id: CampaignId): number => shopPrice(BALANCE.shop.campaigns[id].base, s.fans);
 
 /** 버프를 사면 끝나는 시각. 같은 버프가 켜져 있으면 시간이 더해지고(최대 maxStack배), 다르면 새로 시작한다. */
@@ -73,6 +87,40 @@ export function buyItem(state: GameState, id: ItemId): CommandResult<{ cost: num
   if (!n) return fail(state, 'already_done');
   const bought = track({ ...state, coins: state.coins - cost, buffs: { ...state.buffs, item: { id, until: n.until } } }, 'snacks');
   return { ok: true, state: stampMart(bought), cost, extended: n.extended };
+}
+
+/** 편의점 생활용품(아이스바·무선 이어폰·프로틴 바)을 사서 켠다. 같은 용품이면 시간이 더해지고 다른 용품이면 바뀐다. 상품과는 따로 켜진다. */
+export function buyGoods(state: GameState, id: GoodsId): CommandResult<{ cost: number; extended: boolean }> {
+  const def = BALANCE.shop.goods[id];
+  if (!def) return fail(state, 'not_found');
+  const cost = goodsPrice(state, id);
+  if (state.coins < cost) return fail(state, 'insufficient_coins');
+  const n = nextUntil(state.lastSettledAt, state.buffs.goods, id, def.durationMs);
+  if (!n) return fail(state, 'already_done');
+  const bought = track({ ...state, coins: state.coins - cost, buffs: { ...state.buffs, goods: { id, until: n.until } } }, 'snacks');
+  return { ok: true, state: stampMart(bought), cost, extended: n.extended };
+}
+
+/** 할인 영수증을 산다. 최대 receipt.max장까지 가진다. 다음 장비 구매에 자동으로 한 장이 쓰인다. */
+export function buyReceipt(state: GameState): CommandResult<{ cost: number }> {
+  if (state.mart.receipts >= BALANCE.shop.receipt.max) return fail(state, 'already_done');
+  const cost = receiptPrice(state);
+  if (state.coins < cost) return fail(state, 'insufficient_coins');
+  const bought = track({ ...state, coins: state.coins - cost, mart: { ...state.mart, receipts: state.mart.receipts + 1 } }, 'snacks');
+  return { ok: true, state: stampMart(bought), cost };
+}
+
+/** 카드팩을 사서 포토카드 티켓 한 장을 얻는다. 하루 pack.perDay장까지, 티켓이 가득이면 못 산다. */
+export function buyPack(state: GameState): CommandResult<{ cost: number; left: number }> {
+  if (packsLeft(state) <= 0) return fail(state, 'daily_limit');
+  if (state.photo.tickets >= BALANCE.photo.maxTickets) return fail(state, 'already_done');
+  const cost = packPrice(state);
+  if (state.coins < cost) return fail(state, 'insufficient_coins');
+  const day = dayKey(state.lastSettledAt);
+  const packs = (state.mart.packDay === day ? state.mart.packs : 0) + 1;
+  const paid = addTickets({ ...state, coins: state.coins - cost, mart: { ...state.mart, packDay: day, packs } }, 1);
+  const bought = track(paid, 'snacks');
+  return { ok: true, state: stampMart(bought), cost, left: BALANCE.shop.pack.perDay - packs };
 }
 
 /** 야식 컵라면 세트를 산다. 최대 meal.max개까지 가진다. */

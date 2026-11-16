@@ -3,7 +3,7 @@ import { Progress } from '../components/parts';
 import { BALANCE, STREAM_CERT_VIBE, STREAM_PLATFORMS } from '../game/balance';
 import { CERT_TIER_COUNT, certStatus } from '../game/certs';
 import { CERT_TIER_TEXT, DISTRIBUTOR_TEXT, STREAM_PLATFORM_TEXT, VIBE_TEXT } from '../game/content';
-import { previewDistributor, streamClaimStatus, streamRate, streamRevenueMult, streamTotal } from '../game/selectors';
+import { previewDistributor, streamBoostMult, streamClaimStatus, streamRate, streamRevenueMult, streamTotal } from '../game/selectors';
 import { doBuyDistributor, doClaimCert, doClaimStreaming, useUi } from '../store/gameStore';
 
 /** 배율 표시: 1.05처럼 필요한 만큼만 소수점을 보인다. */
@@ -15,7 +15,9 @@ export function StatsScreen() {
   const st = g.streaming;
   const total = streamTotal(st);
   const claim = streamClaimStatus(g);
-  const rate = streamRate(g);
+  // 무선 이어폰이 켜져 있으면 쌓이는 속도가 빨라진다
+  const boost = streamBoostMult(g);
+  const rate = streamRate(g) * boost;
   const perCoin = BALANCE.streaming.streamsPerCoin;
   const revenue = streamRevenueMult(g);
   const dist = previewDistributor(g);
@@ -35,7 +37,7 @@ export function StatsScreen() {
         </div>
         <div>
           <strong>{fmtStreamRate(rate)}</strong>
-          <span>초당 스트리밍</span>
+          <span>{boost > 1 ? `초당 스트리밍 (🎧 ×${fmtMult(boost)})` : '초당 스트리밍'}</span>
         </div>
         <div>
           <strong>{fmtStreams(claim.pending)}</strong>

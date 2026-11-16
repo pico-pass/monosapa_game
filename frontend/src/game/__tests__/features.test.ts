@@ -795,7 +795,7 @@ describe('저장 검증(나중에 추가된 필드)', () => {
     if (!v.ok) return;
     expect(v.state.diamondUpgrades).toEqual({ production: 2, royalty: 1, offline: 0 });
     expect(v.state.distributor).toBe(0); // 유통사 호감도가 없던 저장은 0레벨
-    expect(v.state.buffs).toEqual({ snack: null, campaign: null, item: null });
+    expect(v.state.buffs).toEqual({ snack: null, campaign: null, item: null, goods: null });
     expect(v.state.cosmetics).toEqual({ themes: ['default'], theme: 'default', costumes: [], costume: null, darkCostume: null, title: null });
     expect(v.state.counters).toEqual(zeroCounters());
     expect(v.state.achievements).toEqual({});
@@ -823,7 +823,7 @@ describe('저장 검증(나중에 추가된 필드)', () => {
     });
     expect(lenient.ok).toBe(true);
     if (!lenient.ok) return;
-    expect(lenient.state.buffs).toEqual({ snack: null, campaign: { id: 'flyer', until: 7 }, item: null });
+    expect(lenient.state.buffs).toEqual({ snack: null, campaign: { id: 'flyer', until: 7 }, item: null, goods: null });
     expect(lenient.state.cosmetics).toEqual({ themes: ['default', 'pastel'], theme: 'default', costumes: ['bunny', 'king'], costume: null, darkCostume: null, title: 'grind' }); // 어둠 칸에 일반 옷은 못 입는다
     const worn = validateState({ ...s, cosmetics: { ...s.cosmetics, costumes: ['bunny', 'king'], costume: 'bunny', darkCostume: 'king' } });
     expect(worn.ok && worn.state.cosmetics).toMatchObject({ costumes: ['bunny', 'king'], costume: 'bunny', darkCostume: 'king' });

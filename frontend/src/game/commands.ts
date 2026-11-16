@@ -22,6 +22,7 @@ import {
   previewEquipStar,
   previewRemaster,
   previewSingle,
+  receiptDiscount,
   rhymesOf,
   stageDifficulty,
   stageStatus,
@@ -157,14 +158,23 @@ export function buyEquipment(
   state: GameState,
   kind: EquipmentKind,
   persona: Persona = 'normal',
-): CommandResult<{ cost: number; level: number }> {
+): CommandResult<{ cost: number; level: number; discount: number }> {
   const level = equipmentOf(state, persona)[kind];
   if (level >= equipmentDef(persona).maxLevel) return fail(state, 'max_level');
-  const cost = equipmentCost(kind, level, persona);
+  // 할인 영수증이 있으면 이 구매 하나에 한 장이 쓰인다(깎을 게 없으면 쓰이지 않는다)
+  const raw = equipmentCost(kind, level, persona);
+  const discount = receiptDiscount(state, raw);
+  const cost = raw - discount;
   if (state.coins < cost) return fail(state, 'insufficient_coins');
   const key = persona === 'normal' ? 'equipment' : 'darkEquipment';
-  const next = track(withFlag({ ...state, coins: state.coins - cost, [key]: { ...state[key], [kind]: level + 1 } }, 'buy'), 'buys');
-  return { ok: true, state: next, cost, level: level + 1 };
+  const paid: GameState = {
+    ...state,
+    coins: state.coins - cost,
+    [key]: { ...state[key], [kind]: level + 1 },
+    mart: discount > 0 ? { ...state.mart, receipts: state.mart.receipts - 1 } : state.mart,
+  };
+  const next = track(withFlag(paid, 'buy'), 'buys');
+  return { ok: true, state: next, cost, level: level + 1, discount };
 }
 
 /* ---------- 장비 한계 돌파 (★) ---------- */

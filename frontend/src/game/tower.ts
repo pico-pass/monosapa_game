@@ -1,8 +1,7 @@
 import { BALANCE } from './balance';
 import { weekKey } from './missions';
-import { bonuses } from './packdata';
 import { mulberry32 } from './runner';
-import { clampResource, clickPowerOf, equipmentOf, playerLevel, royaltyBreakdown } from './selectors';
+import { clampResource, clickPowerOf, equipmentOf, playerLevel, powerBonusNow, royaltyBreakdown } from './selectors';
 import { mix } from './streaming';
 import { difficultyOf, type Difficulty } from './towerbattle';
 import { track } from './tracking';
@@ -40,7 +39,7 @@ export function towerPower(s: GameState, persona: Persona): number {
   const gear = e.mic + e.studio + e.promotion;
   const click = Math.min(T.clickCap, clickPowerOf(s, persona));
   const base = T.basePower + T.perLevel * (playerLevel(s.fans) - 1);
-  return base * (1 + T.perGear * gear + T.perClick * click) * (1 + bonuses(s).power);
+  return base * (1 + T.perGear * gear + T.perClick * click) * (1 + powerBonusNow(s));
 }
 
 /** 새 주가 시작됐으면 이번 주 기록을 비운다. 바뀐 게 없으면 같은 상태를 돌려준다. */

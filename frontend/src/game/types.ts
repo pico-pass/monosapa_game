@@ -128,6 +128,11 @@ export type CampaignId = 'flyer' | 'insta' | 'billboard';
  * 초코바(공연·아케이드 코인 보상 +) · 딸기우유(육성 성장도 +)
  */
 export type ItemId = 'oden' | 'iced' | 'choco' | 'milk';
+/**
+ * 편의점 생활용품(상품과 따로 하나만 켜는 두 번째 칸): 아이스바(어둠속성 과열이 천천히 오른다) ·
+ * 무선 이어폰(스트리밍이 더 빨리 쌓인다) · 프로틴 바(전투력 +)
+ */
+export type GoodsId = 'icebar' | 'earbuds' | 'protein';
 export type ThemeId = 'default' | 'pastel' | 'mono' | 'neon';
 /** 일반속성 모노사파의 코스튬(다이아로 산다. 모양만 바뀐다). 지뢰·텐션업·화난·메이드·토끼·타락천사·곰도리·수녀·뱀파이어·냥집사·유령신부 */
 export type NormalCostumeId = 'jirai' | 'hype' | 'angry' | 'maid' | 'bunny' | 'fallen' | 'bear' | 'nun' | 'vampire' | 'butler' | 'bride';
@@ -142,9 +147,11 @@ export interface Buffs {
   campaign: { id: CampaignId; until: number } | null;
   /** 편의점 상품 버프(어묵·얼음컵·초코바·딸기우유). 하나만 켤 수 있고 간식·홍보 캠페인과는 따로 켜진다. */
   item: { id: ItemId; until: number } | null;
+  /** 편의점 생활용품 버프(아이스바·무선 이어폰·프로틴 바). 하나만 켤 수 있고 간식·상품·홍보 캠페인과는 따로 켜진다. */
+  goods: { id: GoodsId; until: number } | null;
 }
 
-/** 편의점의 쌓아 두는 것들: 야식 컵라면 세트 · 멤버십 스탬프와 무료 쿠폰 */
+/** 편의점의 쌓아 두는 것들: 야식 컵라면 세트 · 멤버십 스탬프와 무료 쿠폰 · 할인 영수증 · 오늘 산 카드팩 */
 export interface Mart {
   /** 가지고 있는 야식 컵라면 세트 수. 오프라인 정산 상한을 넘겨 자리를 비웠을 때 한 번에 하나씩 쓰인다. */
   nightMeals: number;
@@ -152,6 +159,12 @@ export interface Mart {
   stamps: number;
   /** 받을 수 있는 무료 간식 쿠폰(스탬프를 다 모으면 뽑힌다). 없으면 null. */
   coupon: SnackId | null;
+  /** 가지고 있는 할인 영수증 수. 다음 장비 구매 하나에 하나씩 자동으로 쓰인다. */
+  receipts: number;
+  /** 카드팩을 산 날짜(기기 시간대의 yyyy-mm-dd). 안 산 적이 없으면 빈 문자열. */
+  packDay: string;
+  /** packDay에 산 카드팩 수. 날짜가 바뀌면 0부터 다시 센다. */
+  packs: number;
 }
 
 /** 다이아로 사는 꾸미기. 효과는 모양뿐이다. */
@@ -506,6 +519,8 @@ export type FailReason =
   | 'insufficient_hearts'
   | 'need_plaza'
   | 'festival_used'
+  // 편의점 카드팩
+  | 'daily_limit'
   // 모노사파 육성
   | 'nurture_locked'
   | 'level_low'

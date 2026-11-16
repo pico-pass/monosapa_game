@@ -1,4 +1,4 @@
-import type { BuildingId, CampaignId, CardRarity, CostumeId, CounterKey, DarkCostumeId, DiamondUpgradeKind, EquipmentKind, ItemId, Persona, PostKind, SnackId, SkillId, StageId, StreamPlatform, ThemeId, Vibe } from './types';
+import type { BuildingId, CampaignId, CardRarity, CostumeId, CounterKey, DarkCostumeId, DiamondUpgradeKind, EquipmentKind, GoodsId, ItemId, Persona, PostKind, SnackId, SkillId, StageId, StreamPlatform, ThemeId, Vibe } from './types';
 
 /**
  * 모든 경제 수치는 이 파일 한 곳에서만 수정한다. (기획서 3~7, 11장)
@@ -162,6 +162,29 @@ export const BALANCE = {
       choco: { base: 600, bonus: 0.5, durationMs: 15 * 60_000, incomeSecs: 600 },
       milk: { base: 700, bonus: 0.5, durationMs: 30 * 60_000 },
     } as Record<ItemId, { base: number; bonus: number; durationMs: number; incomeSecs?: number }>,
+    /**
+     * 편의점 생활용품(사용자 요청으로 추가, 제안값). 상품과 따로 하나만 켜지는 두 번째 칸이고 같은 규칙이다(같은 걸 또 사면 시간이 더해지고, 다른 걸 사면 바뀐다).
+     *   icebar 어둠속성 과열이 오르는 속도 −bonus(식는 속도·마이크 압수 규칙은 그대로) · earbuds 스트리밍이 쌓이는 속도 +bonus(정산 간격은 그대로) ·
+     *   protein 전투력(곡 카드·피처링·포토 세트 등이 주는 영구 전투력에 더하는 값) +bonus. 아케이드 판정과 계단 전투력에 모두 붙는다.
+     * 가격은 기본가 × 25 × 레벨 배율과 수입 incomeSecs초 분량 중 큰 쪽이다(후반에 공짜가 되지 않게):
+     *   이어폰은 스트리밍 정산 코인(초당 스트리밍 × 정산 배율 ÷ 스트리밍당 코인)에 묶어서 다 쓰면 가격의 1.2배쯤 돌려받고, 아이스바·프로틴 바는 인세(두 자아 중 높은 쪽)에 묶는다.
+     */
+    goods: {
+      icebar: { base: 500, bonus: 0.4, durationMs: 15 * 60_000, incomeSecs: 120 },
+      earbuds: { base: 600, bonus: 0.5, durationMs: 30 * 60_000, incomeSecs: 750 },
+      protein: { base: 800, bonus: 0.1, durationMs: 20 * 60_000, incomeSecs: 60 },
+    } as Record<GoodsId, { base: number; bonus: number; durationMs: number; incomeSecs?: number }>,
+    /**
+     * 할인 영수증: 다음 장비(마이크·스튜디오·홍보) 구매 한 번의 비용을 rate만큼 깎아 준다(소모형, 최대 max장까지 가진다).
+     * 깎아 주는 코인은 인세 capSecs초 분량을 넘지 못하고(아주 비싼 장비에 써도 이득이 한도 안에 있다), 가격은 기본가 × 25 × 레벨 배율과 인세 incomeSecs초 분량 중 큰 쪽이라서
+     * 한 장이 주는 최대 이득은 가격의 capSecs / incomeSecs배(1.5배)다. 그래서 인세 50분 분량이 넘는 장비를 살 때부터 이득이다.
+     */
+    receipt: { base: 200, rate: 0.2, capSecs: 900, incomeSecs: 600, max: 3 },
+    /**
+     * 카드팩: 포토카드 티켓 1장을 코인으로 산다(다이아 티켓과 같은 티켓이다). 하루(기기 시간대) perDay장까지.
+     * 티켓은 싱글·앨범·공연 첫 클리어로만 생겼는데 코인이 쓰일 곳이 하나 더 생기는 것이라, 가격은 기본가 × 25 × 레벨 배율과 인세 incomeSecs초 분량 중 큰 쪽이다.
+     */
+    pack: { base: 1500, incomeSecs: 1800, perDay: 2 },
     /** 야식 컵라면 세트: 오프라인 정산 상한이 모자라게 자리를 비웠을 때 상한을 extraMs 늘려 주고 하나가 사라진다. 최대 max개까지 가진다. */
     meal: { base: 1500, extraMs: 60 * 60_000, max: 3, incomeSecs: 1800 },
     /** 멤버십: 편의점에서 간식·상품을 goal번 사면 무료 간식 쿠폰(어떤 간식인지는 씨앗으로 뽑는다) 하나 */
@@ -1601,6 +1624,7 @@ export const BUILDING_IDS = Object.keys(BALANCE.village.buildings) as BuildingId
 
 export const SNACK_IDS = Object.keys(BALANCE.shop.snacks) as SnackId[];
 export const ITEM_IDS = Object.keys(BALANCE.shop.items) as ItemId[];
+export const GOODS_IDS = Object.keys(BALANCE.shop.goods) as GoodsId[];
 export const CAMPAIGN_IDS = Object.keys(BALANCE.shop.campaigns) as CampaignId[];
 export const THEME_IDS = Object.keys(BALANCE.shop.themes) as ThemeId[];
 export const COSTUME_IDS = Object.keys(BALANCE.shop.costumes) as CostumeId[];

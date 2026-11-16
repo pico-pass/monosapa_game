@@ -29,6 +29,11 @@ export function advance(state: GameState, durationMs: number, ctx: AdvanceContex
   // 어묵 꼬치: 켜져 있는 동안만 자동 라임 생산이 늘어난다. 끝나는 시각에서 구간을 쪼개서 큰 전진과 작은 전진이 같은 결과를 낸다.
   const odenUntil = state.buffs.item?.id === 'oden' ? state.buffs.item.until : 0;
   const odenBoost = 1 + BALANCE.shop.items.oden.bonus;
+  // 아이스바: 켜져 있는 동안 어둠속성 과열이 천천히 오른다. 이것도 끝나는 시각에서 구간을 쪼갠다.
+  const coolUntil = state.buffs.goods?.id === 'icebar' ? state.buffs.goods.until : 0;
+  const coolMult = 1 - BALANCE.shop.goods.icebar.bonus;
+  // 무선 이어폰: 켜져 있는 동안 스트리밍이 더 빨리 쌓인다(자아·과열과 무관해서 아래에서 따로 더한다).
+  const earbuds = state.buffs.goods?.id === 'earbuds' ? { until: state.buffs.goods.until, mult: 1 + BALANCE.shop.goods.earbuds.bonus } : null;
 
   let t = state.lastSettledAt;
   const end = t + durationMs;
@@ -43,7 +48,7 @@ export function advance(state: GameState, durationMs: number, ctx: AdvanceContex
   let normalMs = 0;
   let darkMs = 0;
 
-  // 구간 수는 유한하다: 어둠→(80)→(100)→일반 이후에는 일반에서 경계가 하나뿐이고, 어묵이 끝나는 시각이 경계를 하나 더한다.
+  // 구간 수는 유한하다: 어둠→(80)→(100)→일반 이후에는 일반에서 경계가 하나뿐이고, 어묵·아이스바가 끝나는 시각이 경계를 하나씩 더한다.
   for (let guard = 0; guard < 24 && t < end - EPS; guard++) {
     const remaining = end - t;
     if (persona === 'normal') {
@@ -73,9 +78,11 @@ export function advance(state: GameState, durationMs: number, ctx: AdvanceContex
     }
     const hot = heat >= P.hotThreshold - EPS;
     const boundary = hot ? P.maxHeat : P.hotThreshold;
-    const toBoundaryMs = ((boundary - heat) / P.heatUpPerSec) * 1000;
+    const cooled = t < coolUntil - EPS;
+    const heatUp = P.heatUpPerSec * (cooled ? coolMult : 1);
+    const toBoundaryMs = ((boundary - heat) / heatUp) * 1000;
     const boosted = t < odenUntil - EPS;
-    const seg = Math.min(remaining, toBoundaryMs, boosted ? odenUntil - t : Infinity);
+    const seg = Math.min(remaining, toBoundaryMs, boosted ? odenUntil - t : Infinity, cooled ? coolUntil - t : Infinity);
     const sec = seg / 1000;
     const rate = (hot ? P.darkHotRate : P.darkRate) * darkMult * (boosted ? odenBoost : 1);
     dark += rate * sec * eff;
@@ -94,7 +101,7 @@ export function advance(state: GameState, durationMs: number, ctx: AdvanceContex
         events.push({ type: 'micSeized' });
       }
     } else {
-      heat += P.heatUpPerSec * sec;
+      heat += heatUp * sec;
     }
   }
 
@@ -113,7 +120,7 @@ export function advance(state: GameState, durationMs: number, ctx: AdvanceContex
       // 결산(Wrapped)용: 생산이 지급된 시간만 자아별로 센다.
       stats: eff > 0 && (normalMs > 0 || darkMs > 0) ? { ...state.stats, normalMs: state.stats.normalMs + normalMs, darkMs: state.stats.darkMs + darkMs } : state.stats,
       // 스트리밍은 팬 수에만 비례하고 자아·과열과 무관해서 위 구간 계산과 따로 더한다.
-      streaming: accrueStreams(state.streaming, state.fans, state.lastSettledAt, end, eff),
+      streaming: accrueStreams(state.streaming, state.fans, state.lastSettledAt, end, eff, earbuds),
     },
     events,
   };

@@ -77,7 +77,7 @@ function richState(): GameState {
     fans: 5000,
     singles: singles(3),
     concerts,
-    buffs: { snack: { id: 'coffee', until: T0 + 600_000 }, campaign: { id: 'insta', until: T0 + 3600_000 }, item: { id: 'oden', until: T0 + 900_000 } },
+    buffs: { snack: { id: 'coffee', until: T0 + 600_000 }, campaign: { id: 'insta', until: T0 + 3600_000 }, item: { id: 'oden', until: T0 + 900_000 }, goods: { id: 'earbuds', until: T0 + 1_200_000 } },
     cosmetics: { themes: ['default', 'neon'], theme: 'neon', costumes: ['bunny', 'king'], costume: 'bunny', darkCostume: 'king', title: 'grind' },
     achievements: { grind: T0, 'first-verse': T0 },
     counters: { ...s.counters, works: 20000, posts: 3, snacks: 12 },
@@ -131,23 +131,59 @@ describe('새 화면 렌더링', () => {
     expect(html).toContain('아케이드·육성 대기시간 −30%');
     expect(html).toContain('공연·아케이드 코인 보상 +50%');
     expect(html).toContain('육성 성장도 +50%');
-    expect(html).toContain('야식 컵라면 세트');
+    // 생활용품(두 번째 칸): 무선 이어폰이 켜져 있다
+    expect(html).toContain('무선 이어폰 효과 중');
+    for (const name of ['아이스바', '프로틴 바']) expect(html, name).toContain(name);
+    expect(html).toContain('어둠 과열이 오르는 속도 −40%');
+    expect(html).toContain('스트리밍이 쌓이는 속도 +50%');
+    expect(html).toContain('전투력 +10%');
+    // 할인 영수증·카드팩
+    expect(html).toContain('할인 영수증');
+    expect(html).toContain('다음 장비 구매 한 번에 −20%');
     expect(html).toContain('가진 수 0 / 3');
+    expect(html).toContain('카드팩');
+    expect(html).toContain('오늘 2 / 2장 남음');
+    expect(html).toContain('포토카드 티켓 1장');
+    expect(html).toContain('야식 컵라면 세트');
     expect(html).toContain('편의점 멤버십');
     expect(html).toContain('0 / 10');
     expect(html).not.toContain('쿠폰 쓰기'); // 쿠폰이 없으면 버튼이 없다
     const s = richState();
-    const withCoupon = await render('shop', { ...s, mart: { nightMeals: 3, stamps: 4, coupon: 'lunchbox' } });
+    const withCoupon = await render('shop', { ...s, mart: { nightMeals: 3, stamps: 4, coupon: 'lunchbox', receipts: 2, packDay: '', packs: 0 } });
     expect(withCoupon).toContain('쿠폰 쓰기');
     expect(withCoupon).toContain('편의점 도시락');
     expect(withCoupon).toContain('가진 수 3 / 3');
     expect(withCoupon).toContain('더 챙길 수 없어요');
     expect(withCoupon).toContain('4 / 10');
+    expect(withCoupon).toContain('가진 수 2 / 3'); // 영수증
+    // 카드팩은 하루 한도를 다 사면 막힌다
+    const day = new Date(T0);
+    const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+    const sold = await render('shop', { ...s, coins: 1e12, mart: { ...s.mart, packDay: key, packs: BALANCE.shop.pack.perDay } });
+    expect(sold).toContain('오늘은 모두 샀어요');
+    expect(sold).toContain('오늘 0 / 2장 남음');
   });
 
-  it('작업실: 켜져 있는 편의점 상품이 칩으로 보인다', async () => {
+  it('작업실: 켜져 있는 편의점 상품·생활용품이 칩으로 보인다', async () => {
     const html = await render('studio', richState());
     expect(html).toContain('자동 라임 생산 +40%');
+    expect(html).toContain('스트리밍이 쌓이는 속도 +50%');
+  });
+
+  it('통계: 무선 이어폰이 켜져 있으면 초당 스트리밍에 배수가 붙는다', async () => {
+    const on = await render('stats', richState());
+    expect(on).toContain('🎧 ×1.5');
+    const off = await render('stats', { ...richState(), buffs: { ...richState().buffs, goods: null } });
+    expect(off).not.toContain('🎧 ×'); // 이어폰이 꺼져 있으면 배수 표시가 없다
+  });
+
+  it('장비: 할인 영수증이 있으면 할인 문구와 깎인 가격이 보인다', async () => {
+    const base = { ...createInitialState(T0), fans: 1e6, coins: 1e12 };
+    const none = await render('equip', base);
+    expect(none).not.toContain('할인 영수증 사용');
+    const html = await render('equip', { ...base, mart: { ...base.mart, receipts: 2 } });
+    expect(html).toContain('할인 영수증 사용');
+    expect(html).toContain('남은 영수증 2장');
   });
 
   it('상점: 코스튬 21종(일반 11·어둠 10)과 입는 중 표시', async () => {

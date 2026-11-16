@@ -1,6 +1,5 @@
 import { BALANCE } from './balance';
-import { bonuses } from './packdata';
-import { chocoMult, clampResource, cooldownMult, levelUpDiamonds, royaltyBreakdown } from './selectors';
+import { chocoMult, clampResource, cooldownMult, levelUpDiamonds, powerBonusNow, royaltyBreakdown } from './selectors';
 import { trackOfSingle, trackSingles } from './songcharts';
 import { mix } from './streaming';
 import { track } from './tracking';
@@ -96,7 +95,7 @@ export function beginArcade(
   return {
     ok: true,
     state: next,
-    run: { id: runId, kind, persona: state.activePersona, power: bonuses(state).power, seed, target: opts.target ?? null, level: opts.level ?? 'normal', status: 'running' },
+    run: { id: runId, kind, persona: state.activePersona, power: powerBonusNow(state), seed, target: opts.target ?? null, level: opts.level ?? 'normal', status: 'running' },
   };
 }
 

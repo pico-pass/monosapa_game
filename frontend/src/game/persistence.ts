@@ -1,4 +1,4 @@
-import { ACHIEVEMENTS, BALANCE, BUILDING_IDS, CAMPAIGN_IDS, COSTUME_IDS, ENDLESS, ENDLESS_MAX_TIER, EQUIPMENT_KINDS, ITEM_IDS, MISSION_METRICS, POST_KINDS, SCHEMA_VERSION, SKILL_IDS, SNACK_IDS, STAGE_IDS, STREAM_PLATFORMS, THEME_IDS, costumePersona } from './balance';
+import { ACHIEVEMENTS, BALANCE, BUILDING_IDS, CAMPAIGN_IDS, COSTUME_IDS, ENDLESS, ENDLESS_MAX_TIER, EQUIPMENT_KINDS, GOODS_IDS, ITEM_IDS, MISSION_METRICS, POST_KINDS, SCHEMA_VERSION, SKILL_IDS, SNACK_IDS, STAGE_IDS, STREAM_PLATFORMS, THEME_IDS, costumePersona } from './balance';
 import { CERT_TIER_COUNT, emptyCerts } from './certs';
 import { albumDefById, albumSeries, mailTemplateById } from './content';
 import { emptyFanMail } from './fanmail';
@@ -24,6 +24,7 @@ import type {
   EquipStars,
   FanMail,
   GameState,
+  GoodsId,
   ItemId,
   Mail,
   Mart,
@@ -81,7 +82,7 @@ export function createInitialState(now: number, reducedMotion = false): GameStat
     skills: emptySkills(),
     village: emptyVillage(streamSeedFrom(now + 3), now),
     endless: {},
-    buffs: { snack: null, campaign: null, item: null },
+    buffs: { snack: null, campaign: null, item: null, goods: null },
     mart: emptyMart(),
     cosmetics: { themes: ['default'], theme: 'default', costumes: [], costume: null, darkCostume: null, title: null },
     counters: zeroCounters(),
@@ -230,7 +231,7 @@ function parseCerts(raw: unknown): Streaming['certs'] {
 
 /** 숫자는 엄격하게, 알 수 없는 ID나 사라진 항목은 조용히 버린다. */
 function parseBuffs(raw: unknown): Buffs {
-  const buffs: Buffs = { snack: null, campaign: null, item: null };
+  const buffs: Buffs = { snack: null, campaign: null, item: null, goods: null };
   if (raw === undefined) return buffs;
   if (!isObj(raw)) return bad('buffs가 올바르지 않습니다.');
   if (raw.snack != null) {
@@ -251,10 +252,16 @@ function parseBuffs(raw: unknown): Buffs {
     const until = num(raw.item, 'until', 0, MAX_TIME, 'buffs.item.until');
     if (ITEM_IDS.includes(id as ItemId)) buffs.item = { id: id as ItemId, until };
   }
+  if (raw.goods != null) {
+    if (!isObj(raw.goods)) return bad('buffs.goods가 올바르지 않습니다.');
+    const id = raw.goods.id;
+    const until = num(raw.goods, 'until', 0, MAX_TIME, 'buffs.goods.until');
+    if (GOODS_IDS.includes(id as GoodsId)) buffs.goods = { id: id as GoodsId, until };
+  }
   return buffs;
 }
 
-export const emptyMart = (): Mart => ({ nightMeals: 0, stamps: 0, coupon: null });
+export const emptyMart = (): Mart => ({ nightMeals: 0, stamps: 0, coupon: null, receipts: 0, packDay: '', packs: 0 });
 
 /** 편의점 상태. 없는 예전 저장은 빈 상태로 읽고, 알 수 없는 쿠폰은 버린다. */
 function parseMart(raw: unknown): Mart {
@@ -266,6 +273,10 @@ function parseMart(raw: unknown): Mart {
     nightMeals: raw.nightMeals === undefined ? 0 : Math.min(BALANCE.shop.meal.max, int(raw, 'nightMeals', 0, 1_000_000, 'mart.nightMeals')),
     stamps: raw.stamps === undefined ? 0 : Math.min(BALANCE.shop.stamps.goal, int(raw, 'stamps', 0, 1_000_000, 'mart.stamps')),
     coupon,
+    receipts: raw.receipts === undefined ? 0 : Math.min(BALANCE.shop.receipt.max, int(raw, 'receipts', 0, 1_000_000, 'mart.receipts')),
+    // 날짜 모양이 아니면 버린다(오늘 산 카드팩 수는 날짜가 바뀌면 어차피 0부터다)
+    packDay: typeof raw.packDay === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.packDay) ? raw.packDay : '',
+    packs: raw.packs === undefined ? 0 : Math.min(BALANCE.shop.pack.perDay, int(raw, 'packs', 0, 1_000_000, 'mart.packs')),
   };
 }
 

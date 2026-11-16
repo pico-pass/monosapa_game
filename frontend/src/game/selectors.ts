@@ -1,7 +1,7 @@
 import { BALANCE, SECRET_STAGE_IDS, STAGES, STREAM_PLATFORMS, TEMP_OPEN_STAGES, TOUR_STAGE, WORLD_STAGE, type AchievementMetric, type MissionMetric } from './balance';
 import { albumSeries, singleTitle, type AlbumDef } from './content';
 import { bonuses, completedSets, mascotStage, photoDistinct, songCardOf, type BonusState } from './packdata';
-import type { Album, AlbumType, CostumeId, CounterKey, DiamondUpgradeKind, Equipment, EquipmentKind, GameState, ItemId, Persona, StageId, Streaming } from './types';
+import type { Album, AlbumType, CostumeId, CounterKey, DiamondUpgradeKind, Equipment, EquipmentKind, GameState, GoodsId, ItemId, Persona, StageId, Streaming } from './types';
 
 const P = BALANCE.persona;
 
@@ -71,6 +71,24 @@ export const cooldownMult = (s: Pick<GameState, 'buffs' | 'lastSettledAt'>): num
 export const chocoMult = (s: Pick<GameState, 'buffs' | 'lastSettledAt'>): number => 1 + itemBonus(s, 'choco');
 /** 딸기우유: 육성 성장도 배율. 없거나 끝났으면 1. */
 export const milkMult = (s: Pick<GameState, 'buffs' | 'lastSettledAt'>): number => 1 + itemBonus(s, 'milk');
+
+/** 그 생활용품이 at 시점에 켜져 있으면 그 효과 값(bonus), 아니면 0. */
+export function goodsBonus(s: Pick<GameState, 'buffs' | 'lastSettledAt'>, id: GoodsId, at: number = s.lastSettledAt): number {
+  const b = s.buffs.goods;
+  return b && b.id === id && b.until > at ? BALANCE.shop.goods[id].bonus : 0;
+}
+
+/** 아이스바: 어둠속성 과열이 오르는 속도 배율(1보다 작다). 없거나 끝났으면 1. */
+export const heatUpMult = (s: Pick<GameState, 'buffs' | 'lastSettledAt'>, at: number = s.lastSettledAt): number => 1 - goodsBonus(s, 'icebar', at);
+/** 무선 이어폰: 스트리밍이 쌓이는 속도 배율. 없거나 끝났으면 1. */
+export const streamBoostMult = (s: Pick<GameState, 'buffs' | 'lastSettledAt'>, at: number = s.lastSettledAt): number => 1 + goodsBonus(s, 'earbuds', at);
+/** 프로틴 바: 영구 전투력 보너스에 더하는 값. 없거나 끝났으면 0. */
+export const proteinPower = (s: Pick<GameState, 'buffs' | 'lastSettledAt'>): number => goodsBonus(s, 'protein');
+/** 아케이드 판정·계단 전투력에 붙는 지금의 전투력 보너스 = 영구 보너스(곡 카드·피처링·포토 세트 등) + 프로틴 바. */
+export const powerBonusNow = (s: GameState): number => bonuses(s).power + proteinPower(s);
+
+/** 두 자아 중 높은 쪽의 초당 인세(자아를 바꿔 싸게 사지 못하게 가격·한도의 기준으로 쓴다). */
+export const maxRoyaltyPerSec = (s: GameState): number => Math.max(royaltyBreakdown(s, 'normal').perSec, royaltyBreakdown(s, 'dark').perSec);
 
 /** 상점 코인 가격: 기본가 × 25 × (1 + 0.25 × (플레이어 레벨 − 1)) */
 export function shopPrice(base: number, fans: number): number {
@@ -168,6 +186,10 @@ export const royaltyRate = (s: GameState, persona: Persona = s.activePersona) =>
 export const streamRate = (s: Pick<GameState, 'fans'>): number => s.fans * BALANCE.streaming.perFanPerSec;
 
 export const streamTotal = (st: Streaming): number => STREAM_PLATFORMS.reduce((sum, p) => sum + st.totals[p], 0);
+
+/** 지금 정산하면 초당 코인으로 바뀌는 스트리밍 수입(이어폰 효과는 빼고 센다). 이어폰 가격의 기준이다. */
+export const streamCoinsPerSec = (s: Pick<GameState, 'fans' | 'distributor'>): number =>
+  (streamRate(s) * streamRevenueMult(s)) / BALANCE.streaming.streamsPerCoin;
 
 /** 유통사 호감도에 따른 스트리밍 수익 배율 = 1 + perLevel × 레벨. 아무것도 안 올렸으면 ×1이다. */
 export const streamRevenueMult = (s: Pick<GameState, 'distributor'>): number => 1 + BALANCE.distributor.perLevel * s.distributor;
@@ -358,12 +380,31 @@ export function equipmentCost(kind: EquipmentKind, level: number, persona: Perso
   return Math.ceil(def.base * def.growth ** level);
 }
 
+/**
+ * 할인 영수증이 있으면 이 비용에서 깎아 주는 코인(없거나 깎을 게 없으면 0).
+ * 비용의 rate만큼이되 인세 capSecs초 분량을 넘지 않는다. 0이면 영수증은 쓰이지 않는다.
+ */
+export function receiptDiscount(s: GameState, cost: number): number {
+  if (s.mart.receipts <= 0 || !Number.isFinite(cost) || cost <= 0) return 0;
+  const R = BALANCE.shop.receipt;
+  return Math.max(0, Math.min(Math.floor(cost * R.rate), Math.floor(maxRoyaltyPerSec(s) * R.capSecs)));
+}
+
+/** 영수증을 쓴 뒤의 장비 구매 비용 */
+export function equipmentPrice(s: GameState, kind: EquipmentKind, persona: Persona = 'normal'): number {
+  const cost = equipmentCost(kind, equipmentOf(s, persona)[kind], persona);
+  return cost - receiptDiscount(s, cost);
+}
+
 export interface EquipmentPreview {
   kind: EquipmentKind;
   persona: Persona;
   level: number;
   maxed: boolean;
+  /** 사는 데 드는 코인(할인 영수증을 쓴 뒤의 값) */
   cost: number;
+  /** 할인 영수증이 깎아 주는 코인. 영수증이 없거나 최대 레벨이면 0. */
+  discount: number;
   /** 구매 전/후 표시 값 (생산배율 또는 인세 배율 계수) */
   before: number;
   after: number;
@@ -385,13 +426,16 @@ export function previewEquipment(s: GameState, kind: EquipmentKind, persona: Per
   const maxLevel = equipmentDef(persona).maxLevel;
   const maxed = level >= maxLevel;
   const next = withEquipmentLevel(s, persona, kind, Math.min(level + 1, maxLevel));
+  const raw = equipmentCost(kind, level, persona);
+  const discount = maxed ? 0 : receiptDiscount(s, raw);
   if (kind === 'promotion') {
     return {
       kind,
       persona,
       level,
       maxed,
-      cost: equipmentCost(kind, level, persona),
+      cost: raw - discount,
+      discount,
       before: 1 + BALANCE.royalty.promotionPerLevel * level,
       after: 1 + BALANCE.royalty.promotionPerLevel * equipmentOf(next, persona).promotion,
       rateBefore: royaltyRate(s, persona),
@@ -404,7 +448,8 @@ export function previewEquipment(s: GameState, kind: EquipmentKind, persona: Per
     persona,
     level,
     maxed,
-    cost: equipmentCost(kind, level, persona),
+    cost: raw - discount,
+    discount,
     before: productionMultiplier(s, persona),
     after: productionMultiplier(next, persona),
     rateBefore: rhymeRate(s, persona),

@@ -37,11 +37,27 @@ export function platformShares(seed: number, bucket: number): number[] {
   return w.map((x) => x / sum);
 }
 
+/** 무선 이어폰처럼 until(ms)까지만 쌓이는 속도에 mult를 곱하는 효과 */
+export interface StreamBoost {
+  until: number;
+  mult: number;
+}
+
 /**
  * fromMs~toMs 동안 쌓인 스트리밍을 플랫폼별 누적에 더한다. efficiency는 생산 효율(오프라인 0.7, 상한 뒤 0).
+ * boost가 있으면 boost.until 전까지만 속도가 mult배가 되도록 그 시각에서 구간을 쪼갠다(큰 전진과 작은 전진이 같은 결과를 낸다).
  * 쌓일 게 없으면 입력 객체를 그대로 돌려준다.
  */
-export function accrueStreams(streaming: Streaming, fans: number, fromMs: number, toMs: number, efficiency: number): Streaming {
+export function accrueStreams(streaming: Streaming, fans: number, fromMs: number, toMs: number, efficiency: number, boost: StreamBoost | null = null): Streaming {
+  if (boost && boost.mult !== 1 && boost.until > fromMs) {
+    const mid = Math.min(toMs, boost.until);
+    const boosted = accrueRange(streaming, fans, fromMs, mid, efficiency * boost.mult);
+    return mid < toMs ? accrueRange(boosted, fans, mid, toMs, efficiency) : boosted;
+  }
+  return accrueRange(streaming, fans, fromMs, toMs, efficiency);
+}
+
+function accrueRange(streaming: Streaming, fans: number, fromMs: number, toMs: number, efficiency: number): Streaming {
   const perSec = fans * S.perFanPerSec * efficiency;
   if (!(perSec > 0) || !(toMs > fromMs)) return streaming;
   const totals = { ...streaming.totals };
