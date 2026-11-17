@@ -22,12 +22,14 @@ export interface SocialSummary {
   bossClaimable: number;
   /** 시상식에서 할 일이 있으면 1(투표할 수 있는데 안 한 부문 · 발표 뒤 받지 않은 보상) */
   awards: number;
+  /** 내 무대가 지난주 인기 3위 안이고 보상을 아직 안 받았으면 1 */
+  venues: number;
 }
 
 /** 신고창이 가리키는 대상 */
 export interface ReportTarget {
-  kind: 'chat' | 'dm' | 'profile';
-  /** 챗방·개인채팅이면 메시지 ID */
+  kind: 'chat' | 'dm' | 'profile' | 'venue';
+  /** 챗방·개인채팅이면 메시지 ID, 무대면 무대 ID */
   refId?: string;
   /** 프로필이면 신고할 계정 ID */
   uid?: string;
@@ -42,7 +44,7 @@ interface SocialState {
   dmWith: string | null;
 }
 
-export const EMPTY_SUMMARY: SocialSummary = { mailUnread: 0, mailClaimable: 0, friendRequests: 0, dmUnread: 0, villageFlags: 0, bossClaimable: 0, awards: 0 };
+export const EMPTY_SUMMARY: SocialSummary = { mailUnread: 0, mailClaimable: 0, friendRequests: 0, dmUnread: 0, villageFlags: 0, bossClaimable: 0, awards: 0, venues: 0 };
 
 let state: SocialState = { summary: EMPTY_SUMMARY, profile: null, report: null, dmWith: null };
 const listeners = new Set<() => void>();
@@ -62,7 +64,7 @@ export const mailBadge = (s: SocialSummary): number => Math.max(s.mailUnread, s.
 /** 친구 알림: 받은 요청 + 안 읽은 개인채팅 */
 export const friendBadge = (s: SocialSummary): number => s.friendRequests + s.dmUnread;
 /** 더보기 탭의 알림 점에 더해지는 개수 */
-export const socialTotal = (s: SocialSummary): number => mailBadge(s) + friendBadge(s) + s.villageFlags + s.bossClaimable + s.awards;
+export const socialTotal = (s: SocialSummary): number => mailBadge(s) + friendBadge(s) + s.villageFlags + s.bossClaimable + s.awards + s.venues;
 
 /** 새 소식 개수를 다시 가져온다. 실패하면 이전 값을 그대로 둔다. */
 export async function refreshSummary(): Promise<void> {

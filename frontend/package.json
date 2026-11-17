@@ -14,7 +14,8 @@
     "sim:village": "tsx scripts/village-sim.ts",
     "sim:arcade": "tsx scripts/arcade-sim.ts",
     "sim:radio": "tsx scripts/radio-sim.ts",
-    "sim:tour": "tsx scripts/tour-sim.ts"
+    "sim:tour": "tsx scripts/tour-sim.ts",
+    "sim:venue": "tsx scripts/venue-sim.ts"
   },
   "dependencies": {
     "react": "^19.3.1",

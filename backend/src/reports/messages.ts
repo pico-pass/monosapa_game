@@ -17,7 +17,7 @@ export function warnMail(reason: string, note: string): { title: string; body: s
 export function muteMail(reason: string, note: string, hours: number, until: number): { title: string; body: string } {
   return {
     title: '🚫 이용 제한 안내',
-    body: `신고가 접수되어 확인한 결과, ${hours}시간 동안 챗방 글쓰기·개인채팅·프로필 수정이 제한돼요. (한국 시간 ${kst(until)}까지)\n사유: ${reason}\n운영자 안내: ${note}`,
+    body: `신고가 접수되어 확인한 결과, ${hours}시간 동안 챗방 글쓰기·개인채팅·프로필 수정·무대 올리기가 제한돼요. (한국 시간 ${kst(until)}까지)\n사유: ${reason}\n운영자 안내: ${note}`,
   };
 }
 

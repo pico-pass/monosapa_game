@@ -1,7 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Types, type HydratedDocument } from 'mongoose';
 
-export const REPORT_KINDS = ['profile', 'chat', 'dm'] as const;
+export const REPORT_KINDS = ['profile', 'chat', 'dm', 'venue'] as const;
 export type ReportKind = (typeof REPORT_KINDS)[number];
 
 export const REPORT_REASONS = ['abuse', 'spam', 'sexual', 'hate', 'other'] as const;
@@ -31,7 +31,7 @@ export class Report {
   @Prop({ required: true, enum: REPORT_KINDS })
   kind!: ReportKind;
 
-  /** 신고한 대상: 챗방·개인채팅은 메시지 ID, 프로필은 신고당한 계정 ID */
+  /** 신고한 대상: 챗방·개인채팅은 메시지 ID, 프로필은 신고당한 계정 ID, 무대는 무대 ID */
   @Prop({ required: true })
   refId!: string;
 
@@ -41,7 +41,7 @@ export class Report {
   @Prop({ type: String, default: '' })
   detail!: string;
 
-  /** 신고 당시 내용: 메시지 글, 또는 프로필의 닉네임·소개 */
+  /** 신고 당시 내용: 메시지 글, 프로필의 닉네임·소개, 또는 무대의 이름·분위기 */
   @Prop({ required: true })
   snapshot!: string;
 

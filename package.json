@@ -20,6 +20,7 @@
     "sim:radio": "npm run sim:radio -w frontend",
     "sim:tour": "npm run sim:tour -w frontend",
     "dev:realtime": "npm run dev -w realtime",
-    "launch:reset": "node backend/scripts/launch-reset.mjs"
+    "launch:reset": "node backend/scripts/launch-reset.mjs",
+    "sim:venue": "npm run sim:venue -w frontend"
   }
 }

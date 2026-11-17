@@ -8,6 +8,7 @@ import { DirectMessage } from '../dm/direct-message.schema.js';
 import { MailboxService } from '../mailbox/mailbox.service.js';
 import { displayNameOf, mutedUntilMs } from '../users/profile.js';
 import { User } from '../users/user.schema.js';
+import { Venue } from '../venues/venue.schema.js';
 import type { CreateReportDto, MutedListDto, ReportDto, ReportListDto, ResolveReportDto } from './dto/reports.dto.js';
 import { muteMail, reporterMail, warnMail } from './messages.js';
 import { REASON_TEXT, REPORT_ACTIONS, REPORT_KINDS, REPORT_REASONS, Report, type ReportAction, type ReportDocument, type ReportKind } from './report.schema.js';
@@ -31,6 +32,7 @@ export class ReportsService {
     @InjectModel(User.name) private readonly users: Model<User>,
     @InjectModel(ChatMessage.name) private readonly chat: Model<ChatMessage>,
     @InjectModel(DirectMessage.name) private readonly dms: Model<DirectMessage>,
+    @InjectModel(Venue.name) private readonly venues: Model<Venue>,
     private readonly mailbox: MailboxService,
   ) {}
 
@@ -70,6 +72,13 @@ export class ReportsService {
       const msg = await this.chat.findById(refId).exec();
       if (!msg) throw new NotFoundException('신고할 메시지를 찾을 수 없어요.');
       return { target: msg.userId, refId, snapshot: msg.text, context: [] };
+    }
+    // 무대: 숨겨지지 않고 이름이 있는 무대만 신고할 수 있다. 글은 이름뿐이라 이름·분위기·장치 수를 스냅샷으로 남긴다.
+    if (kind === 'venue') {
+      const venue = await this.venues.findOne({ _id: refId, hidden: false, name: { $ne: '' } }).exec();
+      if (!venue) throw new NotFoundException('신고할 무대를 찾을 수 없어요.');
+      const devices = venue.cells.filter((c) => c !== '').length;
+      return { target: venue.userId, refId, snapshot: `무대 이름: ${venue.name}\n분위기: ${venue.theme === 'dark' ? '어둠' : '일반'} · 장치 ${devices}개`, context: [] };
     }
     // 개인채팅: 나에게 온 메시지만 신고할 수 있다. 앞선 대화 몇 줄을 함께 남긴다.
     const msg = await this.dms.findById(refId).exec();
@@ -121,7 +130,7 @@ export class ReportsService {
 
   /**
    * 신고를 처리한다. dismiss 는 조치 없이 닫고, warn 은 신고된 글(프로필이면 닉네임·소개)을 지우고 경고 우편을 보내고,
-   * mute 는 거기에 더해 muteHours 동안 챗방·개인채팅·프로필 수정을 막는다. 같은 대상의 열린 신고는 함께 처리한다.
+   * mute 는 거기에 더해 muteHours 동안 챗방·개인채팅·프로필 수정·무대 올리기를 막는다. 같은 대상의 열린 신고는 함께 처리한다.
    */
   async resolve(admin: UserDto, id: string, body: ResolveReportDto | undefined, now = Date.now()): Promise<ReportDto> {
     if (!isValidObjectId(id)) throw new NotFoundException('신고를 찾을 수 없어요.');
@@ -183,6 +192,8 @@ export class ReportsService {
   private async removeContent(doc: ReportDocument): Promise<void> {
     if (doc.kind === 'chat') await this.chat.deleteOne({ _id: doc.refId }).exec();
     else if (doc.kind === 'dm') await this.dms.deleteOne({ _id: doc.refId }).exec();
+    // 무대는 이름을 지우고 숨긴다(주인이 새 이름으로 다시 올리면 다시 공개되고, 또 어기면 또 신고할 수 있다).
+    else if (doc.kind === 'venue') await this.venues.updateOne({ _id: doc.refId }, { $set: { hidden: true, name: '' } }).exec();
     else await this.users.updateOne({ _id: doc.target }, { $set: { nickname: null, bio: null } }).exec();
   }
 

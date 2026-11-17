@@ -38,7 +38,7 @@ import { addLyricCard, draftChoices, trimLyricCard } from '../game/lyricdeck';
 import { claimPresent, feedMascot, giftMascot, playMascot } from '../game/mascot';
 import { nurtureAct, nurtureWake } from '../game/nurture';
 import { buyTickets, craftPhoto, dismantlePhoto, giveCard, photoPull, takeCard, type PhotoPullResult } from '../game/photocards';
-import { applyAwardClaim, applyBossClaim, applyChallengeClaim, applyChallengePosted, applyChartClaim, applyMailClaim, applyVillageHearts } from '../game/serverRewards';
+import { applyAwardClaim, applyBossClaim, applyChallengeClaim, applyChallengePosted, applyChartClaim, applyMailClaim, applyVenueClaim, applyVillageHearts } from '../game/serverRewards';
 import { remasterCard, toggleDeck } from '../game/songcards';
 import { abandonTower, beginTower, finishTower, rollTower, type TowerOutcome, type TowerRun } from '../game/tower';
 import { ACHIEVEMENT_TEXT, CAMPAIGN_TEXT, COSTUME_TEXT, GOODS_TEXT, ITEM_TEXT, MEAL_TEXT, PACK_TEXT, RECEIPT_TEXT, SCRATCH_TEXT, SLEEVE_TEXT, SNACK_TEXT, STAGE_TEXT, THEME_TEXT, pickLine, residentName, scratchLabel, type Situation } from '../game/content';
@@ -49,6 +49,8 @@ import { buyCampaign, buyCostume, buyGoods, buyItem, buyMeal, buyPack, buyReceip
 import { InputLimiter } from '../game/input';
 import { autoRadio, claimRadio, clearRadio, setRadioSlot, type RadioPaid } from '../game/radio';
 import { abandonTour, claimTour, startTour, type TourClaim } from '../game/tour';
+import { applyVenueVisit, clearVenue, placeDevice, playOwnVenue, setVenueName, setVenueTheme, submitName, uploadIssue } from '../game/venue';
+import type { MyVenueData, VenueVisitData } from '../platform/venues';
 import type { BlocksSummary } from '../game/blocks';
 import type { BounceSummary } from '../game/bounce';
 import type { DefenseSummary } from '../game/defense';
@@ -94,6 +96,7 @@ import type {
   StreamPlatform,
   ThemeId,
   TourCityId,
+  VenueDeviceId,
 } from '../game/types';
 import { api, errorText } from '../platform/api';
 import { CloudSync, reconcileOnBoot, resetLocalProgress, scopedStorage, type RemoteSave } from '../platform/cloudSave';
@@ -133,9 +136,10 @@ export type TabId =
   | 'radio'
   | 'tour'
   | 'awards'
+  | 'venue'
   | 'admin';
 /** 하단 탭의 「더보기」 안에 있는 화면들 */
-export const MORE_TABS: readonly TabId[] = ['stats', 'ranking', 'collection', 'shop', 'missions', 'achievements', 'mail', 'monogram', 'chat', 'inquiry', 'collect', 'nurture', 'arcade', 'challenge', 'chart', 'wrapped', 'sampler', 'friends', 'dm', 'postbox', 'skills', 'village', 'boss', 'live', 'radio', 'tour', 'awards', 'admin'];
+export const MORE_TABS: readonly TabId[] = ['stats', 'ranking', 'collection', 'shop', 'missions', 'achievements', 'mail', 'monogram', 'chat', 'inquiry', 'collect', 'nurture', 'arcade', 'challenge', 'chart', 'wrapped', 'sampler', 'friends', 'dm', 'postbox', 'skills', 'village', 'boss', 'live', 'radio', 'tour', 'awards', 'venue', 'admin'];
 export type Phase = 'booting' | 'ready' | 'readonly' | 'corrupt';
 
 export interface Bubble {
@@ -293,6 +297,12 @@ const FAIL_TEXT: Record<FailReason, string> = {
   tour_locked: '월클 콘서트를 클리어하면 순회공연이 열려요.',
   tour_busy: '이미 순회공연 중이에요. 먼저 끝내거나 중단해 주세요.',
   tour_invalid: '노선이 올바르지 않아요. 서울에서 이어지는 도시를 한 번씩만 골라 주세요.',
+  venue_locked: `팬 ${BALANCE.venue.unlockFans.toLocaleString('ko-KR')}명부터 내 무대를 꾸밀 수 있어요.`,
+  venue_invalid: '놓을 수 없는 칸이나 장치예요.',
+  venue_device_locked: '아직 해금되지 않은 장치예요. 해당 공연장을 클리어하면 열려요.',
+  venue_limit: '이 장치는 더 놓을 수 없어요. 다른 칸의 장치를 먼저 치워 주세요.',
+  venue_empty: '장치를 하나 이상 놓아야 공연할 수 있어요.',
+  venue_cooldown: '내 무대 공연은 30분에 한 번만 할 수 있어요.',
   tile_invalid: '아직 열리지 않은 땅이에요.',
   tile_taken: '이미 건물이 있는 칸이에요.',
   building_limit: '이 건물은 더 지을 수 없어요.',
@@ -1088,6 +1098,112 @@ export function doAbandonTour(): void {
   }
   toast('🗺️ 순회공연을 중단했어요.', 'info');
   saveNow();
+}
+
+/* ---------- 내 무대 ---------- */
+
+export function doPlaceDevice(index: number, id: VenueDeviceId | null): void {
+  const r = exec((s) => placeDevice(s, index, id));
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  saveNow();
+}
+
+export function doClearVenue(): void {
+  const r = exec(clearVenue);
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  sfx.buy();
+  saveNow();
+}
+
+export function doSetVenueName(name: string): void {
+  const r = exec((s) => setVenueName(s, name));
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  saveNow();
+}
+
+export function doSetVenueTheme(theme: Persona): void {
+  const r = exec((s) => setVenueTheme(s, theme));
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  sfx.buy();
+  saveNow();
+}
+
+/** 내 무대 공연: 30분마다 한 번, 인세 분량의 코인. 결과를 돌려줘서 화면이 연출한다. */
+export function doPlayOwnVenue(): { coins: number; grade: number } | null {
+  const r = exec((s) => playOwnVenue(s, Date.now()));
+  if (!r) return null;
+  if (!r.ok) {
+    failToast(r.reason);
+    return null;
+  }
+  sfx.album();
+  toast(`🏗️ 내 무대 공연! 🪙 +${fmt(r.coins)}`, 'good');
+  saveNow();
+  return { coins: r.coins, grade: r.grade };
+}
+
+/** 지금 초안을 서버에 올린다(점수·등급은 서버가 다시 계산한다). 실패하면 null. */
+export async function doUploadVenue(): Promise<MyVenueData | null> {
+  if (ui.phase !== 'ready') return null;
+  const issue = uploadIssue(ui.game);
+  if (issue) {
+    toast(issue === 'locked' ? FAIL_TEXT.venue_locked : issue === 'name' ? `무대 이름을 ${BALANCE.venue.nameMin}~${BALANCE.venue.nameMax}자로 지어 주세요.` : FAIL_TEXT.venue_empty, 'warn');
+    sfx.fail();
+    return null;
+  }
+  const v = ui.game.venue;
+  try {
+    const res = await api<MyVenueData>('venues/me', { method: 'PUT', body: { name: submitName(v.name), theme: v.theme, cells: v.cells } });
+    sfx.unlock();
+    toast('🏗️ 내 무대를 올렸어요. 이제 다른 팬들이 공연하러 올 수 있어요!', 'good');
+    return res;
+  } catch (e) {
+    toast(errorText(e), 'warn');
+    sfx.fail();
+    return null;
+  }
+}
+
+/** 남의 무대에서 공연한다: 서버가 하루 한도·하루 한 번을 확인하고 무대 등급을 돌려주면 그 등급으로 코인을 반영한다. */
+export async function doVisitVenue(id: string): Promise<VenueVisitData | null> {
+  if (ui.phase !== 'ready') return null;
+  try {
+    const res = await api<{ grade: number; rentPaid: boolean; visitsLeft: number }>(`venues/${id}/play`, { method: 'POST' });
+    const r = exec((s) => applyVenueVisit(s, res.grade));
+    if (!r) return null;
+    if (!r.ok) {
+      failToast(r.reason);
+      return null;
+    }
+    sfx.album();
+    saveNow(true);
+    return { coins: r.coins, grade: r.grade, rentPaid: res.rentPaid, visitsLeft: res.visitsLeft };
+  } catch (e) {
+    toast(errorText(e), 'warn');
+    sfx.fail();
+    return null;
+  }
+}
+
+/** 지난주 인기 무대 보상을 받는다. 서버가 한 번만 내주고 반영은 여기서 한다. */
+export async function doClaimVenueWeekly(): Promise<boolean> {
+  try {
+    const res = await api<{ week: number; rank: number; diamonds: number }>('venues/claim-weekly', { method: 'POST' });
+    const r = exec((s) => applyVenueClaim(s, res.diamonds));
+    if (r?.ok) {
+      sfx.album();
+      toast(`🏗️ 지난주 인기 무대 ${res.rank}위! 💎 +${r.diamonds}`, 'good');
+      saveNow(true);
+    }
+    return true;
+  } catch (e) {
+    toast(errorText(e), 'warn');
+    return false;
+  }
 }
 
 /* ---------- 라디오국 ---------- */

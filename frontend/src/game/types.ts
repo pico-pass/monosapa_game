@@ -108,6 +108,38 @@ export interface Tour {
   best: Partial<Record<TourCityId, number>>;
 }
 
+/* ---------- 무대 디자인 빌더 「내 무대」 ---------- */
+
+/** 무대 장치. light 조명 · sound 음향 · fx 연출 · safety 안전 · mood 분위기(어둠 무대에서만 점수에 반영). 표는 balance.ts의 VENUE_DEVICES. */
+export type VenueDeviceId =
+  | 'spot'
+  | 'mirrorball'
+  | 'laser'
+  | 'wire'
+  | 'speaker'
+  | 'micstand'
+  | 'subwoofer'
+  | 'flame'
+  | 'dryice'
+  | 'confetti'
+  | 'led'
+  | 'bar'
+  | 'candle'
+  | 'monitor'
+  | 'coffin';
+
+/** 내 무대 초안(서버에 올린 것과 따로 저장된다). 규칙은 venue.ts. */
+export interface Venue {
+  /** 무대 이름(비어 있으면 아직 안 지었다) */
+  name: string;
+  /** 어둠 무대에서만 분위기 장치가 점수에 반영된다 */
+  theme: Persona;
+  /** 8열 × 6행 = 48칸(위에서 아래, 왼쪽에서 오른쪽). 빈 칸은 null */
+  cells: (VenueDeviceId | null)[];
+  /** 마지막으로 내 무대 공연을 한 시각(ms). 0이면 한 번도 안 했다. */
+  ownAt: number;
+}
+
 /** 팬들이 사는 마을. 8×8 땅(인덱스 = y×8 + x)의 가운데부터 팬 수에 따라 열린다. 규칙은 villagedata.ts·village.ts. */
 export interface Village {
   /** 소식 카드를 정하는 씨앗 */
@@ -494,6 +526,8 @@ export interface GameState {
   radio: Radio;
   /** 순회공연: 진행 중인 투어와 도시별 기념품 */
   tour: Tour;
+  /** 내 무대 초안: 이름·분위기·장치 배치와 마지막 내 무대 공연 시각 */
+  venue: Venue;
   /** 시상식 트로피(1위 보상으로 받은 것, `trophy-<해>-<부문>`). 칭호로 달 수 있다. */
   trophies: string[];
   /** 끝없는 업적: 지표 ID → 지금까지 받은 단계 수 */
@@ -592,6 +626,13 @@ export type FailReason =
   | 'tour_locked'
   | 'tour_busy'
   | 'tour_invalid'
+  // 내 무대
+  | 'venue_locked'
+  | 'venue_invalid'
+  | 'venue_device_locked'
+  | 'venue_limit'
+  | 'venue_empty'
+  | 'venue_cooldown'
   // 모노사파 육성
   | 'nurture_locked'
   | 'level_low'

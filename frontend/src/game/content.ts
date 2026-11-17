@@ -1,5 +1,5 @@
-import type { AwardCategory } from './balance';
-import type { AlbumType, BuildingId, CampaignId, CardRarity, CostumeId, DialogueTone, GoodsId, ItemId, Persona, PostKind, SnackId, StageId, StreamPlatform, SkillId, ThemeId, Vibe, VirtualComment } from './types';
+import type { AwardCategory, VenueDeviceDef, VenueDeviceKind } from './balance';
+import type { AlbumType, BuildingId, CampaignId, CardRarity, CostumeId, DialogueTone, GoodsId, ItemId, Persona, PostKind, SnackId, StageId, StreamPlatform, SkillId, ThemeId, Vibe, VenueDeviceId, VirtualComment } from './types';
 
 /* 대사·제목·댓글·공연장 이름. 모두 게임용 창작 문구이며 실제 인물의 곡·발언이 아니다.
    가상의 상대·자기디스·황당한 상황만 다루고, 현실 이용자나 실제 인물을 겨냥하지 않는다. */
@@ -1397,3 +1397,57 @@ export function awardValueText(category: AwardCategory, value: number): string {
   if (category === 'fan-normal' || category === 'fan-dark') return `${Math.round(value).toLocaleString('ko-KR')}표`;
   return `${(Math.round((value / 24) * 10) / 10).toLocaleString('ko-KR')}점`;
 }
+
+/* ---------- 무대 디자인 빌더 「내 무대」 ---------- */
+
+export const VENUE_DEVICE_TEXT: Record<VenueDeviceId, { name: string; icon: string }> = {
+  spot: { name: '스포트라이트', icon: '🔦' },
+  mirrorball: { name: '미러볼', icon: '🪩' },
+  laser: { name: '레이저', icon: '🔆' },
+  wire: { name: '와이어 액션', icon: '🪢' },
+  speaker: { name: '스피커', icon: '🔈' },
+  micstand: { name: '마이크 스탠드', icon: '🎤' },
+  subwoofer: { name: '서브우퍼', icon: '🔊' },
+  flame: { name: '불꽃', icon: '🔥' },
+  dryice: { name: '드라이아이스', icon: '🌫️' },
+  confetti: { name: '폭죽', icon: '🎆' },
+  led: { name: 'LED 스크린', icon: '📺' },
+  bar: { name: '안전바', icon: '🚧' },
+  candle: { name: '촛불', icon: '🕯️' },
+  monitor: { name: '감시 모니터', icon: '🖥️' },
+  coffin: { name: '관 연출', icon: '⚰️' },
+};
+
+export const VENUE_KIND_TEXT: Record<VenueDeviceKind, { name: string; icon: string; stat: 'glam' | 'sound' | 'safety' | 'mood' }> = {
+  light: { name: '조명', icon: '💡', stat: 'glam' },
+  fx: { name: '연출', icon: '🔥', stat: 'glam' },
+  sound: { name: '음향', icon: '🔊', stat: 'sound' },
+  safety: { name: '안전', icon: '🧱', stat: 'safety' },
+  mood: { name: '분위기(어둠 전용)', icon: '🖤', stat: 'mood' },
+};
+
+export const VENUE_STAT_TEXT = {
+  glam: { name: '화려함', icon: '✨' },
+  sound: { name: '음향', icon: '🔊' },
+  safety: { name: '안전', icon: '🛡️' },
+  mood: { name: '분위기', icon: '🖤' },
+} as const;
+
+/** 장치 카드에 붙는 효과 한 줄. 수치는 balance.ts의 BALANCE.venue에서 받아 온다(문구가 표와 어긋나지 않게). */
+export function venueDeviceEffect(def: VenueDeviceDef, rules: { lightFxMult: number; speakerSymmetryMult: number; hazardPenalty: number }): string {
+  const stat = VENUE_STAT_TEXT[VENUE_KIND_TEXT[def.kind].stat].name;
+  const base = `${stat} +${def.base}`;
+  if (def.kind === 'fx') return `${base} · 조명 옆이면 ×${rules.lightFxMult} · 안전바 없이 놓으면 안전 −${rules.hazardPenalty}`;
+  if (def.id === 'speaker') return `${base} · 가운데 기준 좌우 대칭이면 ×${rules.speakerSymmetryMult}`;
+  if (def.kind === 'mood') return `${base} · 어둠 무대에서만 반영`;
+  return base;
+}
+
+/** 내 무대 화면 문구 */
+export const VENUE_UI_TEXT = {
+  title: '내 무대',
+  intro: '장치를 놓아 나만의 무대를 꾸미고 서버에 올리면 다른 팬들이 내 무대에 공연하러 와요. 공연장을 처음 클리어할 때마다 새 장치가 열려요.',
+  rules: '조명과 음향이 하나도 없으면 등급이 C까지예요. 연출 장치(불꽃·폭죽 같은 것)는 주변 한 칸 안에 안전바가 있어야 안전해요. 점수는 화려함 + 음향 + 안전 + 분위기이고, 등급(E~S)만큼 무대 배율이 붙어요.',
+  tabs: { build: '꾸미기', browse: '둘러보기', mine: '내 무대' },
+  sorts: { popular: '🔥 인기', new: '🆕 새 무대', friends: '👥 친구' },
+} as const;

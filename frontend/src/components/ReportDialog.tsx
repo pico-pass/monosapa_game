@@ -13,10 +13,10 @@ export const REPORT_REASONS = [
 ] as const;
 type Reason = (typeof REPORT_REASONS)[number][0];
 
-const KIND_TEXT: Record<ReportTarget['kind'], string> = { chat: '챗방 메시지', dm: '개인채팅 메시지', profile: '프로필' };
+const KIND_TEXT: Record<ReportTarget['kind'], string> = { chat: '챗방 메시지', dm: '개인채팅 메시지', profile: '프로필', venue: '무대' };
 const DETAIL_MAX = 200;
 
-/** 챗방 메시지·개인채팅 메시지·프로필 신고. 운영자가 확인해 처리하고, 결과는 우편으로 알려 줘요. */
+/** 챗방 메시지·개인채팅 메시지·프로필·무대 신고. 운영자가 확인해 처리하고, 결과는 우편으로 알려 줘요. */
 export function ReportDialog({ target }: { target: ReportTarget }) {
   const [reason, setReason] = useState<Reason>('abuse');
   const [detail, setDetail] = useState('');

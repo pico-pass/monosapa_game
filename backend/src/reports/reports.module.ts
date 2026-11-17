@@ -5,6 +5,7 @@ import { ChatMessage, ChatMessageSchema } from '../chat/chat.schema.js';
 import { DirectMessage, DirectMessageSchema } from '../dm/direct-message.schema.js';
 import { MailboxModule } from '../mailbox/mailbox.module.js';
 import { User, UserSchema } from '../users/user.schema.js';
+import { Venue, VenueSchema } from '../venues/venue.schema.js';
 import { Report, ReportSchema } from './report.schema.js';
 import { ReportsController } from './reports.controller.js';
 import { ReportsService } from './reports.service.js';
@@ -18,6 +19,7 @@ import { ReportsService } from './reports.service.js';
       { name: User.name, schema: UserSchema },
       { name: ChatMessage.name, schema: ChatMessageSchema },
       { name: DirectMessage.name, schema: DirectMessageSchema },
+      { name: Venue.name, schema: VenueSchema },
     ]),
   ],
   controllers: [ReportsController],

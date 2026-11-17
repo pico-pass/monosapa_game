@@ -4,7 +4,7 @@ import { api, errorText } from '../platform/api';
 import { doClaimMail, toast } from '../store/gameStore';
 import { refreshSummary } from '../store/socialStore';
 
-type Kind = 'gift' | 'admin' | 'warning' | 'report' | 'live' | 'launch';
+type Kind = 'gift' | 'admin' | 'warning' | 'report' | 'live' | 'launch' | 'venue';
 interface Mail {
   id: string;
   kind: Kind;
@@ -25,7 +25,7 @@ interface Mailbox {
   claimable: number;
 }
 
-const KIND_ICON: Record<Kind, string> = { gift: '🎁', admin: '📢', warning: '⚠️', report: '📝', live: '🎤', launch: '🎉' };
+const KIND_ICON: Record<Kind, string> = { gift: '🎁', admin: '📢', warning: '⚠️', report: '📝', live: '🎤', launch: '🎉', venue: '🏗️' };
 const DAY_MS = 86_400_000;
 const hasReward = (m: Mail) => m.diamonds > 0 || (m.coins ?? 0) > 0;
 const rewardText = fmtReward;

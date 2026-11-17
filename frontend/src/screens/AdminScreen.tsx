@@ -7,7 +7,7 @@ import { toast } from '../store/gameStore';
 type Action = 'dismiss' | 'warn' | 'mute';
 interface Report {
   id: string;
-  kind: 'profile' | 'chat' | 'dm';
+  kind: 'profile' | 'chat' | 'dm' | 'venue';
   reason: string;
   reasonText: string;
   detail: string;
@@ -29,7 +29,7 @@ interface Muted {
   until: number;
 }
 
-const KIND_TEXT = { chat: '챗방', dm: '개인채팅', profile: '프로필' } as const;
+const KIND_TEXT = { chat: '챗방', dm: '개인채팅', profile: '프로필', venue: '무대' } as const;
 const ACTION_TEXT: Record<Action, string> = { dismiss: '기각', warn: '경고', mute: '이용 제한' };
 const MUTE_CHOICES: [number, string][] = [
   [24, '1일'],

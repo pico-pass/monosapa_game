@@ -52,6 +52,7 @@ async function render(tab: TabId, game: GameState): Promise<string> {
     radio: () => import('../RadioScreen'),
     tour: () => import('../TourScreen'),
     awards: () => import('../AwardsScreen'),
+    venue: () => import('../VenueScreen'),
     release: () => import('../ReleaseScreen'),
     nurture: () => import('../NurtureScreen'),
     friends: () => import('../FriendsScreen'),
@@ -199,6 +200,24 @@ describe('새 화면 렌더링', () => {
     const html = await render('awards', { ...richState(), lastSettledAt: T0 });
     expect(html).toContain('모노사파 어워즈');
     expect(html).toContain('불러오는 중');
+  });
+
+  it('내 무대: 팬 1,000명 전에는 잠겨 있고, 열리면 바닥·장치 상자·올리기가 보인다', async () => {
+    const locked = await render('venue', { ...createInitialState(T0), fans: 10 });
+    expect(locked).toContain('내 무대');
+    expect(locked).toContain('명부터 내 무대를 꾸밀 수 있어요');
+    expect(locked).not.toContain('장치 상자');
+    const html = await render('venue', { ...richState(), lastSettledAt: T0 });
+    expect(html).toContain('꾸미기');
+    expect(html).toContain('둘러보기');
+    expect(html).toContain('장치 상자');
+    expect(html).toContain('aria-label="무대 바닥 8열 6행"');
+    expect(html).toContain('서버에 올리기');
+    expect(html).toContain('스포트라이트');
+  });
+
+  it('더보기에 내 무대 메뉴가 있다', async () => {
+    expect(await render('more', richState())).toContain('내 무대');
   });
 
   it('순회공연: 월클 전에는 잠겨 있고, 열리면 지도·이어 갈 도시·도감이 보인다', async () => {

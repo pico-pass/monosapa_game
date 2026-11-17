@@ -14,4 +14,6 @@ export class SocialSummaryDto {
   bossClaimable!: number;
   /** 시상식에서 할 일이 있으면 1(투표할 수 있는데 아직 안 한 부문이 있거나, 발표 뒤 받지 않은 보상이 있다) */
   awards!: number;
+  /** 내 무대가 지난주 인기 3위 안이고 보상을 아직 안 받았으면 1 */
+  venues!: number;
 }

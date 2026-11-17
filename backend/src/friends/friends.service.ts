@@ -158,6 +158,13 @@ export class FriendsService {
     return { diamonds: GIFT_DIAMONDS };
   }
 
+  /** 내 친구(수락된 관계)들의 계정 ID */
+  async friendIdsOf(userId: string): Promise<Types.ObjectId[]> {
+    const me = new Types.ObjectId(userId);
+    const docs = await this.friendships.find({ status: 'accepted', $or: [{ requester: me }, { addressee: me }] }, 'requester addressee').exec();
+    return docs.map((d) => (String(d.requester) === userId ? d.addressee : d.requester));
+  }
+
   async areFriends(a: string, b: string): Promise<boolean> {
     if (!isValidObjectId(a) || !isValidObjectId(b)) return false;
     return !!(await this.friendships.exists({ pair: pairKey(a, b), status: 'accepted' }).exec());

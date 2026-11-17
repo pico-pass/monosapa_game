@@ -1,4 +1,4 @@
-import type { BuildingId, CampaignId, CardRarity, CostumeId, CounterKey, DarkCostumeId, DiamondUpgradeKind, EquipmentKind, GoodsId, ItemId, Persona, PostKind, SnackId, SkillId, StageId, StreamPlatform, ThemeId, TourCityId, TourRegion, Vibe } from './types';
+import type { BuildingId, CampaignId, CardRarity, CostumeId, CounterKey, DarkCostumeId, DiamondUpgradeKind, EquipmentKind, GoodsId, ItemId, Persona, PostKind, SnackId, SkillId, StageId, StreamPlatform, ThemeId, TourCityId, TourRegion, Vibe, VenueDeviceId } from './types';
 
 /**
  * 모든 경제 수치는 이 파일 한 곳에서만 수정한다. (기획서 3~7, 11장)
@@ -1509,6 +1509,37 @@ export const BALANCE = {
    */
   awards: { trophyPerk: { song: 0.05, other: 0.04 }, maxTrophies: 200, maxDiamonds: 500 },
   /**
+   * 무대 디자인 빌더 「내 무대」(콘텐츠 팩 3, 수치는 제안값이고 `npm run sim:venue`로 등급 경계를 맞춘다): 8열 × 6행 바닥에 장치(`VENUE_DEVICES`)를 놓아 무대를 꾸미고,
+   * 점수 = 화려함(조명·연출) + 음향 + 안전 + 분위기(어둠 무대의 분위기 장치만). 조명 상하좌우에 붙은 연출은 ×lightFxMult, 좌우 대칭 자리의 스피커 쌍은 각각 ×speakerSymmetryMult,
+   * 주변 8칸에 안전바가 없는 연출 장치는 하나마다 안전 −hazardPenalty. 조명·음향이 하나도 없으면 등급은 C(gradeCapMissing)까지. 등급 E~S(번호 0~5)는 점수가 gradeMin 이상일 때고
+   * 무대 배율 = 1 + gradeMultStep × 등급 번호. **서버 `backend/src/venues/rules.ts`와 같은 표·식이어야 하고** 프런트 테스트 `venue.test.ts`가 그 파일을 읽어 비교한다.
+   * 내 무대 공연: ownCooldownMs마다 한 번, 인세(활동 중인 자아) ownSecs초 분량 × 무대 배율. 남의 무대 공연: 하루 visitsPerDay곳, 인세 visitSecs초 분량 × (visitBase + visitStep × 등급 번호).
+   * 팬 unlockFans명부터 열린다(서버도 같은 값으로 올리기·남의 무대 공연·좋아요를 막는다: 서버 `VENUE_MIN_FANS`).
+   */
+  venue: {
+    unlockFans: 1000,
+    w: 8,
+    h: 6,
+    nameMin: 2,
+    nameMax: 16,
+    lightFxMult: 1.25,
+    speakerSymmetryMult: 1.2,
+    hazardPenalty: 2,
+    gradeMin: [0, 8, 18, 36, 60, 84] as readonly number[],
+    gradeCapMissing: 2,
+    gradeMultStep: 0.05,
+    ownSecs: 300,
+    ownCooldownMs: 30 * 60_000,
+    visitSecs: 180,
+    visitBase: 0.8,
+    visitStep: 0.1,
+    visitsPerDay: 3,
+    /** 서버가 정하는 값(화면 문구용. 원본은 서버 `venues/rules.ts`이고 테스트가 비교한다): 방문 한 번의 대관료(다이아)·주인의 하루 대관료 상한·지난주 인기 1~3위 보상(다이아) */
+    rentFee: 1,
+    rentDailyMax: 5,
+    weeklyRewards: [30, 20, 10] as readonly number[],
+  },
+  /**
    * 라디오국 「모노사파 FM」(사용자가 고른 콘텐츠 팩 3의 아이디어, 수치는 모두 제안값): 기기 시간대 0~23시 24칸 편성표가 매일 되풀이되고,
    * 정산할 때 지난 시간(완전히 지난 정시만, 최대 capHours시간)을 칸마다 계산해 코인·팬을 준다. 설계는 docs/pack3-design.md.
    *   칸 종류: song 곡(내 싱글) · talk 멘트 · ad 광고 · guest 게스트(가진 피처링 래퍼, 한 편성표에 한 번씩) · off 비움.
@@ -2097,6 +2128,44 @@ const TITLE_VIBE: Partial<Record<AchievementMetric, Vibe>> = {
   pulls: 'coin',
   chartNo1: 'fan',
 };
+
+/* ---------- 무대 디자인 빌더 장치 ---------- */
+
+export type VenueDeviceKind = 'light' | 'sound' | 'fx' | 'safety' | 'mood';
+export interface VenueDeviceDef {
+  id: VenueDeviceId;
+  kind: VenueDeviceKind;
+  /** 능력치에 더해지는 점수(배율 전) */
+  base: number;
+  /** 한 무대에 놓을 수 있는 최대 개수 */
+  max: number;
+  /** 이 공연장을 처음 클리어하면 해금된다. null이면 처음부터 쓴다. */
+  unlock: StageId | null;
+}
+
+/**
+ * 장치 15종(설계서는 14종이라고 적었지만 표에 적힌 장치는 15종이다): 조명 4 · 음향 3 · 연출 4 · 안전 1 · 분위기(어둠 전용) 3.
+ * 서버 `venues/rules.ts`의 `DEVICES`와 ID·갈래·기본값·최대 개수가 같아야 한다. 해금 공연장은 설계서 표 그대로(서버는 해금을 모른다).
+ */
+export const VENUE_DEVICES: readonly VenueDeviceDef[] = [
+  { id: 'spot', kind: 'light', base: 1, max: 6, unlock: null },
+  { id: 'mirrorball', kind: 'light', base: 2, max: 4, unlock: 'hall' },
+  { id: 'laser', kind: 'light', base: 2, max: 4, unlock: 'solo' },
+  { id: 'wire', kind: 'light', base: 3, max: 2, unlock: 'universe' },
+  { id: 'speaker', kind: 'sound', base: 1, max: 6, unlock: null },
+  { id: 'micstand', kind: 'sound', base: 2, max: 4, unlock: 'club' },
+  { id: 'subwoofer', kind: 'sound', base: 3, max: 2, unlock: 'large' },
+  { id: 'flame', kind: 'fx', base: 2, max: 4, unlock: 'medium' },
+  { id: 'dryice', kind: 'fx', base: 2, max: 3, unlock: 'large' },
+  { id: 'confetti', kind: 'fx', base: 3, max: 3, unlock: 'arena' },
+  { id: 'led', kind: 'fx', base: 3, max: 2, unlock: 'world' },
+  { id: 'bar', kind: 'safety', base: 1, max: 6, unlock: null },
+  { id: 'candle', kind: 'mood', base: 1, max: 6, unlock: 'rooftop' },
+  { id: 'monitor', kind: 'mood', base: 2, max: 3, unlock: 'ruins' },
+  { id: 'coffin', kind: 'mood', base: 3, max: 1, unlock: 'garage' },
+];
+
+export const venueDeviceDef = (id: VenueDeviceId): VenueDeviceDef => VENUE_DEVICES.find((d) => d.id === id)!;
 
 /* ---------- 시상식 트로피 ---------- */
 

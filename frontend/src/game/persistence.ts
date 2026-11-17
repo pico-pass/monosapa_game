@@ -1,4 +1,4 @@
-import { ACHIEVEMENTS, BALANCE, BUILDING_IDS, CAMPAIGN_IDS, COSTUME_IDS, ENDLESS, ENDLESS_MAX_TIER, EQUIPMENT_KINDS, GOODS_IDS, ITEM_IDS, MISSION_METRICS, POST_KINDS, SCHEMA_VERSION, SKILL_IDS, SNACK_IDS, STAGE_IDS, STREAM_PLATFORMS, THEME_IDS, TOUR_CITY_IDS, costumePersona, parseTrophyId } from './balance';
+import { ACHIEVEMENTS, BALANCE, BUILDING_IDS, CAMPAIGN_IDS, COSTUME_IDS, ENDLESS, ENDLESS_MAX_TIER, EQUIPMENT_KINDS, GOODS_IDS, ITEM_IDS, MISSION_METRICS, POST_KINDS, SCHEMA_VERSION, SKILL_IDS, SNACK_IDS, STAGE_IDS, STREAM_PLATFORMS, THEME_IDS, TOUR_CITY_IDS, VENUE_DEVICES, costumePersona, parseTrophyId } from './balance';
 import { CERT_TIER_COUNT, emptyCerts } from './certs';
 import { albumDefById, albumSeries, mailTemplateById } from './content';
 import { emptyFanMail } from './fanmail';
@@ -6,6 +6,7 @@ import { emptyMissions } from './missions';
 import { emptyMonogram } from './monogram';
 import { RADIO_KINDS, emptyRadio, hourStart } from './radio';
 import { emptyTour, validRoute } from './tour';
+import { VENUE_CELLS, cleanVenueName, emptyVenue } from './venue';
 import { Invalid, MAX_TIME, bad, bool, int, isObj, num, persona, str, type Obj } from './parse';
 import { emptyArcade, emptyCards, emptyFeat, emptyMascots, emptyNurtures, emptyPhoto, emptyStats, packSeeds, parseArcade, parseCards, parseFeat, parseMascots, parseNurtures, parsePhoto, parseStats } from './pack-state';
 import { retroactiveDiamonds } from './selectors';
@@ -40,6 +41,8 @@ import type {
   Tour,
   TourCityId,
   TourRun,
+  Venue,
+  VenueDeviceId,
   SnackId,
   Skills,
   StageId,
@@ -90,6 +93,7 @@ export function createInitialState(now: number, reducedMotion = false): GameStat
     village: emptyVillage(streamSeedFrom(now + 3), now),
     radio: emptyRadio(now, streamSeedFrom(now + 4)),
     tour: emptyTour(streamSeedFrom(now + 5)),
+    venue: emptyVenue(),
     trophies: [],
     endless: {},
     buffs: { snack: null, campaign: null, item: null, goods: null },
@@ -366,6 +370,33 @@ function parseMart(raw: unknown): Mart {
   };
 }
 
+/**
+ * 내 무대 초안. 없는 예전 저장은 빈 무대이고, 모르는 장치 ID·장치별 최대 개수를 넘은 장치는 빈 칸으로 읽는다(칸 수가 48이 아니어도 앞에서부터 48칸까지만).
+ * 해금 여부는 저장에서 확인하지 않는다(공연장 클리어 기록에서 파생되고, 점수 계산은 놓인 장치를 그대로 센다). 마지막 내 무대 공연 시각은 정산 시각을 넘지 못한다(시계를 앞으로 돌려 쿨다운을 건너뛰지 못하게).
+ */
+function parseVenue(raw: unknown, at: number): Venue {
+  const out = emptyVenue();
+  if (raw === undefined) return out;
+  if (!isObj(raw)) return bad('venue가 올바르지 않습니다.');
+  const cells = out.cells;
+  if (raw.cells !== undefined) {
+    if (!Array.isArray(raw.cells)) return bad('venue.cells가 올바르지 않습니다.');
+    const used: Partial<Record<VenueDeviceId, number>> = {};
+    raw.cells.slice(0, VENUE_CELLS).forEach((c, i) => {
+      const def = typeof c === 'string' ? VENUE_DEVICES.find((d) => d.id === c) : undefined;
+      if (!def || (used[def.id] ?? 0) >= def.max) return;
+      used[def.id] = (used[def.id] ?? 0) + 1;
+      cells[i] = def.id;
+    });
+  }
+  return {
+    name: raw.name === undefined ? '' : typeof raw.name === 'string' ? cleanVenueName(raw.name) : bad('venue.name이 올바르지 않습니다.'),
+    theme: raw.theme === undefined ? 'normal' : persona(raw, 'theme', 'venue.theme'),
+    cells,
+    ownAt: raw.ownAt === undefined ? 0 : Math.min(num(raw, 'ownAt', 0, MAX_TIME, 'venue.ownAt'), at),
+  };
+}
+
 /** 시상식 트로피: 모양이 맞고 아는 부문인 ID만 남기고(중복 제거) 한도까지만 받아들인다. */
 function parseTrophies(raw: unknown): string[] {
   if (raw === undefined) return [];
@@ -607,6 +638,7 @@ export function validateState(input: unknown): Validation {
     const village = parseVillage(o.village, streamSeedFrom(savedAtSeed + 3), num(o, 'lastSettledAt', 0, MAX_TIME));
     const radio = parseRadio(o.radio, num(o, 'lastSettledAt', 0, MAX_TIME), streamSeedFrom(savedAtSeed + 4));
     const tour = parseTour(o.tour, streamSeedFrom(savedAtSeed + 5));
+    const venue = parseVenue(o.venue, num(o, 'lastSettledAt', 0, MAX_TIME));
     const trophies = parseTrophies(o.trophies);
     const endless = parseEndless(o.endless);
     const buffs = parseBuffs(o.buffs);
@@ -653,6 +685,7 @@ export function validateState(input: unknown): Validation {
       village,
       radio,
       tour,
+      venue,
       trophies,
       endless,
       buffs,

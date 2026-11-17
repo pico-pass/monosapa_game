@@ -7,6 +7,7 @@ import { BossService } from '../boss/boss.service.js';
 import { DirectMessage } from '../dm/direct-message.schema.js';
 import { FriendsService } from '../friends/friends.service.js';
 import { MailboxService } from '../mailbox/mailbox.service.js';
+import { VenuesService } from '../venues/venues.service.js';
 import { VillageService } from '../village/village.service.js';
 import type { SocialSummaryDto } from './dto/social.dto.js';
 
@@ -19,11 +20,12 @@ export class SocialService {
     private readonly village: VillageService,
     private readonly boss: BossService,
     private readonly awards: AwardsBoardService,
+    private readonly venues: VenuesService,
   ) {}
 
   async summary(user: UserDto): Promise<SocialSummaryDto> {
     const me = new Types.ObjectId(user.id);
-    const [mail, friendRequests, dmUnread, villageFlags, bossClaimable, awards] = await Promise.all([
+    const [mail, friendRequests, dmUnread, villageFlags, bossClaimable, awards, venues] = await Promise.all([
       this.mailbox.counts(me),
       this.friends.incomingCount(user.id),
       this.dms.countDocuments({ to: me, readAt: null }).exec(),
@@ -31,7 +33,8 @@ export class SocialService {
       this.village.pendingCount(user.id).catch(() => 0),
       this.boss.claimableCount(user.id).catch(() => 0),
       this.awards.pendingCount(user.id).catch(() => 0),
+      this.venues.pendingCount(user.id).catch(() => 0),
     ]);
-    return { mailUnread: mail.unread, mailClaimable: mail.claimable, friendRequests, dmUnread, villageFlags, bossClaimable, awards };
+    return { mailUnread: mail.unread, mailClaimable: mail.claimable, friendRequests, dmUnread, villageFlags, bossClaimable, awards, venues };
   }
 }
