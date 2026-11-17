@@ -22,6 +22,8 @@ export const CLEAR_COLLECTIONS = [
   'boss_logs',
   'village_flags',
   'chart_claims',
+  'award_points',
+  'award_ticks',
   'live_rewards',
   'live_daily',
   'live_records',

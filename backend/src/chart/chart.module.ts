@@ -18,5 +18,6 @@ import { ChartService } from './chart.service.js';
   ],
   controllers: [ChartController],
   providers: [ChartService],
+  exports: [ChartService],
 })
 export class ChartModule {}

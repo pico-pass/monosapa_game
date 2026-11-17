@@ -40,6 +40,16 @@ interface Ranked extends Candidate {
   revival: boolean;
 }
 
+/** 순위 순으로 내려주는 상위 곡 한 줄(곡 키·계정 ID까지 들어 있다) */
+export interface TopRankedEntry {
+  rank: number;
+  key: string;
+  uid: string;
+  title: string;
+  artist: string;
+  revival: boolean;
+}
+
 /** 한 곡의 그 시각 세기. 같은 입력이면 같은 결과라서 서버를 다시 켜거나 요청이 여러 번 와도 차트가 흔들리지 않는다. */
 export function strengthOf(c: Pick<Candidate, 'key' | 'base' | 'releasedAt'>, at: number): { strength: number; revival: boolean } {
   const hour = Math.floor(at / HOUR);
@@ -103,6 +113,16 @@ export class ChartService {
       .filter((c) => c.persona === persona)
       .map((c) => ({ ...c, ...strengthOf(c, at) }))
       .sort((a, b) => b.strength - a.strength || (a.key < b.key ? -1 : 1));
+  }
+
+  /** 지금 두 속성의 상위 n곡(순위 순). 시상식 집계(`awards`)가 정시마다 남겨 둘 때 쓴다. `revival`은 그 시각에 역주행 중인 곡이다. */
+  async topRanked(n: number, now = Date.now()): Promise<Record<Persona, TopRankedEntry[]>> {
+    const all = await this.candidates(now);
+    const top = (persona: Persona): TopRankedEntry[] =>
+      this.rank(all, now, persona)
+        .slice(0, n)
+        .map((c, i) => ({ rank: i + 1, key: c.key, uid: c.userId, title: c.title, artist: c.artist, revival: c.revival }));
+    return { normal: top('normal'), dark: top('dark') };
   }
 
   private list(all: Candidate[], now: number, persona: Persona, viewerId: string): ChartListDto {
