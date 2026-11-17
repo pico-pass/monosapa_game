@@ -4,6 +4,7 @@ import { albumDefById, albumSeries, mailTemplateById } from './content';
 import { emptyFanMail } from './fanmail';
 import { emptyMissions } from './missions';
 import { emptyMonogram } from './monogram';
+import { RADIO_KINDS, emptyRadio, hourStart } from './radio';
 import { Invalid, MAX_TIME, bad, bool, int, isObj, num, persona, str, type Obj } from './parse';
 import { emptyArcade, emptyCards, emptyFeat, emptyMascots, emptyNurtures, emptyPhoto, emptyStats, packSeeds, parseArcade, parseCards, parseFeat, parseMascots, parseNurtures, parsePhoto, parseStats } from './pack-state';
 import { retroactiveDiamonds } from './selectors';
@@ -33,6 +34,8 @@ import type {
   NormalCostumeId,
   Persona,
   Post,
+  Radio,
+  RadioSlot,
   SnackId,
   Skills,
   StageId,
@@ -81,6 +84,7 @@ export function createInitialState(now: number, reducedMotion = false): GameStat
     equipStars: emptyEquipStars(),
     skills: emptySkills(),
     village: emptyVillage(streamSeedFrom(now + 3), now),
+    radio: emptyRadio(now, streamSeedFrom(now + 4)),
     endless: {},
     buffs: { snack: null, campaign: null, item: null, goods: null },
     mart: emptyMart(),
@@ -208,6 +212,30 @@ function parseVillage(raw: unknown, seed: number, at: number): Village {
     newsBucket: raw.newsBucket === undefined ? 0 : int(raw, 'newsBucket', 0, 1e9, 'village.newsBucket'),
     dex,
     paidSteps: raw.paidSteps === undefined ? 0 : int(raw, 'paidSteps', 0, 10_000, 'village.paidSteps'),
+  };
+}
+
+/**
+ * 라디오국. 없는 예전 저장은 새 라디오(전부 비어 있고 지금 정시부터 센다)다. 편성표는 24칸으로 맞추고, 알 수 없는 종류나 모양이 이상한 칸은 비운 칸으로 읽는다
+ * (없는 곡·가지지 않은 게스트는 계산할 때 비운 칸으로 본다). 정산 시각은 저장 시각의 정시를 넘지 못한다(기기 시계를 앞으로 돌려 미리 받지 못하게).
+ */
+function parseRadio(raw: unknown, at: number, seed: number): Radio {
+  const out = emptyRadio(at, seed);
+  if (raw === undefined) return out;
+  if (!isObj(raw)) return bad('radio가 올바르지 않습니다.');
+  const slots: RadioSlot[] = out.slots;
+  if (raw.slots !== undefined) {
+    if (!Array.isArray(raw.slots) || raw.slots.length > out.slots.length) return bad('radio.slots가 올바르지 않습니다.');
+    raw.slots.forEach((x, i) => {
+      if (!isObj(x) || !RADIO_KINDS.includes(x.k as RadioSlot['k'])) return;
+      const k = x.k as RadioSlot['k'];
+      slots[i] = (k === 'song' || k === 'guest') && typeof x.id === 'string' && x.id.length > 0 && x.id.length <= 64 ? { k, id: x.id } : { k: k === 'song' || k === 'guest' ? 'off' : k };
+    });
+  }
+  return {
+    slots,
+    claimedAt: raw.claimedAt === undefined ? out.claimedAt : hourStart(Math.min(num(raw, 'claimedAt', 0, MAX_TIME, 'radio.claimedAt'), at)),
+    seed: raw.seed === undefined ? out.seed : int(raw, 'seed', 0, 4294967295, 'radio.seed'),
   };
 }
 
@@ -515,6 +543,7 @@ export function validateState(input: unknown): Validation {
     const equipStars = parseEquipStars(o.equipStars);
     const skills = parseSkills(o.skills);
     const village = parseVillage(o.village, streamSeedFrom(savedAtSeed + 3), num(o, 'lastSettledAt', 0, MAX_TIME));
+    const radio = parseRadio(o.radio, num(o, 'lastSettledAt', 0, MAX_TIME), streamSeedFrom(savedAtSeed + 4));
     const endless = parseEndless(o.endless);
     const buffs = parseBuffs(o.buffs);
     const mart = parseMart(o.mart);
@@ -558,6 +587,7 @@ export function validateState(input: unknown): Validation {
       equipStars,
       skills,
       village,
+      radio,
       endless,
       buffs,
       mart,

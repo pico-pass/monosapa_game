@@ -3,6 +3,7 @@ import { claimableMissions, attendanceStatus } from './missions';
 import { presentsReady } from './mascot';
 import { readyPosts } from './monogram';
 import { nurtureAlerts } from './nurture';
+import { radioAlerts } from './radio';
 import { skillPointsFree } from './skills';
 import { villageAlerts } from './village';
 import type { GameState } from './types';
@@ -22,6 +23,8 @@ export interface MoreAlerts {
   stats: number;
   /** 고르지 않은 마을 소식 + 수확할 ❤️가 가득 차 가는 마을 */
   village: number;
+  /** 정산 대기가 쌓인 라디오가 있으면 1 */
+  radio: number;
   total: number;
 }
 
@@ -34,5 +37,6 @@ export function moreAlerts(s: GameState): MoreAlerts {
   const skills = skillPointsFree(s) > 0 ? 1 : 0;
   const stats = certsClaimable(s);
   const village = villageAlerts(s);
-  return { missions, mail, monogram, collect, nurture, skills, stats, village, total: missions + mail + monogram + collect + nurture + skills + stats + village };
+  const radio = radioAlerts(s);
+  return { missions, mail, monogram, collect, nurture, skills, stats, village, radio, total: missions + mail + monogram + collect + nurture + skills + stats + village + radio };
 }

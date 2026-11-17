@@ -1504,6 +1504,52 @@ export const BALANCE = {
   },
   titlePerk: { low: 0.01, mid: 0.015, high: 0.02, top: 0.03, midDiamonds: 8, highDiamonds: 15, topDiamonds: 30 },
   /**
+   * 라디오국 「모노사파 FM」(사용자가 고른 콘텐츠 팩 3의 아이디어, 수치는 모두 제안값): 기기 시간대 0~23시 24칸 편성표가 매일 되풀이되고,
+   * 정산할 때 지난 시간(완전히 지난 정시만, 최대 capHours시간)을 칸마다 계산해 코인·팬을 준다. 설계는 docs/pack3-design.md.
+   *   칸 종류: song 곡(내 싱글) · talk 멘트 · ad 광고 · guest 게스트(가진 피처링 래퍼, 한 편성표에 한 번씩) · off 비움.
+   *   청취자 배율 mult = 시간대 곡선 curve[시] × 취향(곡의 자아가 낮·밤에 맞는가) × 이어짐. 이어짐은
+   *     멘트·게스트 뒤 talk.span칸 ×talk.next(연달아 둘이면 두 번째는 무효, 멘트·게스트 칸은 talk.fansPct의 팬도 준다) · 광고 뒤 한 칸 ×ad.next · 비운 칸 뒤 한 칸 ×off.next,
+   *     같은 곡이 직전 fatigue.window칸 안에 또 나오면 ×fatigue.mult, 같은 자아 곡이 이어지면 1 + streak.step × 이어진 수(최대 streak.max),
+   *     자아가 다른 곡 바로 뒤(사이에 멘트가 없을 때)면 ×switchMult, 이웃 칸의 게스트가 곡을 guest[등급]만큼 올려 준다.
+   *   곡 한 칸: 인세(그 곡의 자아) coinSecs초 분량 × 곡 등급 quality × mult, 팬 fansPct(비율) × quality × mult.
+   *     곡 등급 = 곡 카드 등급 quality[N·R·SR·SSR] × (1 + remaster × 리마스터 레벨).
+   *   광고 한 칸: 인세(높은 쪽) ad.coinSecs초 분량 × mult, 팬은 없다.
+   *   시간마다 ±noise 변수는 씨앗과 시간 번호로만 정한다(같은 상태는 같은 결과).
+   * 목표(npm run sim:radio로 맞췄다): 잘 짠 하루(자동 편성)는 인세 약 46분 분량 + 팬 약 0.8%, 곡 하나만 되풀이한 하루는 21분 안팎.
+   *   처음 제안값(곡 75초·광고 160초·멘트 뒤 두 칸 ×1.25)은 시뮬레이션에서 멘트·광고가 한 번도 선택되지 않아 지금 값으로 올렸다.
+   */
+  radio: {
+    unlockFans: 10_000,
+    capHours: 24,
+    /** 시간대별 청취자 곡선(0~23시, 상대값): 출근 7~9시·퇴근 17~19시·밤 22시가 높고 새벽이 낮다 */
+    curve: [0.55, 0.4, 0.3, 0.25, 0.25, 0.35, 0.55, 0.85, 1, 0.8, 0.6, 0.65, 0.9, 0.85, 0.6, 0.6, 0.7, 0.95, 1, 0.9, 0.8, 0.85, 0.95, 0.8] as readonly number[],
+    /** 0~23시의 시간대: 낮은 일반, 밤은 어둠이 강하고 저녁(과 이른 아침)은 같다 */
+    periods: [
+      'night', 'night', 'night', 'night', 'night', 'night', 'evening', 'day', 'day', 'day', 'day', 'day',
+      'day', 'day', 'day', 'day', 'day', 'day', 'day', 'evening', 'evening', 'evening', 'night', 'night',
+    ] as readonly ('day' | 'evening' | 'night')[],
+    taste: {
+      day: { normal: 1.3, dark: 0.7 },
+      evening: { normal: 1, dark: 1 },
+      night: { normal: 0.8, dark: 1.4 },
+    } as Record<'day' | 'evening' | 'night', Record<Persona, number>>,
+    song: { coinSecs: 100, fansPct: 0.0003 },
+    ad: { coinSecs: 220, next: 0.8 },
+    talk: { next: 1.3, span: 3, fansPct: 0.00015 },
+    off: { next: 0.8 },
+    fatigue: { window: 3, mult: 0.5 },
+    streak: { step: 0.05, max: 4 },
+    switchMult: 0.85,
+    quality: { N: 1, R: 1.15, SR: 1.4, SSR: 1.8 } as Record<CardRarity, number>,
+    remaster: 0.1,
+    guest: { N: 0.1, R: 0.2, SR: 0.35, SSR: 0.5 } as Record<CardRarity, number>,
+    noise: 0.1,
+    /** 화면에 보이는 청취자 수 = √팬 × listenerK × 청취자 배율(수입 계산에는 쓰이지 않는 표시용) */
+    listenerK: 4,
+    /** 정산 대기가 이만큼 쌓이면 더보기에 알림 점이 켜진다 */
+    alertHours: 6,
+  },
+  /**
    * 팬 마을: 팬들이 사는 8×8 땅의 가운데부터 팬 수에 따라(sides) 4×4 → 6×6 → 8×8로 넓어진다.
    * 땅은 세로로 세 구역이다(열 0~2 해 드는 거리 = 일반, 3~4 황혼 골목 = 경계, 5~7 지하 골목 = 어둠). 합주실만 구역을 탄다:
    *   일반 구역은 일반 라임에 100%, 어둠 구역은 어둠 라임에 100%, 황혼 골목은 양쪽에 twilightShare씩.

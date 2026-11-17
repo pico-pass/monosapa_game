@@ -610,6 +610,43 @@ export const SLEEVE_TEXT = {
   blurb: '포토카드를 넣는 투명한 비닐. 새것처럼 보이게 해 주지만, 같은 카드가 두 장이면 소용없다.',
 };
 
+/** 라디오국 「모노사파 FM」 문구 */
+export const RADIO_TEXT = {
+  name: '모노사파 FM',
+  icon: '📻',
+  blurb: '24시간 편성표를 짜 두면 시간대마다 다른 청취자가 들어요. 낮에는 일반이, 밤에는 어둠이 더 잘 들려요.',
+};
+
+/** 편성표 칸 종류 */
+export const RADIO_KIND_TEXT: Record<'song' | 'talk' | 'ad' | 'guest' | 'off', { icon: string; name: string; desc: string }> = {
+  song: { icon: '🎵', name: '곡', desc: '내가 발매한 싱글을 틀어요. 코인과 팬이 모여요.' },
+  talk: { icon: '🗣️', name: '멘트', desc: '코인은 없고 팬이 조금 늘어요. 다음 세 시간 청취자를 붙잡아 줘요.' },
+  ad: { icon: '📢', name: '광고', desc: '코인을 바로 벌어요. 다만 다음 시간 청취자가 줄어요.' },
+  guest: { icon: '🎙️', name: '게스트', desc: '피처링 래퍼를 불러요. 멘트처럼 청취자를 붙잡고, 이웃 곡을 올려 줘요.' },
+  off: { icon: '⬛', name: '비움', desc: '방송을 쉬어요. 다음 시간 청취자가 줄어요.' },
+};
+
+/** 시간대 이름 */
+export const RADIO_PERIOD_TEXT: Record<'day' | 'evening' | 'night', { icon: string; name: string }> = {
+  day: { icon: '☀️', name: '낮' },
+  evening: { icon: '🌆', name: '저녁' },
+  night: { icon: '🌙', name: '밤' },
+};
+
+/** 칸에 붙는 설명 */
+export const RADIO_NOTE_TEXT: Record<'talk' | 'afterAd' | 'afterOff' | 'fatigue' | 'streak' | 'switch' | 'guest' | 'tasteGood' | 'tasteBad' | 'missing', { text: string; tone: 'good' | 'bad' }> = {
+  talk: { text: '멘트 뒤라 청취자 +30%', tone: 'good' },
+  afterAd: { text: '광고 뒤라 청취자 −20%', tone: 'bad' },
+  afterOff: { text: '방송을 쉰 뒤라 청취자 −20%', tone: 'bad' },
+  fatigue: { text: '같은 곡이 가까워요 −50%', tone: 'bad' },
+  streak: { text: '같은 자아가 이어져요 +', tone: 'good' },
+  switch: { text: '자아가 바뀌는데 멘트가 없어요 −15%', tone: 'bad' },
+  guest: { text: '게스트가 곡을 띄워요 +', tone: 'good' },
+  tasteGood: { text: '이 시간대에 잘 맞는 자아예요', tone: 'good' },
+  tasteBad: { text: '이 시간대에는 덜 맞는 자아예요', tone: 'bad' },
+  missing: { text: '비어 있는 곡이에요(없어졌거나 가지지 않았어요)', tone: 'bad' },
+};
+
 export const MEAL_TEXT = {
   name: '야식 컵라면 세트',
   icon: '🍜',

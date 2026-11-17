@@ -49,6 +49,7 @@ async function render(tab: TabId, game: GameState): Promise<string> {
     skills: () => import('../SkillScreen'),
     village: () => import('../VillageScreen'),
     boss: () => import('../BossScreen'),
+    radio: () => import('../RadioScreen'),
     release: () => import('../ReleaseScreen'),
     nurture: () => import('../NurtureScreen'),
     friends: () => import('../FriendsScreen'),
@@ -111,7 +112,7 @@ describe('새 화면 렌더링', () => {
 
   it('더보기: 알림 점과 메뉴', async () => {
     const html = await render('more', richState());
-    for (const name of ['상점', '미션·출석', '업적·칭호', '팬 DM', '모노그램', '챗방', '문의함']) expect(html).toContain(name);
+    for (const name of ['상점', '미션·출석', '업적·칭호', '팬 DM', '모노그램', '챗방', '문의함', '모노사파 FM']) expect(html).toContain(name);
     expect(html).toContain('dot-badge');
   });
 
@@ -190,6 +191,35 @@ describe('새 화면 렌더링', () => {
     for (let set = 1; set <= 6; set++) for (let grade = 1; grade <= 6; grade++) owned[`p${set}-${grade}`] = 1;
     const full = await renderNamed(loader, 'ShopScreen', 'shop', { ...g, photo: { ...g.photo, owned } });
     expect(full).toContain('카드를 모두 모았어요');
+  });
+
+  it('라디오국: 팬이 모자라면 잠겨 있고, 열리면 24칸 편성표·정산 대기·자동 편성이 보인다', async () => {
+    const locked = await render('radio', { ...createInitialState(T0), fans: 100 });
+    expect(locked).toContain('나만의 라디오국이 열려요');
+    expect(locked).not.toContain('24시간 편성표');
+    const open = { ...richState(), fans: 50_000, lastSettledAt: T0 };
+    const empty = await render('radio', open);
+    expect(empty).toContain('모노사파 FM');
+    expect(empty).toContain('24시간 편성표');
+    expect(empty).toContain('00:00');
+    expect(empty).toContain('23:00');
+    expect(empty).toContain('자동 편성');
+    expect(empty).toContain('모두 비우기');
+    expect(empty).toContain('정산 대기 0시간');
+    expect(empty).toContain('한 시간이 다 지나면 받을 수 있어요');
+    expect(empty).toContain('지금'); // 지금 시각의 칸 표시
+    const slots = Array.from({ length: 24 }, (_, h) => (h === 12 ? { k: 'song' as const, id: 'single-1' } : h === 13 ? { k: 'talk' as const } : h === 14 ? { k: 'ad' as const } : { k: 'off' as const }));
+    const planned = await render('radio', { ...open, lastSettledAt: T0 + 3 * 3600_000, radio: { ...open.radio, claimedAt: T0, slots } });
+    expect(planned).toContain('곡1');
+    expect(planned).toContain('멘트');
+    expect(planned).toContain('광고');
+    expect(planned).toContain('정산 대기 3시간');
+    expect(planned).toContain('방송 정산 받기');
+    expect(planned).toContain('하루 예상');
+    expect(planned).toContain('낮(07~18시)에는 일반 곡이');
+    // 곡이 없으면 자동 편성 버튼이 막힌다
+    const noSongs = await render('radio', { ...open, singles: [] });
+    expect(noSongs).toContain('첫 싱글을 발매하면 곡을 편성할 수 있어요');
   });
 
   it('작업실: 켜져 있는 편의점 상품·생활용품이 칩으로 보인다', async () => {

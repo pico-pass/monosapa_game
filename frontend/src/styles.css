@@ -5493,3 +5493,107 @@ span.rar {
   color: #fff;
   border-color: rgba(255, 255, 255, 0.35);
 }
+
+/* ---------- 라디오국 ---------- */
+.radio-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.radio-row {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-soft);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.radio-row-now {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.radio-p-night .radio-hour {
+  color: var(--accent2);
+}
+.radio-hour {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+.radio-hour small {
+  color: var(--accent);
+}
+.radio-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.radio-main strong {
+  overflow-wrap: anywhere;
+  font-size: 14px;
+}
+.radio-notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.radio-note {
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 11px;
+}
+.radio-note-good {
+  color: var(--good);
+  border-color: var(--good);
+}
+.radio-note-bad {
+  color: var(--warn);
+  border-color: var(--warn);
+}
+.radio-yield {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.radio-yield small {
+  color: var(--muted);
+}
+.radio-pick-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 52vh;
+  overflow-y: auto;
+}
+.radio-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-soft);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.radio-pick:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.radio-pick-on {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+}

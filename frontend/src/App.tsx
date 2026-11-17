@@ -56,6 +56,7 @@ import { SkillScreen } from './screens/SkillScreen';
 import { VillageScreen } from './screens/VillageScreen';
 import { BossScreen } from './screens/BossScreen';
 import { LiveScreen } from './screens/LiveScreen';
+import { RadioScreen } from './screens/RadioScreen';
 import { StatsScreen } from './screens/StatsScreen';
 import { TowerStage } from './screens/TowerStage';
 import { StudioScreen } from './screens/StudioScreen';
@@ -116,6 +117,7 @@ const SUB_TITLE: Partial<Record<TabId, string>> = {
   village: '팬 마을',
   boss: '월드 보스',
   live: '라이브 대전',
+  radio: '모노사파 FM',
   admin: '관리자',
 };
 
@@ -210,6 +212,7 @@ function Game() {
         {ui.tab === 'village' && <VillageScreen />}
         {ui.tab === 'boss' && <BossScreen />}
         {ui.tab === 'live' && <LiveScreen />}
+        {ui.tab === 'radio' && <RadioScreen />}
         {ui.tab === 'admin' && <AdminScreen />}
       </main>
       <nav className="tabs" aria-label="메인 메뉴">

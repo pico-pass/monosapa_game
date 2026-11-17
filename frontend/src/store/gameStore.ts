@@ -47,6 +47,7 @@ import { claimAttendance, claimMission, rollMissions } from '../game/missions';
 import { buySlot, collectPost, startPost } from '../game/monogram';
 import { buyCampaign, buyCostume, buyGoods, buyItem, buyMeal, buyPack, buyReceipt, buyScratch, buySleeve, buySnack, buyTheme, redeemCoupon, setCostume, setTheme } from '../game/shop';
 import { InputLimiter } from '../game/input';
+import { autoRadio, claimRadio, clearRadio, setRadioSlot, type RadioPaid } from '../game/radio';
 import type { BlocksSummary } from '../game/blocks';
 import type { BounceSummary } from '../game/bounce';
 import type { DefenseSummary } from '../game/defense';
@@ -84,6 +85,7 @@ import type {
   GameState,
   Persona,
   PostKind,
+  RadioSlot,
   Settings,
   SkillId,
   SnackId,
@@ -126,9 +128,10 @@ export type TabId =
   | 'village'
   | 'boss'
   | 'live'
+  | 'radio'
   | 'admin';
 /** 하단 탭의 「더보기」 안에 있는 화면들 */
-export const MORE_TABS: readonly TabId[] = ['stats', 'ranking', 'collection', 'shop', 'missions', 'achievements', 'mail', 'monogram', 'chat', 'inquiry', 'collect', 'nurture', 'arcade', 'challenge', 'chart', 'wrapped', 'sampler', 'friends', 'dm', 'postbox', 'skills', 'village', 'boss', 'live', 'admin'];
+export const MORE_TABS: readonly TabId[] = ['stats', 'ranking', 'collection', 'shop', 'missions', 'achievements', 'mail', 'monogram', 'chat', 'inquiry', 'collect', 'nurture', 'arcade', 'challenge', 'chart', 'wrapped', 'sampler', 'friends', 'dm', 'postbox', 'skills', 'village', 'boss', 'live', 'radio', 'admin'];
 export type Phase = 'booting' | 'ready' | 'readonly' | 'corrupt';
 
 export interface Bubble {
@@ -280,6 +283,7 @@ const FAIL_TEXT: Record<FailReason, string> = {
   no_points: '쓸 수 있는 스킬 포인트가 없어요. 플레이어 레벨이 오르면 생겨요.',
   need_max_level: '장비를 최대 레벨까지 올린 뒤에 한계를 돌파할 수 있어요.',
   village_locked: '팬 3만 명부터 마을이 열려요.',
+  radio_locked: '팬 1만 명부터 라디오국이 열려요.',
   tile_invalid: '아직 열리지 않은 땅이에요.',
   tile_taken: '이미 건물이 있는 칸이에요.',
   building_limit: '이 건물은 더 지을 수 없어요.',
@@ -1030,6 +1034,51 @@ export function doBuyPack(): void {
   if (!r.ok) return failToast(r.reason);
   sfx.buy();
   toast(`${PACK_TEXT.icon} ${PACK_TEXT.name}에서 포토카드 티켓 1장이 나왔어요! (오늘 ${r.left}장 더) 🪙 ${fmt(r.cost)}`, 'good');
+  saveNow();
+}
+
+/* ---------- 라디오국 ---------- */
+
+/** 편성을 바꾸기 전에 자동으로 정산된 방송분이 있으면 알려 준다. */
+function radioPaidToast(paid: RadioPaid | null): void {
+  if (!paid || (paid.coins <= 0 && paid.fans <= 0)) return;
+  toast(`📻 지난 방송 ${paid.hours}시간 정산 · 🪙 +${fmt(paid.coins)} · 팬 +${fmt(paid.fans)}${paid.diamonds > 0 ? ` · 💎 +${paid.diamonds}` : ''}`, 'good');
+}
+
+export function doClaimRadio(): void {
+  const r = exec(claimRadio);
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  sfx.buy();
+  toast(`📻 ${r.paid.hours}시간 방송 정산! 🪙 +${fmt(r.paid.coins)} · 팬 +${fmt(r.paid.fans)}${r.paid.diamonds > 0 ? ` · 💎 +${r.paid.diamonds}` : ''}`, 'good');
+  saveNow();
+}
+
+export function doSetRadioSlot(hour: number, slot: RadioSlot): void {
+  const r = exec((s) => setRadioSlot(s, hour, slot));
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  sfx.buy();
+  radioPaidToast(r.paid);
+  saveNow();
+}
+
+export function doClearRadio(): void {
+  const r = exec(clearRadio);
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  sfx.buy();
+  radioPaidToast(r.paid);
+  saveNow();
+}
+
+export function doAutoRadio(): void {
+  const r = exec(autoRadio);
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  sfx.unlock();
+  radioPaidToast(r.paid);
+  toast('📻 가진 곡과 래퍼로 편성표를 짰어요.', 'good');
   saveNow();
 }
 

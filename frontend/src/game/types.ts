@@ -55,6 +55,25 @@ export interface VillageNews {
   kind: number;
 }
 
+/** 라디오 편성표의 한 칸(한 시간) 종류. song 곡 · talk 멘트 · ad 광고 · guest 게스트(피처링 래퍼) · off 비움 */
+export type RadioKind = 'song' | 'talk' | 'ad' | 'guest' | 'off';
+
+/** 편성표 한 칸. song은 싱글 ID, guest는 피처링 래퍼 ID를 `id`로 가진다. */
+export interface RadioSlot {
+  k: RadioKind;
+  id?: string;
+}
+
+/** 라디오국 「모노사파 FM」: 기기 시간대 0~23시 24칸 편성표와 마지막 정산 시각. 규칙은 radio.ts. */
+export interface Radio {
+  /** 24칸(인덱스 = 시각). 하루 편성표가 매일 되풀이된다. */
+  slots: RadioSlot[];
+  /** 여기까지 정산했다(정시로 맞춘 시각, ms). 이 뒤로 지난 시간이 정산 대기다. */
+  claimedAt: number;
+  /** 시간마다 ±10% 변수를 정하는 씨앗 */
+  seed: number;
+}
+
 /** 팬들이 사는 마을. 8×8 땅(인덱스 = y×8 + x)의 가운데부터 팬 수에 따라 열린다. 규칙은 villagedata.ts·village.ts. */
 export interface Village {
   /** 소식 카드를 정하는 씨앗 */
@@ -437,6 +456,8 @@ export interface GameState {
   skills: Skills;
   /** 팬 마을: 건물·하트·소식 */
   village: Village;
+  /** 라디오국: 24시간 편성표와 정산 시각 */
+  radio: Radio;
   /** 끝없는 업적: 지표 ID → 지금까지 받은 단계 수 */
   endless: Record<string, number>;
   /** 간식·홍보 캠페인·편의점 상품 버프 */
@@ -527,6 +548,8 @@ export type FailReason =
   | 'festival_used'
   // 편의점 카드팩
   | 'daily_limit'
+  // 라디오국
+  | 'radio_locked'
   // 모노사파 육성
   | 'nurture_locked'
   | 'level_low'

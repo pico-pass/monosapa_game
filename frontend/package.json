@@ -12,7 +12,8 @@
     "sim": "tsx scripts/simulate.ts",
     "sim:nurture": "tsx scripts/nurture-sim.ts",
     "sim:village": "tsx scripts/village-sim.ts",
-    "sim:arcade": "tsx scripts/arcade-sim.ts"
+    "sim:arcade": "tsx scripts/arcade-sim.ts",
+    "sim:radio": "tsx scripts/radio-sim.ts"
   },
   "dependencies": {
     "react": "^19.3.1",
