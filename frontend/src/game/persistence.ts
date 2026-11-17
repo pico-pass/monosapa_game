@@ -1,4 +1,4 @@
-import { ACHIEVEMENTS, BALANCE, BUILDING_IDS, CAMPAIGN_IDS, COSTUME_IDS, ENDLESS, ENDLESS_MAX_TIER, EQUIPMENT_KINDS, GOODS_IDS, ITEM_IDS, MISSION_METRICS, POST_KINDS, SCHEMA_VERSION, SKILL_IDS, SNACK_IDS, STAGE_IDS, STREAM_PLATFORMS, THEME_IDS, TOUR_CITY_IDS, costumePersona } from './balance';
+import { ACHIEVEMENTS, BALANCE, BUILDING_IDS, CAMPAIGN_IDS, COSTUME_IDS, ENDLESS, ENDLESS_MAX_TIER, EQUIPMENT_KINDS, GOODS_IDS, ITEM_IDS, MISSION_METRICS, POST_KINDS, SCHEMA_VERSION, SKILL_IDS, SNACK_IDS, STAGE_IDS, STREAM_PLATFORMS, THEME_IDS, TOUR_CITY_IDS, costumePersona, parseTrophyId } from './balance';
 import { CERT_TIER_COUNT, emptyCerts } from './certs';
 import { albumDefById, albumSeries, mailTemplateById } from './content';
 import { emptyFanMail } from './fanmail';
@@ -90,6 +90,7 @@ export function createInitialState(now: number, reducedMotion = false): GameStat
     village: emptyVillage(streamSeedFrom(now + 3), now),
     radio: emptyRadio(now, streamSeedFrom(now + 4)),
     tour: emptyTour(streamSeedFrom(now + 5)),
+    trophies: [],
     endless: {},
     buffs: { snack: null, campaign: null, item: null, goods: null },
     mart: emptyMart(),
@@ -365,6 +366,13 @@ function parseMart(raw: unknown): Mart {
   };
 }
 
+/** 시상식 트로피: 모양이 맞고 아는 부문인 ID만 남기고(중복 제거) 한도까지만 받아들인다. */
+function parseTrophies(raw: unknown): string[] {
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw)) return bad('trophies가 올바르지 않습니다.');
+  return [...new Set(raw.filter((t): t is string => parseTrophyId(t) !== null))].slice(0, BALANCE.awards.maxTrophies);
+}
+
 function parseCosmetics(raw: unknown): Cosmetics {
   if (raw === undefined) return { themes: ['default'], theme: 'default', costumes: [], costume: null, darkCostume: null, title: null };
   if (!isObj(raw)) return bad('cosmetics가 올바르지 않습니다.');
@@ -599,6 +607,7 @@ export function validateState(input: unknown): Validation {
     const village = parseVillage(o.village, streamSeedFrom(savedAtSeed + 3), num(o, 'lastSettledAt', 0, MAX_TIME));
     const radio = parseRadio(o.radio, num(o, 'lastSettledAt', 0, MAX_TIME), streamSeedFrom(savedAtSeed + 4));
     const tour = parseTour(o.tour, streamSeedFrom(savedAtSeed + 5));
+    const trophies = parseTrophies(o.trophies);
     const endless = parseEndless(o.endless);
     const buffs = parseBuffs(o.buffs);
     const mart = parseMart(o.mart);
@@ -644,6 +653,7 @@ export function validateState(input: unknown): Validation {
       village,
       radio,
       tour,
+      trophies,
       endless,
       buffs,
       mart,

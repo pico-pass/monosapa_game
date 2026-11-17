@@ -51,6 +51,7 @@ async function render(tab: TabId, game: GameState): Promise<string> {
     boss: () => import('../BossScreen'),
     radio: () => import('../RadioScreen'),
     tour: () => import('../TourScreen'),
+    awards: () => import('../AwardsScreen'),
     release: () => import('../ReleaseScreen'),
     nurture: () => import('../NurtureScreen'),
     friends: () => import('../FriendsScreen'),
@@ -113,7 +114,7 @@ describe('새 화면 렌더링', () => {
 
   it('더보기: 알림 점과 메뉴', async () => {
     const html = await render('more', richState());
-    for (const name of ['상점', '미션·출석', '업적·칭호', '팬 DM', '모노그램', '챗방', '문의함', '모노사파 FM', '순회공연']) expect(html).toContain(name);
+    for (const name of ['상점', '미션·출석', '업적·칭호', '팬 DM', '모노그램', '챗방', '문의함', '모노사파 FM', '순회공연', '모노사파 어워즈']) expect(html).toContain(name);
     expect(html).toContain('dot-badge');
   });
 
@@ -192,6 +193,12 @@ describe('새 화면 렌더링', () => {
     for (let set = 1; set <= 6; set++) for (let grade = 1; grade <= 6; grade++) owned[`p${set}-${grade}`] = 1;
     const full = await renderNamed(loader, 'ShopScreen', 'shop', { ...g, photo: { ...g.photo, owned } });
     expect(full).toContain('카드를 모두 모았어요');
+  });
+
+  it('시상식: 서버 응답을 받기 전에는 제목과 불러오는 중이 보인다', async () => {
+    const html = await render('awards', { ...richState(), lastSettledAt: T0 });
+    expect(html).toContain('모노사파 어워즈');
+    expect(html).toContain('불러오는 중');
   });
 
   it('순회공연: 월클 전에는 잠겨 있고, 열리면 지도·이어 갈 도시·도감이 보인다', async () => {

@@ -494,6 +494,8 @@ export interface GameState {
   radio: Radio;
   /** 순회공연: 진행 중인 투어와 도시별 기념품 */
   tour: Tour;
+  /** 시상식 트로피(1위 보상으로 받은 것, `trophy-<해>-<부문>`). 칭호로 달 수 있다. */
+  trophies: string[];
   /** 끝없는 업적: 지표 ID → 지금까지 받은 단계 수 */
   endless: Record<string, number>;
   /** 간식·홍보 캠페인·편의점 상품 버프 */

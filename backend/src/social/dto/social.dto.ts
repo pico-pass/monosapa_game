@@ -12,4 +12,6 @@ export class SocialSummaryDto {
   villageFlags!: number;
   /** 월드 보스에서 받을 수 있는 보상 묶음 수(이번 주 단계 + 지난주 순위) */
   bossClaimable!: number;
+  /** 시상식에서 할 일이 있으면 1(투표할 수 있는데 아직 안 한 부문이 있거나, 발표 뒤 받지 않은 보상이 있다) */
+  awards!: number;
 }

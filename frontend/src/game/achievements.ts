@@ -1,5 +1,5 @@
-import { ACHIEVEMENTS, titlePerkOf, type AchievementDef } from './balance';
-import { ACHIEVEMENT_TEXT, VIBE_TEXT } from './content';
+import { ACHIEVEMENTS, parseTrophyId, titlePerkOf, type AchievementDef } from './balance';
+import { ACHIEVEMENT_TEXT, AWARD_TEXT, VIBE_TEXT } from './content';
 import { achievementValue, clampResource } from './selectors';
 import type { CommandResult, Fail, GameState } from './types';
 
@@ -42,10 +42,16 @@ export function evaluateAchievements(state: GameState): EvaluateResult {
   return { state: { ...state, achievements, diamonds: clampResource(diamonds) }, unlocked };
 }
 
-/** 칭호는 달성한 업적 중 칭호가 있는 것만 달 수 있다. null이면 칭호를 뗀다. */
+/** 시상식 트로피 칭호 문구: 「2026 신인상」. 트로피 ID가 아니면 null */
+export function trophyTitleText(id: string | null): string | null {
+  const t = parseTrophyId(id);
+  return t ? `${t.year} ${AWARD_TEXT[t.category].short}` : null;
+}
+
+/** 칭호는 달성한 업적 중 칭호가 있는 것과 받은 시상식 트로피만 달 수 있다. null이면 칭호를 뗀다. */
 export function setTitle(state: GameState, id: string | null): CommandResult {
   if (id !== null) {
-    const ok = state.achievements[id] !== undefined && !!ACHIEVEMENT_TEXT[id]?.title;
+    const ok = (state.achievements[id] !== undefined && !!ACHIEVEMENT_TEXT[id]?.title) || (state.trophies.includes(id) && parseTrophyId(id) !== null);
     if (!ok) {
       const fail: Fail = { ok: false, reason: 'not_owned', state };
       return fail;
@@ -56,14 +62,18 @@ export function setTitle(state: GameState, id: string | null): CommandResult {
 
 /** 달고 있는 칭호의 표시 문구. 없으면 null */
 export const titleText = (s: Pick<GameState, 'cosmetics'>): string | null =>
-  s.cosmetics.title ? (ACHIEVEMENT_TEXT[s.cosmetics.title]?.title ?? null) : null;
+  s.cosmetics.title ? (ACHIEVEMENT_TEXT[s.cosmetics.title]?.title ?? trophyTitleText(s.cosmetics.title)) : null;
 
-/** 지금 달 수 있는 칭호(달성한 업적 중 칭호가 있는 것). 업적 목록 순서대로 */
-export function ownedTitles(s: Pick<GameState, 'achievements'>): { id: string; title: string }[] {
+/** 지금 달 수 있는 칭호: 달성한 업적 중 칭호가 있는 것(업적 목록 순서) 뒤에 받은 시상식 트로피(받은 순서) */
+export function ownedTitles(s: Pick<GameState, 'achievements'> & { trophies?: readonly string[] }): { id: string; title: string }[] {
   const out: { id: string; title: string }[] = [];
   for (const def of ACHIEVEMENTS) {
     const title = ACHIEVEMENT_TEXT[def.id]?.title;
     if (title && s.achievements[def.id] !== undefined) out.push({ id: def.id, title });
+  }
+  for (const id of s.trophies ?? []) {
+    const title = trophyTitleText(id);
+    if (title) out.push({ id, title });
   }
   return out;
 }

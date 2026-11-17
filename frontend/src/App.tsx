@@ -58,6 +58,7 @@ import { BossScreen } from './screens/BossScreen';
 import { LiveScreen } from './screens/LiveScreen';
 import { RadioScreen } from './screens/RadioScreen';
 import { TourScreen } from './screens/TourScreen';
+import { AwardsScreen } from './screens/AwardsScreen';
 import { StatsScreen } from './screens/StatsScreen';
 import { TowerStage } from './screens/TowerStage';
 import { StudioScreen } from './screens/StudioScreen';
@@ -120,6 +121,7 @@ const SUB_TITLE: Partial<Record<TabId, string>> = {
   live: '라이브 대전',
   radio: '모노사파 FM',
   tour: '순회공연',
+  awards: '모노사파 어워즈',
   admin: '관리자',
 };
 
@@ -216,6 +218,7 @@ function Game() {
         {ui.tab === 'live' && <LiveScreen />}
         {ui.tab === 'radio' && <RadioScreen />}
         {ui.tab === 'tour' && <TourScreen />}
+        {ui.tab === 'awards' && <AwardsScreen />}
         {ui.tab === 'admin' && <AdminScreen />}
       </main>
       <nav className="tabs" aria-label="메인 메뉴">

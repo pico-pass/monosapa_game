@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 import { dayOf } from '../common/week.js';
 import { ChartService } from '../chart/chart.service.js';
+import { AwardsBoardService } from './awards-board.service.js';
 import { AwardPoint, AwardTick } from './awards.schema.js';
 import { AWARD_PERSONAS, HOUR_MS, SNAPSHOT_TOP, hourOf, pointRows } from './rules.js';
 
@@ -27,6 +28,7 @@ export class AwardsService implements OnModuleInit, OnModuleDestroy {
     @InjectModel(AwardTick.name) private readonly ticks: Model<AwardTick>,
     @InjectModel(AwardPoint.name) private readonly points: Model<AwardPoint>,
     private readonly chart: ChartService,
+    private readonly board: AwardsBoardService,
   ) {}
 
   onModuleInit(): void {
@@ -46,10 +48,13 @@ export class AwardsService implements OnModuleInit, OnModuleDestroy {
     if (this.busy) return false;
     this.busy = true;
     try {
-      return await this.collect(now);
-    } catch (e) {
-      this.log.error(`시상식 집계 실패: ${e instanceof Error ? e.message : String(e)}`);
-      return false;
+      const collected = await this.collect(now).catch((e: unknown) => {
+        this.log.error(`시상식 집계 실패: ${e instanceof Error ? e.message : String(e)}`);
+        return false;
+      });
+      // 투표 단계부터 후보, 발표 단계부터 결과를 한 번만 확정해 둔다(이미 있으면 읽기만 한다)
+      await this.board.freeze(now).catch((e: unknown) => this.log.error(`시상식 확정 실패: ${e instanceof Error ? e.message : String(e)}`));
+      return collected;
     } finally {
       this.busy = false;
     }

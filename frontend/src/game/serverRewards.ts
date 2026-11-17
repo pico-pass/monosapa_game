@@ -1,3 +1,4 @@
+import { BALANCE, parseTrophyId } from './balance';
 import { NOTE_LIMIT } from './pack-state';
 import { clampResource } from './selectors';
 import { track } from './tracking';
@@ -57,4 +58,15 @@ export function applyVillageHearts(state: GameState, hearts: number): CommandRes
 export function applyBossClaim(state: GameState, diamonds: number): CommandResult<{ diamonds: number }> {
   const d = cap(diamonds);
   return { ok: true, state: { ...state, diamonds: clampResource(state.diamonds + d) }, diamonds: d };
+}
+
+/**
+ * 시상식 보상: 서버가 받은 것으로 표시하고 돌려준 다이아와 트로피를 반영한다. 트로피는 모양이 맞는 ID만 합집합으로 더하므로 같은 값을 다시 넣어도 그대로다
+ * (그래서 서버가 받았다고 기록한 트로피가 저장에서 빠졌을 때 다시 채우는 데도 쓴다 — 그때는 다이아 0을 넘긴다). 돌려주는 `trophies`는 이번에 새로 더해진 것이다.
+ */
+export function applyAwardClaim(state: GameState, diamonds: number, trophies: readonly string[]): CommandResult<{ diamonds: number; trophies: string[] }> {
+  const d = Math.max(0, Math.min(BALANCE.awards.maxDiamonds, Math.floor(Number.isFinite(diamonds) ? diamonds : 0)));
+  const added = [...new Set(trophies.filter((t) => parseTrophyId(t) !== null && !state.trophies.includes(t)))];
+  const next = [...state.trophies, ...added].slice(-BALANCE.awards.maxTrophies);
+  return { ok: true, state: { ...state, diamonds: clampResource(state.diamonds + d), trophies: next }, diamonds: d, trophies: added };
 }

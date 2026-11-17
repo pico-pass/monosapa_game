@@ -1,3 +1,4 @@
+import type { AwardCategory } from './balance';
 import type { AlbumType, BuildingId, CampaignId, CardRarity, CostumeId, DialogueTone, GoodsId, ItemId, Persona, PostKind, SnackId, StageId, StreamPlatform, SkillId, ThemeId, Vibe, VirtualComment } from './types';
 
 /* 대사·제목·댓글·공연장 이름. 모두 게임용 창작 문구이며 실제 인물의 곡·발언이 아니다.
@@ -1364,3 +1365,35 @@ export const NEWS_TEXT: readonly string[] = [
 ];
 
 export const NEWS_CHOICE_TEXT = { hearts: '❤️ 받기', boost: '📣 응원 부스트' } as const;
+
+/* ---------- 시상식 「모노사파 어워즈」 ---------- */
+
+/** 부문 문구. short은 트로피 칭호(「2026 {short}」, 챗방 칭호 한도 16자 안)에 들어간다. */
+export const AWARD_TEXT: Record<AwardCategory, { icon: string; name: string; short: string; desc: string }> = {
+  'song-normal': { icon: '🏆', name: '올해의 노래 · 일반', short: '올해의 노래·일반', desc: '한 해 동안 일반속성 차트에서 순위 점수를 가장 많이 쌓은 곡이에요.' },
+  'song-dark': { icon: '🏆', name: '올해의 노래 · 어둠', short: '올해의 노래·어둠', desc: '한 해 동안 어둠속성 차트에서 순위 점수를 가장 많이 쌓은 곡이에요.' },
+  rookie: { icon: '🌱', name: '신인상', short: '신인상', desc: '12월 1일 이후 첫 싱글을 낸 신인 중 순위 점수를 가장 많이 쌓은 곡이에요.' },
+  revival: { icon: '🔄', name: '역주행상', short: '역주행상', desc: '차트에서 역주행한 시간이 가장 긴 곡이에요. 올해의 노래 1위 곡은 빠져요.' },
+  longrun: { icon: '⏳', name: '롱런상', short: '롱런상', desc: '차트 30위 안에 가장 오래 머문 곡이에요. 올해의 노래 1위 곡은 빠져요.' },
+  'fan-normal': { icon: '🗳️', name: '팬 투표상 · 일반', short: '팬 투표상·일반', desc: '점수 상위 10곡 후보 중 팬들이 투표로 뽑은 일반속성 곡이에요.' },
+  'fan-dark': { icon: '🗳️', name: '팬 투표상 · 어둠', short: '팬 투표상·어둠', desc: '점수 상위 10곡 후보 중 팬들이 투표로 뽑은 어둠속성 곡이에요.' },
+};
+
+/** 시상식 화면 문구 */
+export const AWARD_UI_TEXT = {
+  title: '모노사파 어워즈',
+  collecting: '집계 중',
+  voting: '투표 중',
+  announced: '결과 발표',
+  closed: '시상식 종료',
+  intro: '한 해 동안 음원 차트에 오른 곡을 정시마다 모아 두었다가 연말에 시상해요. 올해의 노래는 팬이 많은 계정이 유리해서, 신인상·역주행상·롱런상·팬 투표상을 따로 두었어요.',
+  scoreNote: '점수는 정시마다 30위 안 곡에 순위 점수(1위 30점 … 30위 1점)를 모아 하루 24시간으로 나눈 값이에요.',
+  schedule: '집계는 매 정시, 투표는 12월 24일 0시부터 31일 24시까지, 결과 발표는 1월 1일 0시, 보상은 1월 31일까지 받아요.',
+} as const;
+
+/** 부문 기준 값을 보여 줄 문구: 점수는 24로 나눠 보이고, 시간은 시간 수, 투표는 표 수 */
+export function awardValueText(category: AwardCategory, value: number): string {
+  if (category === 'longrun' || category === 'revival') return `${Math.round(value).toLocaleString('ko-KR')}시간`;
+  if (category === 'fan-normal' || category === 'fan-dark') return `${Math.round(value).toLocaleString('ko-KR')}표`;
+  return `${(Math.round((value / 24) * 10) / 10).toLocaleString('ko-KR')}점`;
+}

@@ -1504,6 +1504,11 @@ export const BALANCE = {
   },
   titlePerk: { low: 0.01, mid: 0.015, high: 0.02, top: 0.03, midDiamonds: 8, highDiamonds: 15, topDiamonds: 30 },
   /**
+   * 시상식 「모노사파 어워즈」(설계 docs/pack3-design.md): 서버가 집계·투표·보상을 정하고(보상 다이아는 서버 `WINNER_REWARDS`), 클라이언트는 받은 값을 반영한다.
+   * 1위 트로피는 칭호로 달 수 있고(`trophies`) 달면 부문의 갈래가 올라간다(올해의 노래는 song, 나머지는 other). 한 번에 받는 다이아의 상한(maxDiamonds)은 조작된 응답을 막는 안전선이다.
+   */
+  awards: { trophyPerk: { song: 0.05, other: 0.04 }, maxTrophies: 200, maxDiamonds: 500 },
+  /**
    * 라디오국 「모노사파 FM」(사용자가 고른 콘텐츠 팩 3의 아이디어, 수치는 모두 제안값): 기기 시간대 0~23시 24칸 편성표가 매일 되풀이되고,
    * 정산할 때 지난 시간(완전히 지난 정시만, 최대 capHours시간)을 칸마다 계산해 코인·팬을 준다. 설계는 docs/pack3-design.md.
    *   칸 종류: song 곡(내 싱글) · talk 멘트 · ad 광고 · guest 게스트(가진 피처링 래퍼, 한 편성표에 한 번씩) · off 비움.
@@ -2093,8 +2098,38 @@ const TITLE_VIBE: Partial<Record<AchievementMetric, Vibe>> = {
   chartNo1: 'fan',
 };
 
-/** 칭호(업적 ID)를 달았을 때 붙는 영구 보너스. 갈래는 업적 분야로, 값은 그 업적이 주는 다이아가 클수록 크다. 칭호가 없거나 모르는 ID면 null. */
+/* ---------- 시상식 트로피 ---------- */
+
+/** 시상식 부문. 서버 `backend/src/awards/rules.ts`의 `AWARD_CATEGORIES`와 순서까지 같아야 한다(프런트 테스트 awards.test.ts가 비교한다). */
+export const AWARD_CATEGORIES = ['song-normal', 'song-dark', 'rookie', 'revival', 'longrun', 'fan-normal', 'fan-dark'] as const;
+export type AwardCategory = (typeof AWARD_CATEGORIES)[number];
+
+/** 트로피(= 칭호)를 달았을 때 올라가는 갈래 */
+export const TROPHY_VIBE: Record<AwardCategory, Vibe> = {
+  'song-normal': 'fan',
+  'song-dark': 'power',
+  rookie: 'rhyme',
+  revival: 'power',
+  longrun: 'coin',
+  'fan-normal': 'fan',
+  'fan-dark': 'rhyme',
+};
+
+/** 트로피 ID. 서버 `trophyId`와 같은 모양이다. */
+export const trophyIdOf = (year: number, category: AwardCategory): string => `trophy-${year}-${category}`;
+
+/** 트로피 ID를 해·부문으로 푼다. 모양이 맞지 않거나 모르는 부문이면 null. */
+export function parseTrophyId(id: unknown): { year: number; category: AwardCategory } | null {
+  if (typeof id !== 'string') return null;
+  const m = /^trophy-(\d{4})-([a-z-]+)$/.exec(id);
+  const category = m?.[2] as AwardCategory | undefined;
+  return m && category && (AWARD_CATEGORIES as readonly string[]).includes(category) ? { year: Number(m[1]), category } : null;
+}
+
+/** 칭호(업적 ID 또는 트로피 ID)를 달았을 때 붙는 영구 보너스. 업적 칭호는 갈래가 업적 분야로, 값은 그 업적이 주는 다이아가 클수록 크다. 트로피는 부문마다 갈래가 정해져 있다. 칭호가 없거나 모르는 ID면 null. */
 export function titlePerkOf(id: string | null): { vibe: Vibe; value: number } | null {
+  const trophy = parseTrophyId(id);
+  if (trophy) return { vibe: TROPHY_VIBE[trophy.category], value: trophy.category.startsWith('song-') ? BALANCE.awards.trophyPerk.song : BALANCE.awards.trophyPerk.other };
   const def = id ? ACHIEVEMENTS.find((a) => a.id === id) : undefined;
   const vibe = def ? TITLE_VIBE[def.metric] : undefined;
   if (!def || !vibe) return null;

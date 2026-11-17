@@ -55,7 +55,7 @@ describe('프로필 사진', () => {
 });
 
 describe('새 소식 알림 점', () => {
-  const s = (patch: Partial<SocialSummary>): SocialSummary => ({ mailUnread: 0, mailClaimable: 0, friendRequests: 0, dmUnread: 0, villageFlags: 0, bossClaimable: 0, ...patch });
+  const s = (patch: Partial<SocialSummary>): SocialSummary => ({ mailUnread: 0, mailClaimable: 0, friendRequests: 0, dmUnread: 0, villageFlags: 0, bossClaimable: 0, awards: 0, ...patch });
 
   it('우편함은 안 읽은 우편과 받을 다이아 우편 중 큰 쪽이다', () => {
     expect(mailBadge(s({ mailUnread: 3, mailClaimable: 1 }))).toBe(3);
@@ -71,5 +71,10 @@ describe('새 소식 알림 점', () => {
 
   it('더보기 점에는 마을 깃발과 보스 보상도 들어간다', () => {
     expect(socialTotal(s({ villageFlags: 3, bossClaimable: 1 }))).toBe(4);
+  });
+
+  it('더보기 점에는 시상식 할 일도 들어간다', () => {
+    expect(socialTotal(s({ awards: 1 }))).toBe(1);
+    expect(socialTotal(s({ villageFlags: 3, bossClaimable: 1, awards: 1 }))).toBe(5);
   });
 });

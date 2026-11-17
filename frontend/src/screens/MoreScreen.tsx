@@ -3,7 +3,7 @@ import { useAuth } from '../store/authStore';
 import { setTab, useUi, type TabId } from '../store/gameStore';
 import { friendBadge, mailBadge, useSocial } from '../store/socialStore';
 
-const ITEMS: { id: TabId; icon: string; name: string; desc: string; alert?: 'missions' | 'mail' | 'monogram' | 'collect' | 'nurture' | 'skills' | 'stats' | 'village' | 'radio' | 'tour'; social?: 'postbox' | 'friends' | 'village' | 'boss' }[] = [
+const ITEMS: { id: TabId; icon: string; name: string; desc: string; alert?: 'missions' | 'mail' | 'monogram' | 'collect' | 'nurture' | 'skills' | 'stats' | 'village' | 'radio' | 'tour'; social?: 'postbox' | 'friends' | 'village' | 'boss' | 'awards' }[] = [
   { id: 'shop', icon: '🛒', name: '상점', desc: '간식·홍보 캠페인·테마' },
   { id: 'missions', icon: '📅', name: '미션·출석', desc: '일일·주간 미션 보상', alert: 'missions' },
   { id: 'achievements', icon: '🏅', name: '업적·칭호', desc: '달성하고 칭호를 달아요 · 끝없는 업적' },
@@ -20,6 +20,7 @@ const ITEMS: { id: TabId; icon: string; name: string; desc: string; alert?: 'mis
   { id: 'arcade', icon: '🎮', name: '아케이드', desc: '리듬·생존·가사 덱·계단·피켓팅' },
   { id: 'challenge', icon: '#️⃣', name: '해시태그 챌린지', desc: '주간 주제로 한 줄 가사' },
   { id: 'chart', icon: '📈', name: '음원 차트', desc: '실시간 TOP100과 순위 보상' },
+  { id: 'awards', icon: '🏆', name: '모노사파 어워즈', desc: '연말 시상식·팬 투표·트로피 칭호', social: 'awards' },
   { id: 'wrapped', icon: '🎁', name: '결산 Wrapped', desc: '내 기록을 카드로 공유' },
   { id: 'sampler', icon: '🎙️', name: '목소리 샘플러', desc: '내 목소리로 패드와 비트' },
   { id: 'chat', icon: '💬', name: '챗방', desc: '모두가 쓰는 자유 채팅' },
@@ -42,7 +43,7 @@ export function MoreScreen() {
       <h2 className="section-title">더보기</h2>
       <div className="more-grid">
         {items.map((it) => {
-          const social = it.social === 'postbox' ? mailBadge(summary) : it.social === 'friends' ? friendBadge(summary) : it.social === 'village' ? summary.villageFlags : it.social === 'boss' ? summary.bossClaimable : 0;
+          const social = it.social === 'postbox' ? mailBadge(summary) : it.social === 'friends' ? friendBadge(summary) : it.social === 'village' ? summary.villageFlags : it.social === 'boss' ? summary.bossClaimable : it.social === 'awards' ? summary.awards : 0;
           const n = (it.alert ? alerts[it.alert] : 0) + social;
           return (
             <button key={it.id} type="button" className="more-item" onClick={() => setTab(it.id)}>

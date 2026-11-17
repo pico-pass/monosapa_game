@@ -38,7 +38,7 @@ import { addLyricCard, draftChoices, trimLyricCard } from '../game/lyricdeck';
 import { claimPresent, feedMascot, giftMascot, playMascot } from '../game/mascot';
 import { nurtureAct, nurtureWake } from '../game/nurture';
 import { buyTickets, craftPhoto, dismantlePhoto, giveCard, photoPull, takeCard, type PhotoPullResult } from '../game/photocards';
-import { applyBossClaim, applyChallengeClaim, applyChallengePosted, applyChartClaim, applyMailClaim, applyVillageHearts } from '../game/serverRewards';
+import { applyAwardClaim, applyBossClaim, applyChallengeClaim, applyChallengePosted, applyChartClaim, applyMailClaim, applyVillageHearts } from '../game/serverRewards';
 import { remasterCard, toggleDeck } from '../game/songcards';
 import { abandonTower, beginTower, finishTower, rollTower, type TowerOutcome, type TowerRun } from '../game/tower';
 import { ACHIEVEMENT_TEXT, CAMPAIGN_TEXT, COSTUME_TEXT, GOODS_TEXT, ITEM_TEXT, MEAL_TEXT, PACK_TEXT, RECEIPT_TEXT, SCRATCH_TEXT, SLEEVE_TEXT, SNACK_TEXT, STAGE_TEXT, THEME_TEXT, pickLine, residentName, scratchLabel, type Situation } from '../game/content';
@@ -132,9 +132,10 @@ export type TabId =
   | 'live'
   | 'radio'
   | 'tour'
+  | 'awards'
   | 'admin';
 /** 하단 탭의 「더보기」 안에 있는 화면들 */
-export const MORE_TABS: readonly TabId[] = ['stats', 'ranking', 'collection', 'shop', 'missions', 'achievements', 'mail', 'monogram', 'chat', 'inquiry', 'collect', 'nurture', 'arcade', 'challenge', 'chart', 'wrapped', 'sampler', 'friends', 'dm', 'postbox', 'skills', 'village', 'boss', 'live', 'radio', 'tour', 'admin'];
+export const MORE_TABS: readonly TabId[] = ['stats', 'ranking', 'collection', 'shop', 'missions', 'achievements', 'mail', 'monogram', 'chat', 'inquiry', 'collect', 'nurture', 'arcade', 'challenge', 'chart', 'wrapped', 'sampler', 'friends', 'dm', 'postbox', 'skills', 'village', 'boss', 'live', 'radio', 'tour', 'awards', 'admin'];
 export type Phase = 'booting' | 'ready' | 'readonly' | 'corrupt';
 
 export interface Bubble {
@@ -1634,6 +1635,29 @@ export async function doClaimChart(): Promise<boolean> {
     toast(errorText(e), 'warn');
     return false;
   }
+}
+
+/** 시상식 보상을 받는다: 서버가 받을 수 있는 보상을 전부 한 번씩 내주고, 다이아와 트로피를 저장에 반영한다. */
+export async function doClaimAwards(): Promise<boolean> {
+  try {
+    const res = await api<{ diamonds: number; trophies: string[] }>('awards/claim', { method: 'POST' });
+    const r = exec((s) => applyAwardClaim(s, res.diamonds, res.trophies));
+    if (r?.ok) {
+      sfx.album();
+      toast(`🏆 시상식 보상! 💎 +${r.diamonds}${r.trophies.length > 0 ? ` · 트로피 ${r.trophies.length}개` : ''}`, 'good');
+      saveNow(true);
+    }
+    return true;
+  } catch (e) {
+    toast(errorText(e), 'warn');
+    return false;
+  }
+}
+
+/** 서버가 받았다고 기록한 트로피가 이 저장에 없으면(응답이 저장되기 전에 끊긴 경우) 다시 채운다. 다이아는 건드리지 않는다. */
+export function syncTrophies(ids: readonly string[]): void {
+  const r = exec((s) => applyAwardClaim(s, 0, ids));
+  if (r?.ok && r.trophies.length > 0) saveNow(true);
 }
 
 /** 중복 카드를 교환소에 맡긴다. 서버가 거절하면 카드를 돌려받는다. */

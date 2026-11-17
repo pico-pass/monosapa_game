@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import type { HydratedDocument } from 'mongoose';
-import { AWARD_PERSONAS, AWARD_RETENTION_SECONDS, type AwardPersona } from './rules.js';
+import { Types, type HydratedDocument } from 'mongoose';
+import { AWARD_PERSONAS, AWARD_RETENTION_SECONDS, VOTE_CATEGORIES, type AwardPersona, type CandidateRow, type ResultRow, type VoteCategory } from './rules.js';
 
 /**
  * 정시 집계 표식. 정시 번호가 유일해서 같은 정시를 두 번 더하지 않는다(서버를 다시 켜거나 확인이 겹쳐도 한 번만).
@@ -63,3 +63,78 @@ export type AwardPointDocument = HydratedDocument<AwardPoint>;
 export const AwardPointSchema = SchemaFactory.createForClass(AwardPoint);
 AwardPointSchema.index({ day: 1, persona: 1, key: 1 }, { unique: true });
 AwardPointSchema.index({ createdAt: 1 }, { expireAfterSeconds: AWARD_RETENTION_SECONDS });
+
+/**
+ * 한 해 시상식의 확정 자료. 후보(투표 시작 전날까지의 누적으로 가린 팬 투표상 후보)와 결과(발표 때 한 번 계산)를 **한 번만** 적어 두고 바꾸지 않는다 —
+ * 집계 자료나 투표가 나중에 달라져도 발표된 결과가 흔들리지 않게 하려는 것이다. 값이 아직 없으면 null이고, 비어 있는 계산은 적지 않는다(다음에 다시 계산한다).
+ */
+@Schema({ collection: 'award_editions', timestamps: false })
+export class AwardEdition {
+  /** 해(`2026`) */
+  @Prop({ required: true, unique: true })
+  period!: string;
+
+  @Prop({ type: Object, default: null })
+  candidates!: CandidateRow[] | null;
+
+  @Prop({ type: Object, default: null })
+  results!: ResultRow[] | null;
+
+  @Prop({ type: Date, required: true })
+  createdAt!: Date;
+}
+export type AwardEditionDocument = HydratedDocument<AwardEdition>;
+export const AwardEditionSchema = SchemaFactory.createForClass(AwardEdition);
+
+/** 팬 투표상 투표. 해·부문·사람마다 한 표이고 바꿀 수 없다. */
+@Schema({ collection: 'award_votes', timestamps: false })
+export class AwardVote {
+  @Prop({ required: true })
+  period!: string;
+
+  @Prop({ required: true, enum: [...VOTE_CATEGORIES] })
+  category!: VoteCategory;
+
+  @Prop({ type: Types.ObjectId, required: true })
+  userId!: Types.ObjectId;
+
+  /** 투표한 곡 키 */
+  @Prop({ required: true })
+  key!: string;
+
+  @Prop({ type: Date, required: true })
+  createdAt!: Date;
+}
+export type AwardVoteDocument = HydratedDocument<AwardVote>;
+export const AwardVoteSchema = SchemaFactory.createForClass(AwardVote);
+AwardVoteSchema.index({ period: 1, category: 1, userId: 1 }, { unique: true });
+AwardVoteSchema.index({ period: 1, category: 1, key: 1 });
+AwardVoteSchema.index({ createdAt: 1 }, { expireAfterSeconds: AWARD_RETENTION_SECONDS });
+
+/** 받은 시상식 보상. (해, 보상 키, 사람)이 유일해서 같은 보상은 한 번만 내준다(`ClaimItem.id`). */
+@Schema({ collection: 'award_claims', timestamps: false })
+export class AwardClaim {
+  @Prop({ required: true })
+  period!: string;
+
+  @Prop({ required: true })
+  item!: string;
+
+  @Prop({ type: Types.ObjectId, required: true })
+  userId!: Types.ObjectId;
+
+  @Prop({ required: true })
+  diamonds!: number;
+
+  /** 이 보상으로 받은 트로피 ID. 없으면 null */
+  @Prop({ type: String, default: null })
+  trophy!: string | null;
+
+  @Prop({ type: Date, required: true })
+  createdAt!: Date;
+}
+export type AwardClaimDocument = HydratedDocument<AwardClaim>;
+export const AwardClaimSchema = SchemaFactory.createForClass(AwardClaim);
+AwardClaimSchema.index({ period: 1, item: 1, userId: 1 }, { unique: true });
+AwardClaimSchema.index({ userId: 1, period: 1 });
+AwardClaimSchema.index({ createdAt: 1 }, { expireAfterSeconds: AWARD_RETENTION_SECONDS });
