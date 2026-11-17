@@ -1,10 +1,11 @@
-import { ACHIEVEMENTS, BALANCE, BUILDING_IDS, CAMPAIGN_IDS, COSTUME_IDS, ENDLESS, ENDLESS_MAX_TIER, EQUIPMENT_KINDS, GOODS_IDS, ITEM_IDS, MISSION_METRICS, POST_KINDS, SCHEMA_VERSION, SKILL_IDS, SNACK_IDS, STAGE_IDS, STREAM_PLATFORMS, THEME_IDS, costumePersona } from './balance';
+import { ACHIEVEMENTS, BALANCE, BUILDING_IDS, CAMPAIGN_IDS, COSTUME_IDS, ENDLESS, ENDLESS_MAX_TIER, EQUIPMENT_KINDS, GOODS_IDS, ITEM_IDS, MISSION_METRICS, POST_KINDS, SCHEMA_VERSION, SKILL_IDS, SNACK_IDS, STAGE_IDS, STREAM_PLATFORMS, THEME_IDS, TOUR_CITY_IDS, costumePersona } from './balance';
 import { CERT_TIER_COUNT, emptyCerts } from './certs';
 import { albumDefById, albumSeries, mailTemplateById } from './content';
 import { emptyFanMail } from './fanmail';
 import { emptyMissions } from './missions';
 import { emptyMonogram } from './monogram';
 import { RADIO_KINDS, emptyRadio, hourStart } from './radio';
+import { emptyTour, validRoute } from './tour';
 import { Invalid, MAX_TIME, bad, bool, int, isObj, num, persona, str, type Obj } from './parse';
 import { emptyArcade, emptyCards, emptyFeat, emptyMascots, emptyNurtures, emptyPhoto, emptyStats, packSeeds, parseArcade, parseCards, parseFeat, parseMascots, parseNurtures, parsePhoto, parseStats } from './pack-state';
 import { retroactiveDiamonds } from './selectors';
@@ -36,6 +37,9 @@ import type {
   Post,
   Radio,
   RadioSlot,
+  Tour,
+  TourCityId,
+  TourRun,
   SnackId,
   Skills,
   StageId,
@@ -85,6 +89,7 @@ export function createInitialState(now: number, reducedMotion = false): GameStat
     skills: emptySkills(),
     village: emptyVillage(streamSeedFrom(now + 3), now),
     radio: emptyRadio(now, streamSeedFrom(now + 4)),
+    tour: emptyTour(streamSeedFrom(now + 5)),
     endless: {},
     buffs: { snack: null, campaign: null, item: null, goods: null },
     mart: emptyMart(),
@@ -236,6 +241,55 @@ function parseRadio(raw: unknown, at: number, seed: number): Radio {
     slots,
     claimedAt: raw.claimedAt === undefined ? out.claimedAt : hourStart(Math.min(num(raw, 'claimedAt', 0, MAX_TIME, 'radio.claimedAt'), at)),
     seed: raw.seed === undefined ? out.seed : int(raw, 'seed', 0, 4294967295, 'radio.seed'),
+  };
+}
+
+/**
+ * 순회공연. 없는 예전 저장은 새 순회공연이고, 알 수 없는 도시의 기념품·기록은 버린다. 진행 중인 투어는 노선이 올바르지 않으면(알 수 없는 도시·끊긴 노선·칸 수 초과) 없는 것으로 읽고,
+ * 칸 수는 이 게임의 최대치(`BALANCE.tour.maxLegs`)까지 받아들인다(최대 칸 수가 정해지는 규칙이 바뀌어도 저장이 깨지지 않게).
+ */
+function parseTour(raw: unknown, seed: number): Tour {
+  const out = emptyTour(seed);
+  if (raw === undefined) return out;
+  if (!isObj(raw)) return bad('tour가 올바르지 않습니다.');
+  const souvenirs: Tour['souvenirs'] = {};
+  const best: Tour['best'] = {};
+  if (raw.souvenirs !== undefined) {
+    if (!isObj(raw.souvenirs)) return bad('tour.souvenirs가 올바르지 않습니다.');
+    for (const id of TOUR_CITY_IDS) if (raw.souvenirs[id] !== undefined) souvenirs[id] = 1;
+  }
+  if (raw.best !== undefined) {
+    if (!isObj(raw.best)) return bad('tour.best가 올바르지 않습니다.');
+    for (const id of TOUR_CITY_IDS) if (raw.best[id] !== undefined) best[id] = int(raw.best, id, 0, 3, `tour.best.${id}`);
+  }
+  let active: TourRun | null = null;
+  if (raw.active !== undefined && raw.active !== null) {
+    const a = raw.active;
+    if (!isObj(a)) return bad('tour.active가 올바르지 않습니다.');
+    const route = Array.isArray(a.route) ? a.route.filter((x): x is string => typeof x === 'string') : [];
+    const personas = Array.isArray(a.personas) ? a.personas.filter((x): x is string => typeof x === 'string') : [];
+    if (route.length === (a.route as unknown[] | undefined)?.length && validRoute(route, personas, BALANCE.tour.maxLegs)) {
+      const power = isObj(a.power) ? a.power : {};
+      active = {
+        no: int(a, 'no', 1, 1_000_000, 'tour.active.no'),
+        route: route as TourCityId[],
+        personas: personas as Persona[],
+        startedAt: num(a, 'startedAt', 0, MAX_TIME, 'tour.active.startedAt'),
+        paid: Math.min(route.length, int(a, 'paid', 0, 1_000, 'tour.active.paid')),
+        power: { normal: num(power, 'normal', 0, 1e15, 'tour.active.power.normal'), dark: num(power, 'dark', 0, 1e15, 'tour.active.power.dark') },
+      };
+    }
+  }
+  const count = raw.count === undefined ? 0 : int(raw, 'count', 0, 1_000_000, 'tour.count');
+  const started = raw.started === undefined ? count : int(raw, 'started', 0, 1_000_000, 'tour.started');
+  return {
+    seed: raw.seed === undefined ? out.seed : int(raw, 'seed', 0, 4294967295, 'tour.seed'),
+    count,
+    // 진행 중인 투어의 번호보다 작게 읽으면 같은 번호가 다시 나올 수 있어서 맞춰 올린다
+    started: Math.max(count, started, active?.no ?? 0),
+    active,
+    souvenirs,
+    best,
   };
 }
 
@@ -544,6 +598,7 @@ export function validateState(input: unknown): Validation {
     const skills = parseSkills(o.skills);
     const village = parseVillage(o.village, streamSeedFrom(savedAtSeed + 3), num(o, 'lastSettledAt', 0, MAX_TIME));
     const radio = parseRadio(o.radio, num(o, 'lastSettledAt', 0, MAX_TIME), streamSeedFrom(savedAtSeed + 4));
+    const tour = parseTour(o.tour, streamSeedFrom(savedAtSeed + 5));
     const endless = parseEndless(o.endless);
     const buffs = parseBuffs(o.buffs);
     const mart = parseMart(o.mart);
@@ -588,6 +643,7 @@ export function validateState(input: unknown): Validation {
       skills,
       village,
       radio,
+      tour,
       endless,
       buffs,
       mart,

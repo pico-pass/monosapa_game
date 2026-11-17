@@ -48,6 +48,7 @@ import { buySlot, collectPost, startPost } from '../game/monogram';
 import { buyCampaign, buyCostume, buyGoods, buyItem, buyMeal, buyPack, buyReceipt, buyScratch, buySleeve, buySnack, buyTheme, redeemCoupon, setCostume, setTheme } from '../game/shop';
 import { InputLimiter } from '../game/input';
 import { autoRadio, claimRadio, clearRadio, setRadioSlot, type RadioPaid } from '../game/radio';
+import { abandonTour, claimTour, startTour, type TourClaim } from '../game/tour';
 import type { BlocksSummary } from '../game/blocks';
 import type { BounceSummary } from '../game/bounce';
 import type { DefenseSummary } from '../game/defense';
@@ -92,6 +93,7 @@ import type {
   StageId,
   StreamPlatform,
   ThemeId,
+  TourCityId,
 } from '../game/types';
 import { api, errorText } from '../platform/api';
 import { CloudSync, reconcileOnBoot, resetLocalProgress, scopedStorage, type RemoteSave } from '../platform/cloudSave';
@@ -129,9 +131,10 @@ export type TabId =
   | 'boss'
   | 'live'
   | 'radio'
+  | 'tour'
   | 'admin';
 /** 하단 탭의 「더보기」 안에 있는 화면들 */
-export const MORE_TABS: readonly TabId[] = ['stats', 'ranking', 'collection', 'shop', 'missions', 'achievements', 'mail', 'monogram', 'chat', 'inquiry', 'collect', 'nurture', 'arcade', 'challenge', 'chart', 'wrapped', 'sampler', 'friends', 'dm', 'postbox', 'skills', 'village', 'boss', 'live', 'radio', 'admin'];
+export const MORE_TABS: readonly TabId[] = ['stats', 'ranking', 'collection', 'shop', 'missions', 'achievements', 'mail', 'monogram', 'chat', 'inquiry', 'collect', 'nurture', 'arcade', 'challenge', 'chart', 'wrapped', 'sampler', 'friends', 'dm', 'postbox', 'skills', 'village', 'boss', 'live', 'radio', 'tour', 'admin'];
 export type Phase = 'booting' | 'ready' | 'readonly' | 'corrupt';
 
 export interface Bubble {
@@ -238,6 +241,8 @@ export interface UiState {
   lyricDraft: string[] | null;
   gachaResult: GachaResult | null;
   scratchResult: ScratchResultView | null;
+  /** 방금 정산한 순회공연 결과(투어 화면에 보여 준다). 새 투어를 출발하면 지운다. */
+  tourResult: TourClaim | null;
   /** 진행 중인 계단 보스전. 전체화면이라 이 동안은 다른 탭으로 나갈 수 없다. */
   towerRun: TowerRun | null;
   towerResult: TowerOutcome | null;
@@ -284,6 +289,9 @@ const FAIL_TEXT: Record<FailReason, string> = {
   need_max_level: '장비를 최대 레벨까지 올린 뒤에 한계를 돌파할 수 있어요.',
   village_locked: '팬 3만 명부터 마을이 열려요.',
   radio_locked: '팬 1만 명부터 라디오국이 열려요.',
+  tour_locked: '월클 콘서트를 클리어하면 순회공연이 열려요.',
+  tour_busy: '이미 순회공연 중이에요. 먼저 끝내거나 중단해 주세요.',
+  tour_invalid: '노선이 올바르지 않아요. 서울에서 이어지는 도시를 한 번씩만 골라 주세요.',
   tile_invalid: '아직 열리지 않은 땅이에요.',
   tile_taken: '이미 건물이 있는 칸이에요.',
   building_limit: '이 건물은 더 지을 수 없어요.',
@@ -365,6 +373,7 @@ let ui: UiState = {
   lyricDraft: null,
   gachaResult: null,
   scratchResult: null,
+  tourResult: null,
   towerRun: null,
   towerResult: null,
 };
@@ -1037,6 +1046,49 @@ export function doBuyPack(): void {
   saveNow();
 }
 
+/* ---------- 순회공연 ---------- */
+
+/** 정산 결과를 한 줄 알림으로 */
+function tourClaimToast(c: TourClaim): string {
+  const grades = c.results.map((x) => ['C', 'B', 'A', 'S'][x.grade]).join('·');
+  const souvenirs = c.results.filter((x) => x.souvenir).length;
+  return `🗺️ 공연 ${c.results.length}곳 정산(${grades}) · 🪙 +${fmt(c.coins)} · 팬 +${fmt(c.fans)}${c.diamonds > 0 ? ` · 💎 +${c.diamonds}` : ''}${souvenirs > 0 ? ` · 기념품 ${souvenirs}개` : ''}${c.finished ? ' · 투어 완료!' : ''}`;
+}
+
+export function doStartTour(route: TourCityId[], personas: Persona[]): void {
+  const r = exec((s) => startTour(s, route, personas));
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  sfx.unlock();
+  set({ tourResult: null });
+  toast(`🗺️ 투어 출발! 도시 ${route.length}곳`, 'good');
+  saveNow();
+}
+
+export function doClaimTour(): void {
+  const r = exec(claimTour);
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  if (r.claim.results.some((x) => x.souvenir || x.grade >= 3)) sfx.album();
+  else sfx.buy();
+  set({ tourResult: r.claim });
+  toast(tourClaimToast(r.claim), 'good');
+  saveNow();
+}
+
+export function doAbandonTour(): void {
+  const r = exec(abandonTour);
+  if (!r) return;
+  if (!r.ok) return failToast(r.reason);
+  sfx.fail();
+  if (r.claim) {
+    set({ tourResult: r.claim });
+    toast(tourClaimToast(r.claim), 'good');
+  }
+  toast('🗺️ 순회공연을 중단했어요.', 'info');
+  saveNow();
+}
+
 /* ---------- 라디오국 ---------- */
 
 /** 편성을 바꾸기 전에 자동으로 정산된 방송분이 있으면 알려 준다. */
@@ -1700,6 +1752,7 @@ function resetRuntime(): void {
     lyricDraft: null,
     gachaResult: null,
     scratchResult: null,
+    tourResult: null,
     towerRun: null,
     towerResult: null,
     tab: 'studio',

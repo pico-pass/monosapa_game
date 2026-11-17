@@ -5597,3 +5597,108 @@ span.rar {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent);
 }
+
+/* ---------- 순회공연 ---------- */
+.tour-map {
+  width: 100%;
+  height: auto;
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.tour-edge {
+  stroke: var(--line);
+  stroke-width: 0.3;
+}
+.tour-edge-on {
+  stroke: var(--accent);
+  stroke-width: 0.9;
+}
+.tour-node circle {
+  fill: var(--panel);
+  stroke: var(--line);
+  stroke-width: 0.5;
+}
+.tour-node text {
+  font-size: 2.6px;
+  fill: var(--text);
+  text-anchor: middle;
+  pointer-events: none;
+}
+.tour-node .tour-node-label {
+  font-size: 2.3px;
+  fill: var(--muted);
+}
+.tour-node-home circle {
+  fill: var(--panel-soft);
+  stroke: var(--text);
+}
+.tour-node-on circle {
+  fill: var(--accent);
+  stroke: var(--accent);
+}
+.tour-node-on text {
+  fill: var(--accent-ink);
+}
+.tour-node-next {
+  cursor: pointer;
+}
+.tour-node-next circle {
+  stroke: var(--accent);
+  stroke-width: 0.9;
+}
+.tour-node[role='button'] {
+  cursor: pointer;
+}
+.tour-next {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tour-next-btn {
+  font-size: 13px;
+}
+.tour-legs,
+.tour-results,
+.tour-dex {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+}
+.tour-leg {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-soft);
+}
+.tour-leg-paid {
+  opacity: 0.6;
+}
+.tour-leg-done {
+  border-color: var(--good);
+}
+.tour-grade {
+  display: inline-block;
+  min-width: 22px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 800;
+  text-align: center;
+  color: #fff;
+  background: var(--muted);
+}
+.tour-grade-S {
+  background: #e8a317;
+}
+.tour-grade-A {
+  background: var(--good);
+}
+.tour-grade-B {
+  background: var(--accent2);
+}

@@ -610,6 +610,49 @@ export const SLEEVE_TEXT = {
   blurb: '포토카드를 넣는 투명한 비닐. 새것처럼 보이게 해 주지만, 같은 카드가 두 장이면 소용없다.',
 };
 
+/** 순회공연 「투어 지도」 문구 */
+export const TOUR_TEXT = {
+  name: '순회공연',
+  icon: '🗺️',
+  blurb: '서울에서 출발해 도시를 이어 노선을 짜 보세요. 비행하고 공연하는 동안 시간이 흘러요. 어디서 어디로 가느냐가 전략이에요.',
+};
+
+/** 도시 이름과 기념품 */
+export const TOUR_CITY_TEXT: Record<string, { name: string; souvenir: { icon: string; name: string } }> = {
+  seoul: { name: '서울', souvenir: { icon: '🏠', name: '' } },
+  tokyo: { name: '도쿄', souvenir: { icon: '🗼', name: '도쿄 타워 키링' } },
+  bangkok: { name: '방콕', souvenir: { icon: '🛺', name: '툭툭 모형' } },
+  singapore: { name: '싱가포르', souvenir: { icon: '🦁', name: '머라이언 인형' } },
+  london: { name: '런던', souvenir: { icon: '🎡', name: '빅벤 엽서' } },
+  paris: { name: '파리', souvenir: { icon: '🥐', name: '에펠탑 모형' } },
+  berlin: { name: '베를린', souvenir: { icon: '🧱', name: '장벽 조각' } },
+  newyork: { name: '뉴욕', souvenir: { icon: '🗽', name: '자유의 여신상 미니어처' } },
+  la: { name: 'LA', souvenir: { icon: '🌴', name: '할리우드 사인 머그컵' } },
+  saopaulo: { name: '상파울루', souvenir: { icon: '⚽', name: '삼바 축구공' } },
+  sydney: { name: '시드니', souvenir: { icon: '🦘', name: '캥거루 인형' } },
+  dubai: { name: '두바이', souvenir: { icon: '🏙️', name: '황금 타워 모형' } },
+  istanbul: { name: '이스탄불', souvenir: { icon: '🕌', name: '유리 램프' } },
+};
+
+/** 지역 이름과 기념품이 올리는 갈래 */
+export const TOUR_REGION_TEXT: Record<'asia' | 'europe' | 'america' | 'oceania', { icon: string; name: string; vibe: string }> = {
+  asia: { icon: '🌏', name: '아시아', vibe: '라임 생산' },
+  europe: { icon: '🌍', name: '유럽', vibe: '인세' },
+  america: { icon: '🌎', name: '아메리카', vibe: '팬 획득' },
+  oceania: { icon: '🧭', name: '오세아니아·중동', vibe: '전투력' },
+};
+
+/** 칸 결과 등급 이름 */
+export const TOUR_GRADE_TEXT = ['C', 'B', 'A', 'S'] as const;
+
+/** 돌발 사건 */
+export const TOUR_EVENT_TEXT: Record<'delay' | 'hit' | 'lost' | 'guest', { icon: string; text: string; tone: 'good' | 'bad' }> = {
+  delay: { icon: '🛫', text: '이륙이 지연돼서 비행이 30% 길어졌어요', tone: 'bad' },
+  hit: { icon: '🔥', text: '현지 반응이 폭발했어요! 팬 +50%', tone: 'good' },
+  lost: { icon: '🧳', text: '짐을 잃어버렸어요. 코인 −20%', tone: 'bad' },
+  guest: { icon: '🎙️', text: '깜짝 게스트가 올라왔어요! 공연 힘 +20%', tone: 'good' },
+};
+
 /** 라디오국 「모노사파 FM」 문구 */
 export const RADIO_TEXT = {
   name: '모노사파 FM',

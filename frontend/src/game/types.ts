@@ -74,6 +74,40 @@ export interface Radio {
   seed: number;
 }
 
+/** 순회공연(투어 지도)의 도시. 서울은 출발지라 도시 목록에 없다. */
+export type TourCityId = 'tokyo' | 'bangkok' | 'singapore' | 'london' | 'paris' | 'berlin' | 'newyork' | 'la' | 'saopaulo' | 'sydney' | 'dubai' | 'istanbul';
+export type TourRegion = 'asia' | 'europe' | 'america' | 'oceania';
+
+/** 진행 중인 순회공연. 시각은 모두 startedAt에서 노선만으로 계산된다(tour.ts의 tourTimeline). */
+export interface TourRun {
+  /** 몇 번째 투어인가(1부터). 돌발 사건·변수를 정하는 번호 */
+  no: number;
+  /** 서울에서 출발해 차례로 가는 도시들 */
+  route: TourCityId[];
+  /** 도시마다 세운 자아 */
+  personas: Persona[];
+  startedAt: number;
+  /** 이미 정산한 칸 수 */
+  paid: number;
+  /** 출발할 때의 전투력 배율(자아별 = 전투력 ÷ 레벨 기본 전투력). 결과는 이 값으로 계산해서 출발 전 미리보기와 같다. */
+  power: Record<Persona, number>;
+}
+
+/** 순회공연: 진행 중인 투어, 도시별 기념품·최고 등급. 규칙은 tour.ts. */
+export interface Tour {
+  /** 돌발 사건·변수를 정하는 씨앗 */
+  seed: number;
+  /** 끝까지 마친 투어 수(최대 칸 수가 늘어난다) */
+  count: number;
+  /** 출발한 투어 수(중단한 투어도 센다). 다음 투어 번호 = started + 1이라 중단하고 다시 시작해도 같은 사건이 나오지 않는다. */
+  started: number;
+  active: TourRun | null;
+  /** 기념품을 받은 도시(A 이상을 처음 받은 곳) */
+  souvenirs: Partial<Record<TourCityId, 1>>;
+  /** 도시별 지금까지의 최고 등급(0 C · 1 B · 2 A · 3 S) */
+  best: Partial<Record<TourCityId, number>>;
+}
+
 /** 팬들이 사는 마을. 8×8 땅(인덱스 = y×8 + x)의 가운데부터 팬 수에 따라 열린다. 규칙은 villagedata.ts·village.ts. */
 export interface Village {
   /** 소식 카드를 정하는 씨앗 */
@@ -458,6 +492,8 @@ export interface GameState {
   village: Village;
   /** 라디오국: 24시간 편성표와 정산 시각 */
   radio: Radio;
+  /** 순회공연: 진행 중인 투어와 도시별 기념품 */
+  tour: Tour;
   /** 끝없는 업적: 지표 ID → 지금까지 받은 단계 수 */
   endless: Record<string, number>;
   /** 간식·홍보 캠페인·편의점 상품 버프 */
@@ -550,6 +586,10 @@ export type FailReason =
   | 'daily_limit'
   // 라디오국
   | 'radio_locked'
+  // 순회공연
+  | 'tour_locked'
+  | 'tour_busy'
+  | 'tour_invalid'
   // 모노사파 육성
   | 'nurture_locked'
   | 'level_low'

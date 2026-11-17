@@ -5,6 +5,7 @@ import { readyPosts } from './monogram';
 import { nurtureAlerts } from './nurture';
 import { radioAlerts } from './radio';
 import { skillPointsFree } from './skills';
+import { tourAlerts } from './tour';
 import { villageAlerts } from './village';
 import type { GameState } from './types';
 
@@ -25,6 +26,8 @@ export interface MoreAlerts {
   village: number;
   /** 정산 대기가 쌓인 라디오가 있으면 1 */
   radio: number;
+  /** 정산할 수 있는 순회공연 칸이 있으면 1 */
+  tour: number;
   total: number;
 }
 
@@ -38,5 +41,6 @@ export function moreAlerts(s: GameState): MoreAlerts {
   const stats = certsClaimable(s);
   const village = villageAlerts(s);
   const radio = radioAlerts(s);
-  return { missions, mail, monogram, collect, nurture, skills, stats, village, radio, total: missions + mail + monogram + collect + nurture + skills + stats + village + radio };
+  const tour = tourAlerts(s);
+  return { missions, mail, monogram, collect, nurture, skills, stats, village, radio, tour, total: missions + mail + monogram + collect + nurture + skills + stats + village + radio + tour };
 }

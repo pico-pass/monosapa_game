@@ -1,4 +1,4 @@
-import type { BuildingId, CampaignId, CardRarity, CostumeId, CounterKey, DarkCostumeId, DiamondUpgradeKind, EquipmentKind, GoodsId, ItemId, Persona, PostKind, SnackId, SkillId, StageId, StreamPlatform, ThemeId, Vibe } from './types';
+import type { BuildingId, CampaignId, CardRarity, CostumeId, CounterKey, DarkCostumeId, DiamondUpgradeKind, EquipmentKind, GoodsId, ItemId, Persona, PostKind, SnackId, SkillId, StageId, StreamPlatform, ThemeId, TourCityId, TourRegion, Vibe } from './types';
 
 /**
  * 모든 경제 수치는 이 파일 한 곳에서만 수정한다. (기획서 3~7, 11장)
@@ -1550,6 +1550,45 @@ export const BALANCE = {
     alertHours: 6,
   },
   /**
+   * 순회공연 「투어 지도」(사용자가 고른 콘텐츠 팩 3의 아이디어, 수치는 모두 제안값): 월클 콘서트를 클리어하면 열린다. 서울에서 출발해 연결된 도시를 이어 노선을 짜고
+   * 도시마다 세울 자아를 골라 출발하면, 비행(실제 시간)과 공연을 거쳐 칸마다 정산된다. 설계는 docs/pack3-design.md.
+   *   시간: 비행 1시간 = 현실 flightMsPerHour, 공연 한 번 = showMs. 이륙 지연 사건은 그 칸의 비행이 delayMult배.
+   *   칸 수: 처음 baseLegs, 투어를 legsEvery번 마칠 때마다 +1, 최대 maxLegs. 한 도시는 한 투어에 한 번.
+   *   결과: 공연 힘(출발 때의 그 자아 전투력 배율 = 전투력 ÷ 레벨 기본 전투력) × 도시 궁합 × 노선 시너지 ÷ 도시 난이도(difficulty[단계−1]) × ±noise 변수로 S·A·B·C를 정한다.
+   *     노선 시너지 = (1 + 같은 지역을 바로 앞 칸에서 이어 간 수 × regionStreak, 최대 regionStreakMax) × (1 − 장거리(longHaulHours 이상)를 바로 앞 칸에서 이어 탄 수 × longHaulPenalty, 최대 longHaulMax칸)
+   *   보상(칸마다): 코인 = 인세(그 자아) × 도시 단계 × coinSecs초 × 등급 배율 × (이번 주 핫 도시 hotMult) , 팬 = 도시 단계 × fansPct × 등급 배율 × 팬 획득 배율.
+   *     네 지역을 모두 지나면 마지막 칸의 코인·팬이 grandTour배(투어 완주). 돌발 사건은 칸마다 씨앗으로 event 확률.
+   *   기념품: 도시에서 처음 A 이상을 받으면 하나, 다이아 단계 × souvenirDiamonds. 하나마다 그 지역 갈래 +souvenirBonus, 한 지역(세 도시)을 다 모으면 그 지역 +regionBonus와 다이아 regionDiamonds,
+   *     열두 도시를 다 모으면 다이아 allDiamonds를 한 번 더(처음 모은 순간에만 받는다). 지역 갈래: 아시아 라임 · 유럽 인세 · 아메리카 팬 · 오세아니아·중동 전투력.
+   */
+  tour: {
+    flightMsPerHour: 6 * 60_000,
+    showMs: 15 * 60_000,
+    baseLegs: 3,
+    legsEvery: 3,
+    maxLegs: 8,
+    regionStreak: 0.1,
+    regionStreakMax: 0.3,
+    longHaulHours: 8,
+    longHaulPenalty: 0.05,
+    longHaulMax: 4,
+    grandTour: 1.2,
+    gradeAt: { S: 1.5, A: 1, B: 0.6 },
+    gradeMult: { S: 2, A: 1.4, B: 1, C: 0.5 },
+    noise: 0.1,
+    coinSecs: 120,
+    fansPct: 0.0003,
+    /** 도시 단계(1~5)마다의 난이도(전투력 배율과 견준다). 레벨에 따른 기본 전투력은 이미 배율에서 빠져 있어서 후반에도 장비·클릭·보너스·노선이 등급을 가른다. */
+    difficulty: [1.8, 2.5, 3.5, 5, 7] as readonly number[],
+    event: { delay: 0.04, hit: 0.04, lost: 0.03, guest: 0.04, delayMult: 1.3, hitMult: 1.5, lostMult: 0.8, guestMult: 1.2 },
+    hotMult: 2,
+    souvenirBonus: 0.003,
+    regionBonus: 0.02,
+    souvenirDiamonds: 2,
+    regionDiamonds: 20,
+    allDiamonds: 60,
+  },
+  /**
    * 팬 마을: 팬들이 사는 8×8 땅의 가운데부터 팬 수에 따라(sides) 4×4 → 6×6 → 8×8로 넓어진다.
    * 땅은 세로로 세 구역이다(열 0~2 해 드는 거리 = 일반, 3~4 황혼 골목 = 경계, 5~7 지하 골목 = 어둠). 합주실만 구역을 탄다:
    *   일반 구역은 일반 라임에 100%, 어둠 구역은 어둠 라임에 100%, 황혼 골목은 양쪽에 twilightShare씩.
@@ -2093,3 +2132,66 @@ export const ENDLESS: readonly EndlessDef[] = [
 /** 단계 수 상한. 지표 값이 재화 상한(1e15)을 넘지 못하니 실제로는 닿지 않는다. */
 export const ENDLESS_MAX_TIER = 200;
 export const endlessGoal = (def: Pick<EndlessDef, 'base' | 'growth'>, tier: number): number => Math.ceil(def.base * def.growth ** (tier - 1));
+
+/** 순회공연 도시. tier는 공연 규모(1~5), affinity는 자아 궁합(그 도시에서 그 자아의 공연 힘 배율). */
+export interface TourCityDef {
+  id: TourCityId;
+  region: TourRegion;
+  tier: 1 | 2 | 3 | 4 | 5;
+  affinity: Record<Persona, number>;
+}
+export const TOUR_CITIES: readonly TourCityDef[] = [
+  { id: 'tokyo', region: 'asia', tier: 3, affinity: { normal: 0.9, dark: 1.2 } },
+  { id: 'bangkok', region: 'asia', tier: 1, affinity: { normal: 1.2, dark: 0.9 } },
+  { id: 'singapore', region: 'asia', tier: 2, affinity: { normal: 1, dark: 1 } },
+  { id: 'london', region: 'europe', tier: 4, affinity: { normal: 1, dark: 1.1 } },
+  { id: 'paris', region: 'europe', tier: 4, affinity: { normal: 1.3, dark: 0.8 } },
+  { id: 'berlin', region: 'europe', tier: 3, affinity: { normal: 0.8, dark: 1.3 } },
+  { id: 'newyork', region: 'america', tier: 5, affinity: { normal: 1, dark: 1 } },
+  { id: 'la', region: 'america', tier: 4, affinity: { normal: 1.2, dark: 0.9 } },
+  { id: 'saopaulo', region: 'america', tier: 3, affinity: { normal: 1.3, dark: 0.8 } },
+  { id: 'sydney', region: 'oceania', tier: 3, affinity: { normal: 1.1, dark: 0.9 } },
+  { id: 'dubai', region: 'oceania', tier: 3, affinity: { normal: 1, dark: 1.1 } },
+  { id: 'istanbul', region: 'oceania', tier: 2, affinity: { normal: 0.9, dark: 1.2 } },
+];
+export const TOUR_CITY_IDS: readonly TourCityId[] = TOUR_CITIES.map((c) => c.id);
+export const tourCityById = (id: string): TourCityDef | undefined => TOUR_CITIES.find((c) => c.id === id);
+export const TOUR_REGIONS: readonly TourRegion[] = ['asia', 'europe', 'america', 'oceania'];
+/** 지역 기념품이 올리는 갈래: 아시아 라임 · 유럽 인세 · 아메리카 팬 · 오세아니아·중동 전투력 */
+export const TOUR_REGION_VIBE: Record<TourRegion, Vibe> = { asia: 'rhyme', europe: 'coin', america: 'fan', oceania: 'power' };
+/** 출발지(서울)를 뺀 비행 노선(양방향) [도시, 도시, 비행 시간] */
+export const TOUR_HOME = 'seoul';
+export const TOUR_FLIGHTS: readonly (readonly [string, string, number])[] = [
+  ['seoul', 'tokyo', 2],
+  ['seoul', 'bangkok', 5],
+  ['seoul', 'singapore', 6],
+  ['seoul', 'sydney', 10],
+  ['seoul', 'dubai', 9],
+  ['tokyo', 'bangkok', 6],
+  ['tokyo', 'singapore', 7],
+  ['tokyo', 'sydney', 9],
+  ['tokyo', 'la', 10],
+  ['bangkok', 'singapore', 2],
+  ['bangkok', 'dubai', 6],
+  ['singapore', 'sydney', 8],
+  ['singapore', 'dubai', 7],
+  ['dubai', 'istanbul', 4],
+  ['dubai', 'london', 7],
+  ['istanbul', 'london', 4],
+  ['istanbul', 'paris', 4],
+  ['istanbul', 'berlin', 3],
+  ['london', 'paris', 1],
+  ['london', 'berlin', 2],
+  ['paris', 'berlin', 2],
+  ['london', 'newyork', 8],
+  ['paris', 'newyork', 8],
+  ['paris', 'saopaulo', 11],
+  ['newyork', 'la', 5],
+  ['newyork', 'saopaulo', 10],
+  ['la', 'saopaulo', 11],
+];
+/** 두 도시(서울 포함)를 잇는 비행 시간. 노선이 없으면 null. */
+export function tourFlightHours(a: string, b: string): number | null {
+  const f = TOUR_FLIGHTS.find(([x, y]) => (x === a && y === b) || (x === b && y === a));
+  return f ? f[2] : null;
+}

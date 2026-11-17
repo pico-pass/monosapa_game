@@ -1,4 +1,4 @@
-import { BALANCE, CARD_RARITIES, FEAT_NPCS, PHOTO_GRADES, PHOTO_SETS, SKILL_IDS, STREAM_CERT_VIBE, STREAM_PLATFORMS, featDefById, photoCardId, titlePerkOf, type FeatDef } from './balance';
+import { BALANCE, CARD_RARITIES, FEAT_NPCS, PHOTO_GRADES, PHOTO_SETS, SKILL_IDS, STREAM_CERT_VIBE, STREAM_PLATFORMS, TOUR_CITIES, TOUR_REGIONS, TOUR_REGION_VIBE, featDefById, photoCardId, titlePerkOf, type FeatDef } from './balance';
 import { nurtureBonus } from './nurturedata';
 import { mulberry32 } from './runner';
 import { mix } from './streaming';
@@ -183,9 +183,9 @@ export interface Bonuses {
   offlineMs: number;
 }
 
-export type BonusState = Pick<GameState, 'cards' | 'photo' | 'feat' | 'mascot' | 'nurture' | 'singles' | 'lastSettledAt' | 'skills' | 'streaming' | 'cosmetics' | 'village'>;
+export type BonusState = Pick<GameState, 'cards' | 'photo' | 'feat' | 'mascot' | 'nurture' | 'singles' | 'lastSettledAt' | 'skills' | 'streaming' | 'cosmetics' | 'village' | 'tour'>;
 
-/** 수집품·레벨 스킬·스트리밍 인증·칭호·팬 마을이 주는 영구 보너스. 아무것도 없으면 전부 0이라 곱하는 쪽은 ×1이다. 마스코트 기분은 lastSettledAt 시점 기준이다. */
+/** 수집품·레벨 스킬·스트리밍 인증·칭호·팬 마을·순회공연 기념품이 주는 영구 보너스. 아무것도 없으면 전부 0이라 곱하는 쪽은 ×1이다. 마스코트 기분은 lastSettledAt 시점 기준이다. */
 export function bonuses(s: BonusState): Bonuses {
   const b: Bonuses = { rhyme: { normal: 0, dark: 0 }, coin: 0, coinBy: { normal: 0, dark: 0 }, fan: 0, power: 0, offlineMs: 0 };
   const add = (vibe: Vibe, v: number, persona?: Persona) => {
@@ -239,6 +239,12 @@ export function bonuses(s: BonusState): Bonuses {
   b.rhyme.normal += village.rhyme.normal;
   b.rhyme.dark += village.rhyme.dark;
   b.offlineMs += village.offlineMs;
+  // 순회공연 기념품: 도시마다 그 지역 갈래 +souvenirBonus, 한 지역(세 도시)을 다 모으면 +regionBonus
+  for (const region of TOUR_REGIONS) {
+    const cities = TOUR_CITIES.filter((c) => c.region === region);
+    const have = cities.filter((c) => s.tour.souvenirs[c.id] !== undefined).length;
+    if (have > 0) add(TOUR_REGION_VIBE[region], have * BALANCE.tour.souvenirBonus + (have === cities.length ? BALANCE.tour.regionBonus : 0));
+  }
   for (const p of ['normal', 'dark'] as const) {
     b.rhyme[p] += mascotBonus(s.mascot[p], s.lastSettledAt);
     // 모노사파 육성 레벨: 그 자아의 라임·인세, 이정표 레벨은 일반이 팬 획득, 어둠이 전투력

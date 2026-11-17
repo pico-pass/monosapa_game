@@ -50,6 +50,7 @@ async function render(tab: TabId, game: GameState): Promise<string> {
     village: () => import('../VillageScreen'),
     boss: () => import('../BossScreen'),
     radio: () => import('../RadioScreen'),
+    tour: () => import('../TourScreen'),
     release: () => import('../ReleaseScreen'),
     nurture: () => import('../NurtureScreen'),
     friends: () => import('../FriendsScreen'),
@@ -112,7 +113,7 @@ describe('새 화면 렌더링', () => {
 
   it('더보기: 알림 점과 메뉴', async () => {
     const html = await render('more', richState());
-    for (const name of ['상점', '미션·출석', '업적·칭호', '팬 DM', '모노그램', '챗방', '문의함', '모노사파 FM']) expect(html).toContain(name);
+    for (const name of ['상점', '미션·출석', '업적·칭호', '팬 DM', '모노그램', '챗방', '문의함', '모노사파 FM', '순회공연']) expect(html).toContain(name);
     expect(html).toContain('dot-badge');
   });
 
@@ -191,6 +192,67 @@ describe('새 화면 렌더링', () => {
     for (let set = 1; set <= 6; set++) for (let grade = 1; grade <= 6; grade++) owned[`p${set}-${grade}`] = 1;
     const full = await renderNamed(loader, 'ShopScreen', 'shop', { ...g, photo: { ...g.photo, owned } });
     expect(full).toContain('카드를 모두 모았어요');
+  });
+
+  it('순회공연: 월클 전에는 잠겨 있고, 열리면 지도·이어 갈 도시·도감이 보인다', async () => {
+    const locked = await render('tour', createInitialState(T0));
+    expect(locked).toContain('월클 콘서트를 클리어하면');
+    expect(locked).not.toContain('노선 짜기');
+    const html = await render('tour', { ...richState(), lastSettledAt: T0 });
+    expect(html).toContain('순회공연');
+    expect(html).toContain('이번 주 핫 도시');
+    expect(html).toContain('마친 투어 0번');
+    expect(html).toContain('기념품 0 / 12');
+    expect(html).toContain('노선 짜기');
+    expect(html).toContain('aria-label="순회공연 지도"');
+    expect(html).toContain('서울에서 출발해요');
+    expect(html).toContain('이어 갈 수 있는 도시');
+    for (const city of ['도쿄', '방콕', '싱가포르', '시드니', '두바이']) expect(html, city).toContain(city);
+    expect(html).not.toContain('aria-label="런던 추가"'); // 서울에서 바로 못 가는 도시
+    expect(html).toContain('기념품 도감');
+    for (const region of ['아시아', '유럽', '아메리카', '오세아니아·중동']) expect(html, region).toContain(region);
+    expect(html).toContain('최대 3곳까지');
+  });
+
+  it('순회공연: 진행 중이면 칸별 단계와 정산 버튼이, 정산 뒤에는 결과 카드가 보인다', async () => {
+    const g = { ...richState(), lastSettledAt: T0 + 40 * 60_000 };
+    const run = { no: 1, route: ['tokyo', 'bangkok', 'singapore'], personas: ['normal', 'dark', 'normal'], startedAt: T0, paid: 0, power: { normal: 3, dark: 3 } };
+    const going = await render('tour', { ...g, tour: { ...g.tour, active: run as never, started: 1 } });
+    expect(going).toContain('투어 진행 중');
+    expect(going).toContain('투어 #1');
+    expect(going).toContain('1. 도쿄');
+    expect(going).toContain('🎁 정산할 수 있어요');
+    expect(going).toContain('정산 받기 (1곳)');
+    expect(going).toContain('✈️ 비행 중');
+    expect(going).toContain('투어 중단');
+    expect(going).not.toContain('노선 짜기'); // 진행 중에는 새 노선을 못 짠다
+    const none = await render('tour', { ...g, lastSettledAt: T0 + 5 * 60_000, tour: { ...g.tour, active: run as never, started: 1 } });
+    expect(none).toContain('아직 끝난 공연이 없어요');
+
+    const claim = {
+      results: [{ index: 0, city: 'tokyo', persona: 'normal', grade: 3, ratio: 2, event: 'hit', hot: true, grand: false, coinSecs: 1, coins: 1234, fansPct: 0.001, fans: 50, souvenir: true, diamonds: 6 }],
+      coins: 1234,
+      fans: 50,
+      diamonds: 6,
+      finished: true,
+    };
+    const result = await renderNamed(() => import('../TourScreen'), 'TourScreen', 'tour', { ...richState(), lastSettledAt: T0 }, { tourResult: claim });
+    expect(result).toContain('방금 정산한 공연');
+    expect(result).toContain('도쿄 타워 키링');
+    expect(result).toContain('현지 반응이 폭발했어요');
+    expect(result).toContain('💎 +6');
+    expect(result).toContain('투어를 마쳤어요');
+  });
+
+  it('순회공연: 기념품을 얻은 도시는 도감에 이름과 최고 등급이 보인다', async () => {
+    const g = { ...richState(), lastSettledAt: T0 };
+    const html = await render('tour', { ...g, tour: { ...g.tour, count: 2, souvenirs: { tokyo: 1 }, best: { tokyo: 3, bangkok: 1 } } });
+    expect(html).toContain('마친 투어 2번');
+    expect(html).toContain('기념품 1 / 12');
+    expect(html).toContain('도쿄 타워 키링');
+    expect(html).toContain('최고 S');
+    expect(html).toContain('최고 B');
+    expect(html).toContain('A 등급 이상이면 기념품을 받아요');
   });
 
   it('라디오국: 팬이 모자라면 잠겨 있고, 열리면 24칸 편성표·정산 대기·자동 편성이 보인다', async () => {
